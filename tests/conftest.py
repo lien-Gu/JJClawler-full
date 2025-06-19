@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client():
-    """测试客户端fixture，在实现main.py后启用"""
-    # TODO: 在main.py实现后，导入app并创建TestClient
-    pass
+    """测试客户端fixture"""
+    from app.main import app
+    return TestClient(app)
 
 
 @pytest.fixture
