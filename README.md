@@ -56,132 +56,176 @@
 
 ### 3.1 技术选型
 
-| 技术栈 | 选择             | 选择理由 |
-|--------|----------------|----------|
-| 编程语言 | Python 3.10+   | 爬虫生态成熟，开发效率高 |
-| Web框架 | FastAPI        | 高性能，自动生成API文档 |
-| HTTP库 | Requests       | 简单易用，稳定可靠 |
-| 数据库 | SQLite → MySQL | 开发用SQLite，生产可迁移MySQL |
-| ORM | SQLAlchemy     | 功能强大，支持多种数据库 |
-| 任务调度 | APScheduler    | 轻量级，满足需求 |
-| 容器化 | Docker         | 便于部署和环境一致性 |
+| 技术栈 | 选择 | 选择理由 |
+|--------|------|----------|
+| 编程语言 | Python 3.13+ | 爬虫生态成熟，开发效率高 |
+| Web框架 | FastAPI | 高性能，自动生成API文档，轻量级 |
+| HTTP库 | httpx | 异步支持，性能更好 |
+| 数据存储 | JSON文件 | 轻量级，便于调试和查看 |
+| 任务调度 | cron + shell | 简单可靠，易于管理 |
+| 依赖管理 | Poetry | 现代Python包管理 |
 
-### 3.2 系统架构图
+### 3.2 基于接口驱动的模块化架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    客户端层                          │
-│            (Web前端 / 移动端 / API调用方)            │
+│                  API接口层                           │
+│              (定义所有对外接口)                       │
+└─────────────────────────────────────────────────────┘
+                            │
+                    根据接口确定功能模块
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                  功能模块层                          │
+│   爬虫模块    数据模块    统计模块    任务模块        │
 └─────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────┐
-│                    API网关层                         │
-│                 FastAPI Router                       │
-│          /rankings  /novels  /tasks  /stats         │
-└─────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        ▼                   ▼                   ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  业务逻辑层  │    │  任务调度层  │    │  爬虫引擎层  │
-│  API Service │    │  Scheduler   │    │   Crawler    │
-└─────────────┘    └─────────────┘    └─────────────┘
-        │                   │                   │
-        └───────────────────┼───────────────────┘
-                            ▼
-┌─────────────────────────────────────────────────────┐
-│                    数据访问层                        │
-│                  SQLAlchemy ORM                      │
-└─────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────┐
-│                    数据存储层                        │
-│                  SQLite / MySQL                      │
+│                  工具支持层                          │
+│      HTTP工具   文件工具   时间工具   日志工具       │
 └─────────────────────────────────────────────────────┘
 ```
 
-### 3.3 模块设计
+### 3.3 接口驱动的开发流程
 
-#### 3.3.1 核心模块
+#### 3.3.1 第一阶段：接口定义
+1. 根据需求确定所有API接口
+2. 定义接口的输入输出格式
+3. 创建接口路由和基础结构
 
-| 模块名称 | 职责 | 主要组件 |
-|---------|------|----------|
-| main.py | 应用入口 | FastAPI实例、生命周期管理 |
-| config.py | 配置管理 | 环境变量、URLs配置加载 |
-| models.py | 数据模型 | ORM模型定义、数据库连接 |
-| crawler.py | 爬虫核心 | HTTP请求、重试机制、数据采集 |
-| scheduler.py | 任务调度 | 定时任务、任务管理 |
-| api/endpoints.py | API接口 | RESTful接口实现 |
-| utils/parser.py | 数据解析 | 响应解析、数据转换 |
+#### 3.3.2 第二阶段：功能模块拆分
+根据接口需求，拆分为以下独立模块：
 
-#### 3.3.2 数据流程
+| 模块名称 | 负责接口 | 核心功能 | 文件位置 |
+|---------|---------|---------|----------|
+| 爬虫模块 | `/crawl/*` | 数据采集、解析、存储 | `modules/crawler.py` |
+| 数据模块 | `/api/v1/rankings`, `/api/v1/novels` | 数据查询、过滤、分页 | `modules/data_service.py` |
+| 统计模块 | `/api/v1/stats` | 数据统计、分析 | `modules/stats_service.py` |
+| 任务模块 | `/api/v1/tasks`, `/api/v1/jobs` | 任务状态管理 | `modules/task_service.py` |
 
+#### 3.3.3 第三阶段：模块独立开发
+每个模块包含：
+- 接口实现函数
+- 数据处理逻辑  
+- 单元测试
+- 模块配置
+
+### 3.4 数据存储简化设计
+
+使用JSON文件存储，按日期和类型分类：
 ```
-用户请求 → API接口 → 业务逻辑处理 → 数据库查询 → 返回结果
-    ↓
-定时触发 → 调度器 → 爬虫任务 → 数据解析 → 存储数据库
+data/
+├── rankings/
+│   ├── 2024-01-01/
+│   │   ├── jiazi.json
+│   │   └── fenlei.json
+├── novels/
+│   └── novel_details.json
+└── tasks/
+    └── task_history.json
 ```
 
 ## 4. 详细设计
 
-### 4.1 数据库设计
+### 4.1 API接口优先设计
 
-#### 4.1.1 数据表结构
+根据需求分析，按优先级定义接口：
 
-**ranking_data（榜单数据表）**
-| 字段名 | 类型 | 说明 | 约束 |
-|--------|------|------|------|
-| id | INTEGER | 主键 | PRIMARY KEY |
-| page_type | VARCHAR(50) | 页面类型 | INDEX |
-| channel | VARCHAR(50) | 频道标识 | INDEX |
-| zh_name | VARCHAR(50) | 中文名称 | - |
-| crawl_time | DATETIME | 爬取时间 | INDEX |
-| data | JSON | 完整榜单数据 | - |
-| created_at | DATETIME | 创建时间 | DEFAULT NOW |
+#### 4.1.1 P0接口（核心功能）
 
-**novels（小说信息表）**
-| 字段名 | 类型 | 说明 | 约束 |
-|--------|------|------|------|
-| id | INTEGER | 主键 | PRIMARY KEY |
-| novel_id | VARCHAR(50) | 小说ID | UNIQUE INDEX |
-| title | VARCHAR(200) | 书名 | - |
-| author | VARCHAR(100) | 作者 | INDEX |
-| tags | JSON | 标签列表 | - |
-| data | JSON | 完整数据 | - |
-| last_updated | DATETIME | 最后更新 | - |
-| created_at | DATETIME | 创建时间 | DEFAULT NOW |
+**1. 健康检查接口**
+```
+GET /health
+响应: {"status": "ok", "timestamp": "2024-01-01T00:00:00Z"}
+```
 
-**crawl_tasks（爬取任务表）**
-| 字段名 | 类型 | 说明 | 约束 |
-|--------|------|------|------|
-| id | INTEGER | 主键 | PRIMARY KEY |
-| task_type | VARCHAR(50) | 任务类型 | - |
-| channel | VARCHAR(50) | 频道 | - |
-| status | VARCHAR(20) | 状态 | - |
-| start_time | DATETIME | 开始时间 | - |
-| end_time | DATETIME | 结束时间 | - |
-| error_message | TEXT | 错误信息 | - |
-| items_crawled | INTEGER | 爬取条目数 | DEFAULT 0 |
-| created_at | DATETIME | 创建时间 | DEFAULT NOW |
+**2. 榜单数据接口**
+```
+GET /api/v1/rankings/latest
+响应: {"count": 50, "data": [ranking_items]}
 
-### 4.2 API接口设计
+GET /api/v1/rankings
+参数: page_type, channel, date, limit, offset
+响应: {"total": 1000, "data": [ranking_items]}
+```
 
-#### 4.2.1 接口清单
+**3. 小说信息接口**
+```
+GET /api/v1/novels/{novel_id}
+响应: {novel_detail}
 
-| 方法 | 路径 | 功能 | 请求参数 | 响应格式 |
-|------|------|------|----------|----------|
-| GET | /health | 健康检查 | - | {status, timestamp} |
-| GET | /api/v1/rankings | 获取榜单列表 | page_type, channel, limit, offset | {total, data[]} |
-| GET | /api/v1/rankings/latest | 获取最新榜单 | - | {count, data[]} |
-| GET | /api/v1/novels | 获取小说列表 | author, status, limit, offset | {total, data[]} |
-| GET | /api/v1/novels/{novel_id} | 获取小说详情 | novel_id | {novel_data} |
-| GET | /api/v1/tasks | 获取任务列表 | status, limit | {count, data[]} |
-| GET | /api/v1/jobs | 获取调度任务 | - | {jobs[]} |
-| POST | /api/v1/crawl/jiazi | 触发夹子爬取 | - | {message} |
-| POST | /api/v1/crawl/page | 触发页面爬取 | page_type, channel | {message} |
-| GET | /api/v1/stats | 获取统计信息 | - | {statistics} |
+GET /api/v1/novels
+参数: author, tags, limit, offset
+响应: {"total": 500, "data": [novel_items]}
+```
+
+**4. 爬虫触发接口**
+```
+POST /api/v1/crawl/jiazi
+响应: {"message": "Task started", "task_id": "xxx"}
+
+POST /api/v1/crawl/page
+参数: {"page_type": "fenlei", "channel": "yanqing"}
+响应: {"message": "Task started", "task_id": "xxx"}
+```
+
+#### 4.1.2 P1接口（管理功能）
+
+**5. 任务管理接口**
+```
+GET /api/v1/tasks
+参数: status, limit
+响应: {"count": 10, "data": [task_items]}
+
+GET /api/v1/tasks/{task_id}
+响应: {task_detail}
+```
+
+**6. 统计信息接口**
+```
+GET /api/v1/stats
+响应: {
+  "total_novels": 1000,
+  "total_rankings": 50,
+  "last_crawl_time": "2024-01-01T00:00:00Z",
+  "crawl_success_rate": 0.95
+}
+```
+
+### 4.2 基于接口的功能模块拆分
+
+根据上述接口设计，将功能拆分为以下独立模块：
+
+#### 4.2.1 爬虫模块 (modules/crawler.py)
+**负责接口**: `/api/v1/crawl/*`
+**核心功能**:
+- 夹子榜单爬取
+- 分类榜单爬取  
+- 数据解析和存储
+- 异常处理和重试
+
+#### 4.2.2 数据服务模块 (modules/data_service.py)
+**负责接口**: `/api/v1/rankings/*`, `/api/v1/novels/*`
+**核心功能**:
+- 榜单数据查询和过滤
+- 小说信息查询
+- 数据分页处理
+- JSON文件读取优化
+
+#### 4.2.3 任务管理模块 (modules/task_service.py)
+**负责接口**: `/api/v1/tasks/*`
+**核心功能**:
+- 任务状态跟踪
+- 任务历史记录
+- 异步任务处理
+
+#### 4.2.4 统计服务模块 (modules/stats_service.py)
+**负责接口**: `/api/v1/stats`
+**核心功能**:
+- 数据统计计算
+- 系统运行状态监控
+- 性能指标收集
 
 ### 4.3 爬虫策略设计
 
