@@ -46,6 +46,10 @@ class RankingService:
     def get_all_rankings(self) -> List[RankingInfo]:
         """获取所有榜单配置"""
         rankings = self.ranking_dao.get_all()
+        if not rankings:
+            logger.info("数据库中暂无榜单数据，需要先执行爬虫任务")
+            return []
+            
         return [
             RankingInfo(
                 id=ranking.id,
@@ -78,6 +82,7 @@ class RankingService:
         )
         
         if not results:
+            logger.info(f"榜单 {ranking_id} 暂无数据，可能需要先执行爬虫任务")
             return ranking_info, [], actual_snapshot_time
         
         # 转换为BookInRanking

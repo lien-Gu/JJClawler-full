@@ -71,6 +71,10 @@ class BookService:
             offset=offset
         )
         
+        if not books:
+            logger.info("数据库中暂无书籍数据，需要先执行爬虫任务")
+            return [], 0
+        
         # 转换为BookDetail
         book_details = []
         for book in books:
