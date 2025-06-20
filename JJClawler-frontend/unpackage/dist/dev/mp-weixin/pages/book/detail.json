@@ -1,6 +1,4 @@
 {
   "navigationBarTitleText": "书籍详情",
-  "usingComponents": {
-    "ranking-card": "../../components/RankingCard"
-  }
+  "usingComponents": {}
 }

@@ -1,38 +1,69 @@
 "use strict";
 const common_vendor = require("../../common/vendor.js");
-const utils_request = require("../../utils/request.js");
 const utils_storage = require("../../utils/storage.js");
-const RankingCard = () => "../../components/RankingCard.js";
 const _sfc_main = {
   name: "BookDetailPage",
-  components: {
-    RankingCard
-  },
   data() {
     return {
       // 书籍ID
       bookId: "",
       // 书籍数据
-      bookData: {},
-      // 榜单历史列表
-      rankingsList: [],
-      // 相关推荐书籍
-      recommendedBooks: [],
-      // 简介展开状态
-      descriptionExpanded: false,
-      // 榜单弹窗显示状态
-      showRankingsPopup: false,
+      bookData: {
+        title: "",
+        author: "",
+        cover: "",
+        category: "",
+        status: "",
+        currentStats: {
+          collectCount: 0,
+          avgClickPerChapter: 0
+        },
+        rankings: []
+      },
+      // 当前选中的tab
+      activeTab: "collect",
+      // 'collect' | 'click'
+      // 历史数据
+      historyStats: {
+        dates: [],
+        collectHistory: [],
+        clickHistory: []
+      },
       // 加载状态
-      loading: false,
-      loadingRankings: false
+      loading: false
     };
   },
   computed: {
     /**
-     * 显示的榜单列表（前3个）
+     * 当前显示的历史数据
      */
-    displayRankings() {
-      return this.rankingsList.slice(0, 3);
+    historyData() {
+      if (this.activeTab === "collect") {
+        return this.historyStats.collectHistory || [];
+      } else {
+        return this.historyStats.clickHistory || [];
+      }
+    },
+    /**
+     * 图表点位数据
+     */
+    chartPoints() {
+      if (this.historyData.length === 0)
+        return [];
+      const maxValue = Math.max(...this.historyData);
+      const minValue = Math.min(...this.historyData);
+      const range = maxValue - minValue || 1;
+      return this.historyData.map((value, index) => ({
+        x: index / (this.historyData.length - 1) * 100,
+        y: (value - minValue) / range * 80 + 10,
+        value: this.formatNumber(value)
+      }));
+    },
+    /**
+     * 图表连接线点位
+     */
+    chartLinePoints() {
+      return this.chartPoints.map((point) => `${point.x},${100 - point.y}`).join(" ");
     }
   },
   onLoad(options) {
@@ -57,11 +88,10 @@ const _sfc_main = {
         this.loadCachedData();
         await Promise.all([
           this.fetchBookInfo(),
-          this.fetchRankingsHistory(),
-          this.fetchRecommendations()
+          this.fetchHistoryStats()
         ]);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/book/detail.vue:251", "初始化数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/book/detail.vue:264", "初始化数据失败:", error);
         this.showError("数据加载失败");
       } finally {
         this.loading = false;
@@ -71,65 +101,106 @@ const _sfc_main = {
      * 加载缓存数据
      */
     loadCachedData() {
-      const cachedBook = utils_storage.getSync(`book_${this.bookId}`);
-      const cachedRankings = utils_storage.getSync(`book_rankings_${this.bookId}`);
-      const cachedRecommendations = utils_storage.getSync(`book_recommendations_${this.bookId}`);
+      const cachedBook = utils_storage.getSync(`book_detail_${this.bookId}`);
+      const cachedHistory = utils_storage.getSync(`book_history_${this.bookId}`);
       if (cachedBook) {
-        this.bookData = cachedBook;
+        this.bookData = { ...this.bookData, ...cachedBook };
       }
-      if (cachedRankings) {
-        this.rankingsList = cachedRankings;
-      }
-      if (cachedRecommendations) {
-        this.recommendedBooks = cachedRecommendations;
+      if (cachedHistory) {
+        this.historyStats = cachedHistory;
       }
     },
     /**
-     * 获取书籍信息
+     * 获取书籍详细信息
      */
     async fetchBookInfo() {
       try {
-        const data = await utils_request.get(`/api/books/${this.bookId}`);
-        if (data) {
-          this.bookData = data;
-          utils_storage.setSync(`book_${this.bookId}`, data, 30 * 60 * 1e3);
-        }
+        const data = await this.getMockBookData();
+        this.bookData = { ...this.bookData, ...data };
+        utils_storage.setSync(`book_detail_${this.bookId}`, data, 30 * 60 * 1e3);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/book/detail.vue:290", "获取书籍信息失败:", error);
+        common_vendor.index.__f__("error", "at pages/book/detail.vue:298", "获取书籍信息失败:", error);
         throw error;
       }
     },
     /**
-     * 获取榜单历史
+     * 获取历史统计数据
      */
-    async fetchRankingsHistory() {
-      this.loadingRankings = true;
+    async fetchHistoryStats() {
       try {
-        const data = await utils_request.get(`/api/books/${this.bookId}/rankings`);
-        if (data && data.list) {
-          this.rankingsList = data.list;
-          utils_storage.setSync(`book_rankings_${this.bookId}`, data.list, 15 * 60 * 1e3);
-        }
+        const data = await this.getMockHistoryData();
+        this.historyStats = data;
+        utils_storage.setSync(`book_history_${this.bookId}`, data, 15 * 60 * 1e3);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/book/detail.vue:308", "获取榜单历史失败:", error);
+        common_vendor.index.__f__("error", "at pages/book/detail.vue:314", "获取历史数据失败:", error);
         throw error;
-      } finally {
-        this.loadingRankings = false;
       }
     },
     /**
-     * 获取相关推荐
+     * 获取模拟书籍数据
      */
-    async fetchRecommendations() {
-      try {
-        const data = await utils_request.get(`/api/books/${this.bookId}/recommendations`, { limit: 8 });
-        if (data && data.list) {
-          this.recommendedBooks = data.list;
-          utils_storage.setSync(`book_recommendations_${this.bookId}`, data.list, 60 * 60 * 1e3);
-        }
-      } catch (error) {
-        common_vendor.index.__f__("error", "at pages/book/detail.vue:326", "获取相关推荐失败:", error);
+    async getMockBookData() {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return {
+        title: "霸道总裁的小娇妻",
+        author: "言情作家",
+        cover: "",
+        category: "现代言情",
+        status: "连载中",
+        currentStats: {
+          collectCount: 125847,
+          avgClickPerChapter: 2156
+        },
+        rankings: [
+          {
+            id: "ranking1",
+            name: "言情总榜",
+            currentRank: 15,
+            rankChange: -2,
+            updateTime: "2024-01-15T10:30:00"
+          },
+          {
+            id: "ranking2",
+            name: "新书榜",
+            currentRank: 8,
+            rankChange: 3,
+            updateTime: "2024-01-15T10:30:00"
+          },
+          {
+            id: "ranking3",
+            name: "收藏榜",
+            currentRank: 22,
+            rankChange: 0,
+            updateTime: "2024-01-15T10:30:00"
+          }
+        ]
+      };
+    },
+    /**
+     * 获取模拟历史数据
+     */
+    async getMockHistoryData() {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const dates = [];
+      const collectHistory = [];
+      const clickHistory = [];
+      const now = /* @__PURE__ */ new Date();
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        dates.push(date.toISOString().split("T")[0]);
+        const baseCollect = 12e4 + i * 200;
+        const collectVariation = Math.random() * 1e3 - 500;
+        collectHistory.push(Math.max(0, Math.floor(baseCollect + collectVariation)));
+        const baseClick = 2e6 + i * 5e3;
+        const clickVariation = Math.random() * 1e4 - 5e3;
+        clickHistory.push(Math.max(0, Math.floor(baseClick + clickVariation)));
       }
+      return {
+        dates,
+        collectHistory,
+        clickHistory
+      };
     },
     /**
      * 刷新数据
@@ -138,8 +209,7 @@ const _sfc_main = {
       try {
         await Promise.all([
           this.fetchBookInfo(),
-          this.fetchRankingsHistory(),
-          this.fetchRecommendations()
+          this.fetchHistoryStats()
         ]);
         common_vendor.index.showToast({
           title: "刷新成功",
@@ -151,88 +221,49 @@ const _sfc_main = {
       }
     },
     /**
-     * 切换关注状态
+     * 切换统计Tab
      */
-    async toggleFollow() {
-      try {
-        const action = this.bookData.isFollowed ? "unfollow" : "follow";
-        await utils_request.get(`/api/books/${this.bookId}/${action}`, {}, { method: "POST" });
-        this.bookData.isFollowed = !this.bookData.isFollowed;
-        common_vendor.index.showToast({
-          title: this.bookData.isFollowed ? "关注成功" : "取消关注",
-          icon: "success",
-          duration: 1500
-        });
-      } catch (error) {
-        this.showError("操作失败");
-      }
+    switchTab(tab) {
+      this.activeTab = tab;
     },
     /**
-     * 阅读书籍
+     * 获取排名变化样式类
      */
-    readBook() {
-      if (this.bookData.readUrl) {
-        common_vendor.index.navigateTo({
-          url: `/pages/reader/index?bookId=${this.bookId}`
-        });
-      } else {
-        common_vendor.index.showToast({
-          title: "阅读功能开发中",
-          icon: "none"
-        });
-      }
+    getRankChangeClass(change) {
+      if (!change || change === 0)
+        return "no-change";
+      return change > 0 ? "rank-up" : "rank-down";
     },
     /**
-     * 分享书籍
+     * 获取排名变化图标
      */
-    shareBook() {
-      common_vendor.index.share({
-        provider: "weixin",
-        scene: "WXSceneSession",
-        type: 0,
-        title: this.bookData.name || this.bookData.title,
-        summary: `推荐一本好书：${this.bookData.author ? "作者 " + this.bookData.author : ""}`,
-        success: () => {
-          common_vendor.index.showToast({
-            title: "分享成功",
-            icon: "success"
-          });
-        },
-        fail: () => {
-          this.showError("分享失败");
-        }
-      });
+    getRankChangeIcon(change) {
+      if (!change || change === 0)
+        return "—";
+      return change > 0 ? "↗" : "↘";
     },
     /**
-     * 切换简介展开状态
+     * 获取最大值
      */
-    toggleDescription() {
-      this.descriptionExpanded = !this.descriptionExpanded;
+    getMaxValue() {
+      return Math.max(...this.historyData);
     },
     /**
-     * 显示全部榜单
+     * 获取最小值
      */
-    showAllRankings() {
-      this.showRankingsPopup = true;
+    getMinValue() {
+      return Math.min(...this.historyData);
     },
     /**
-     * 隐藏榜单弹窗
+     * 获取平均增长
      */
-    hideRankingsPopup() {
-      this.showRankingsPopup = false;
-    },
-    /**
-     * 格式化字数
-     */
-    formatWordCount(count) {
-      if (typeof count !== "number")
-        return count || "0";
-      if (count >= 1e4) {
-        return (count / 1e4).toFixed(1) + "万";
-      } else if (count >= 1e3) {
-        return (count / 1e3).toFixed(1) + "k";
-      }
-      return count.toString();
+    getAverageGrowth() {
+      if (this.historyData.length < 2)
+        return "0%";
+      const first = this.historyData[0];
+      const last = this.historyData[this.historyData.length - 1];
+      const growth = ((last - first) / first * 100).toFixed(1);
+      return growth > 0 ? `+${growth}%` : `${growth}%`;
     },
     /**
      * 格式化数字
@@ -275,143 +306,89 @@ const _sfc_main = {
         icon: "none",
         duration: 2e3
       });
-    },
-    /**
-     * 跳转到榜单详情
-     */
-    goToRankingDetail(ranking) {
-      common_vendor.index.navigateTo({
-        url: `/pages/ranking/detail?id=${ranking.id}`
-      });
-    },
-    /**
-     * 跳转到书籍详情
-     */
-    goToBookDetail(book) {
-      if (book.id === this.bookId)
-        return;
-      common_vendor.index.redirectTo({
-        url: `/pages/book/detail?id=${book.id}`
-      });
     }
   }
 };
 if (!Array) {
-  const _component_RankingCard = common_vendor.resolveComponent("RankingCard");
-  _component_RankingCard();
+  const _component_polyline = common_vendor.resolveComponent("polyline");
+  const _component_svg = common_vendor.resolveComponent("svg");
+  (_component_polyline + _component_svg)();
 }
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
+  var _a, _b;
   return common_vendor.e({
     a: $data.bookData.cover
   }, $data.bookData.cover ? {
     b: $data.bookData.cover
   } : {}, {
-    c: common_vendor.t($data.bookData.name || $data.bookData.title || "书籍详情"),
+    c: common_vendor.t($data.bookData.title || $data.bookData.name || "书籍详情"),
     d: $data.bookData.author
   }, $data.bookData.author ? {
     e: common_vendor.t($data.bookData.author)
   } : {}, {
-    f: $data.bookData.category
+    f: $data.bookData.category || $data.bookData.status
+  }, $data.bookData.category || $data.bookData.status ? common_vendor.e({
+    g: $data.bookData.category
   }, $data.bookData.category ? {
-    g: common_vendor.t($data.bookData.category)
+    h: common_vendor.t($data.bookData.category)
   } : {}, {
-    h: $data.bookData.category && $data.bookData.status
+    i: $data.bookData.category && $data.bookData.status
   }, $data.bookData.category && $data.bookData.status ? {} : {}, {
-    i: $data.bookData.status
+    j: $data.bookData.status
   }, $data.bookData.status ? {
-    j: common_vendor.t($data.bookData.status)
-  } : {}, {
-    k: $data.bookData.status && $data.bookData.wordCount
-  }, $data.bookData.status && $data.bookData.wordCount ? {} : {}, {
-    l: $data.bookData.wordCount
-  }, $data.bookData.wordCount ? {
-    m: common_vendor.t($options.formatWordCount($data.bookData.wordCount))
-  } : {}, {
-    n: common_vendor.t($data.bookData.isFollowed ? "已关注" : "关注"),
-    o: $data.bookData.isFollowed ? 1 : "",
-    p: common_vendor.o((...args) => $options.toggleFollow && $options.toggleFollow(...args)),
-    q: common_vendor.o((...args) => $options.readBook && $options.readBook(...args)),
-    r: common_vendor.o((...args) => $options.shareBook && $options.shareBook(...args)),
-    s: common_vendor.t($options.formatNumber($data.bookData.readCount || 0)),
-    t: common_vendor.t($options.formatNumber($data.bookData.collectCount || 0)),
-    v: common_vendor.t($data.bookData.score || "暂无"),
-    w: common_vendor.t($options.formatTime($data.bookData.updateTime)),
-    x: $data.bookData.description
-  }, $data.bookData.description ? common_vendor.e({
-    y: common_vendor.t($data.bookData.description),
-    z: $data.descriptionExpanded ? 1 : "",
-    A: $data.bookData.description && $data.bookData.description.length > 100
-  }, $data.bookData.description && $data.bookData.description.length > 100 ? {
-    B: common_vendor.t($data.descriptionExpanded ? "收起" : "展开"),
-    C: common_vendor.o((...args) => $options.toggleDescription && $options.toggleDescription(...args))
+    k: common_vendor.t($data.bookData.status)
   } : {}) : {}, {
-    D: $data.bookData.tags && $data.bookData.tags.length
-  }, $data.bookData.tags && $data.bookData.tags.length ? {
-    E: common_vendor.f($data.bookData.tags, (tag, k0, i0) => {
+    l: common_vendor.t($options.formatNumber(((_a = $data.bookData.currentStats) == null ? void 0 : _a.collectCount) || 0)),
+    m: common_vendor.t($options.formatNumber(((_b = $data.bookData.currentStats) == null ? void 0 : _b.avgClickPerChapter) || 0)),
+    n: $data.bookData.rankings && $data.bookData.rankings.length > 0
+  }, $data.bookData.rankings && $data.bookData.rankings.length > 0 ? {
+    o: common_vendor.f($data.bookData.rankings, (ranking, k0, i0) => {
       return {
-        a: common_vendor.t(tag),
-        b: tag
+        a: common_vendor.t(ranking.name),
+        b: common_vendor.t(ranking.currentRank),
+        c: common_vendor.t($options.getRankChangeIcon(ranking.rankChange)),
+        d: common_vendor.t(Math.abs(ranking.rankChange || 0)),
+        e: common_vendor.n($options.getRankChangeClass(ranking.rankChange)),
+        f: common_vendor.t($options.formatTime(ranking.updateTime)),
+        g: ranking.id
       };
     })
   } : {}, {
-    F: $data.rankingsList.length > 3
-  }, $data.rankingsList.length > 3 ? {
-    G: common_vendor.o((...args) => $options.showAllRankings && $options.showAllRankings(...args))
-  } : {}, {
-    H: $data.rankingsList.length > 0
-  }, $data.rankingsList.length > 0 ? {
-    I: common_vendor.f($options.displayRankings, (ranking, k0, i0) => {
+    p: $data.activeTab === "collect" ? 1 : "",
+    q: common_vendor.o(($event) => $options.switchTab("collect")),
+    r: $data.activeTab === "click" ? 1 : "",
+    s: common_vendor.o(($event) => $options.switchTab("click")),
+    t: $options.historyData.length > 0
+  }, $options.historyData.length > 0 ? {
+    v: common_vendor.f(5, (i, k0, i0) => {
       return {
-        a: ranking.id,
-        b: common_vendor.o($options.goToRankingDetail, ranking.id),
-        c: "f3085b2f-0-" + i0,
-        d: common_vendor.p({
-          ranking,
-          showActions: false,
-          showPreview: false
-        })
-      };
-    })
-  } : !$data.loadingRankings ? {} : {}, {
-    J: !$data.loadingRankings,
-    K: $data.loadingRankings
-  }, $data.loadingRankings ? {} : {}, {
-    L: $data.recommendedBooks.length > 0
-  }, $data.recommendedBooks.length > 0 ? {
-    M: common_vendor.f($data.recommendedBooks, (book, k0, i0) => {
-      return common_vendor.e({
-        a: book.cover
-      }, book.cover ? {
-        b: book.cover
-      } : {}, {
-        c: common_vendor.t(book.name || book.title),
-        d: book.author
-      }, book.author ? {
-        e: common_vendor.t(book.author)
-      } : {}, {
-        f: book.id,
-        g: common_vendor.o(($event) => $options.goToBookDetail(book), book.id)
-      });
-    })
-  } : {}, {
-    N: $data.showRankingsPopup
-  }, $data.showRankingsPopup ? {
-    O: common_vendor.o((...args) => $options.hideRankingsPopup && $options.hideRankingsPopup(...args)),
-    P: common_vendor.f($data.rankingsList, (ranking, k0, i0) => {
-      return {
-        a: ranking.id,
-        b: common_vendor.o($options.goToRankingDetail, ranking.id),
-        c: "f3085b2f-1-" + i0,
-        d: common_vendor.p({
-          ranking,
-          showActions: false,
-          showPreview: false
-        })
+        a: i
       };
     }),
-    Q: common_vendor.o(() => {
+    w: common_vendor.f($options.chartPoints, (point, index, i0) => {
+      return {
+        a: common_vendor.t(point.value),
+        b: index,
+        c: point.x + "%",
+        d: point.y + "%"
+      };
     }),
-    R: common_vendor.o((...args) => $options.hideRankingsPopup && $options.hideRankingsPopup(...args))
+    x: common_vendor.p({
+      points: $options.chartLinePoints,
+      fill: "none",
+      stroke: "#007aff",
+      ["stroke-width"]: "0.5"
+    }),
+    y: common_vendor.p({
+      viewBox: "0 0 100 100",
+      preserveAspectRatio: "none"
+    })
+  } : {}, {
+    z: $options.historyData.length > 0
+  }, $options.historyData.length > 0 ? {
+    A: common_vendor.t($options.formatNumber($options.getMaxValue())),
+    B: common_vendor.t($options.formatNumber($options.getMinValue())),
+    C: common_vendor.t($options.getAverageGrowth())
   } : {});
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render], ["__scopeId", "data-v-f3085b2f"]]);
