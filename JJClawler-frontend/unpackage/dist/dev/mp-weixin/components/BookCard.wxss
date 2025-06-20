@@ -1,0 +1,587 @@
+/**
+ * 这里是uni-app内置的常用样式变量
+ * 为了方便开发者使用，将一些常用的颜色进行了定义，开发者可以在这里进行颜色值的统一修改
+ */
+/* 引入样式模块 / Import Style Modules */
+.container.data-v-c553b042 {
+  padding: 20rpx;
+}
+.container-lg.data-v-c553b042 {
+  padding: 40rpx;
+}
+.page-container.data-v-c553b042 {
+  min-height: 100vh;
+  background-color: #f8f8f8;
+  padding: 20rpx;
+}
+.card.data-v-c553b042 {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+.card-hover.data-v-c553b042 {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+.card-hover.data-v-c553b042:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+}
+.text-primary.data-v-c553b042 {
+  color: #333333;
+}
+.text-secondary.data-v-c553b042 {
+  color: #666666;
+}
+.text-placeholder.data-v-c553b042 {
+  color: #999999;
+}
+.text-light.data-v-c553b042 {
+  color: #cccccc;
+}
+.text-center.data-v-c553b042 {
+  text-align: center;
+}
+.text-ellipsis.data-v-c553b042 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.text-ellipsis-2.data-v-c553b042 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.text-ellipsis-3.data-v-c553b042 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.font-xs.data-v-c553b042 {
+  font-size: 20rpx;
+}
+.font-sm.data-v-c553b042 {
+  font-size: 24rpx;
+}
+.font-md.data-v-c553b042 {
+  font-size: 28rpx;
+}
+.font-lg.data-v-c553b042 {
+  font-size: 32rpx;
+}
+.font-xl.data-v-c553b042 {
+  font-size: 36rpx;
+}
+.font-xxl.data-v-c553b042 {
+  font-size: 40rpx;
+}
+.flex.data-v-c553b042 {
+  display: flex;
+}
+.flex-center.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.flex-between.data-v-c553b042 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.flex-around.data-v-c553b042 {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.flex-column.data-v-c553b042 {
+  display: flex;
+  flex-direction: column;
+}
+.flex-column-center.data-v-c553b042 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.flex-1.data-v-c553b042 {
+  flex: 1;
+}
+.m-xs.data-v-c553b042 {
+  margin: 10rpx;
+}
+.m-sm.data-v-c553b042 {
+  margin: 20rpx;
+}
+.m-md.data-v-c553b042 {
+  margin: 30rpx;
+}
+.m-lg.data-v-c553b042 {
+  margin: 40rpx;
+}
+.m-xl.data-v-c553b042 {
+  margin: 60rpx;
+}
+.mt-xs.data-v-c553b042 {
+  margin-top: 10rpx;
+}
+.mt-sm.data-v-c553b042 {
+  margin-top: 20rpx;
+}
+.mt-md.data-v-c553b042 {
+  margin-top: 30rpx;
+}
+.mt-lg.data-v-c553b042 {
+  margin-top: 40rpx;
+}
+.mt-xl.data-v-c553b042 {
+  margin-top: 60rpx;
+}
+.mb-xs.data-v-c553b042 {
+  margin-bottom: 10rpx;
+}
+.mb-sm.data-v-c553b042 {
+  margin-bottom: 20rpx;
+}
+.mb-md.data-v-c553b042 {
+  margin-bottom: 30rpx;
+}
+.mb-lg.data-v-c553b042 {
+  margin-bottom: 40rpx;
+}
+.mb-xl.data-v-c553b042 {
+  margin-bottom: 60rpx;
+}
+.ml-xs.data-v-c553b042 {
+  margin-left: 10rpx;
+}
+.ml-sm.data-v-c553b042 {
+  margin-left: 20rpx;
+}
+.ml-md.data-v-c553b042 {
+  margin-left: 30rpx;
+}
+.ml-lg.data-v-c553b042 {
+  margin-left: 40rpx;
+}
+.ml-xl.data-v-c553b042 {
+  margin-left: 60rpx;
+}
+.mr-xs.data-v-c553b042 {
+  margin-right: 10rpx;
+}
+.mr-sm.data-v-c553b042 {
+  margin-right: 20rpx;
+}
+.mr-md.data-v-c553b042 {
+  margin-right: 30rpx;
+}
+.mr-lg.data-v-c553b042 {
+  margin-right: 40rpx;
+}
+.mr-xl.data-v-c553b042 {
+  margin-right: 60rpx;
+}
+.p-xs.data-v-c553b042 {
+  padding: 10rpx;
+}
+.p-sm.data-v-c553b042 {
+  padding: 20rpx;
+}
+.p-md.data-v-c553b042 {
+  padding: 30rpx;
+}
+.p-lg.data-v-c553b042 {
+  padding: 40rpx;
+}
+.p-xl.data-v-c553b042 {
+  padding: 60rpx;
+}
+.pt-xs.data-v-c553b042 {
+  padding-top: 10rpx;
+}
+.pt-sm.data-v-c553b042 {
+  padding-top: 20rpx;
+}
+.pt-md.data-v-c553b042 {
+  padding-top: 30rpx;
+}
+.pt-lg.data-v-c553b042 {
+  padding-top: 40rpx;
+}
+.pt-xl.data-v-c553b042 {
+  padding-top: 60rpx;
+}
+.pb-xs.data-v-c553b042 {
+  padding-bottom: 10rpx;
+}
+.pb-sm.data-v-c553b042 {
+  padding-bottom: 20rpx;
+}
+.pb-md.data-v-c553b042 {
+  padding-bottom: 30rpx;
+}
+.pb-lg.data-v-c553b042 {
+  padding-bottom: 40rpx;
+}
+.pb-xl.data-v-c553b042 {
+  padding-bottom: 60rpx;
+}
+.pl-xs.data-v-c553b042 {
+  padding-left: 10rpx;
+}
+.pl-sm.data-v-c553b042 {
+  padding-left: 20rpx;
+}
+.pl-md.data-v-c553b042 {
+  padding-left: 30rpx;
+}
+.pl-lg.data-v-c553b042 {
+  padding-left: 40rpx;
+}
+.pl-xl.data-v-c553b042 {
+  padding-left: 60rpx;
+}
+.pr-xs.data-v-c553b042 {
+  padding-right: 10rpx;
+}
+.pr-sm.data-v-c553b042 {
+  padding-right: 20rpx;
+}
+.pr-md.data-v-c553b042 {
+  padding-right: 30rpx;
+}
+.pr-lg.data-v-c553b042 {
+  padding-right: 40rpx;
+}
+.pr-xl.data-v-c553b042 {
+  padding-right: 60rpx;
+}
+.btn-primary.data-v-c553b042 {
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 40rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+}
+.btn-primary.data-v-c553b042:hover {
+  opacity: 0.8;
+}
+.btn-secondary.data-v-c553b042 {
+  background-color: transparent;
+  color: #007aff;
+  border: 2rpx solid #007aff;
+  border-radius: 40rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+}
+.btn-secondary.data-v-c553b042:hover {
+  background-color: #007aff;
+  color: white;
+}
+.input.data-v-c553b042 {
+  border: 2rpx solid #e0e0e0;
+  border-radius: 40rpx;
+  padding: 20rpx 30rpx;
+  font-size: 28rpx;
+  background-color: #f8f8f8;
+  width: 100%;
+}
+.input.data-v-c553b042:focus {
+  border-color: #007aff;
+  outline: none;
+}
+.input.data-v-c553b042::-webkit-input-placeholder {
+  color: #999999;
+}
+.input.data-v-c553b042::placeholder {
+  color: #999999;
+}
+.tag.data-v-c553b042 {
+  padding: 20rpx 40rpx;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+  background-color: #f8f8f8;
+  color: #333333;
+  display: inline-block;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+.tag.data-v-c553b042:hover {
+  background-color: #007aff;
+  color: white;
+}
+.tag-active.data-v-c553b042 {
+  padding: 20rpx 40rpx;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+  background-color: #007aff;
+  color: white;
+  display: inline-block;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+.divider.data-v-c553b042 {
+  height: 2rpx;
+  background-color: #e0e0e0;
+  margin: 30rpx 0;
+}
+.divider-thick.data-v-c553b042 {
+  height: 4rpx;
+  background-color: #d0d0d0;
+  margin: 40rpx 0;
+}
+.shadow-light.data-v-c553b042 {
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+.shadow-medium.data-v-c553b042 {
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+}
+.shadow-dark.data-v-c553b042 {
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+}
+
+/* 行为相关颜色 */
+/* 文字基本颜色 */
+/* 背景颜色 */
+/* 边框颜色 */
+/* 尺寸变量 */
+/* 文字尺寸 */
+/* 图片尺寸 */
+/* Border Radius */
+/* 水平间距 */
+/* 垂直间距 */
+/* 透明度 */
+/* 文章场景相关 */
+.book-card.data-v-c553b042 {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  padding: 40rpx;
+  margin-bottom: 20rpx;
+  transition: all 0.3s ease;
+}
+.book-card.clickable.data-v-c553b042 {
+  cursor: pointer;
+}
+.book-card.clickable.data-v-c553b042:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+}
+.book-card.clickable.data-v-c553b042:active {
+  transform: translateY(0);
+}
+.book-header.data-v-c553b042 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-items: flex-start;
+  margin-bottom: 30rpx;
+}
+.book-cover.data-v-c553b042 {
+  flex-shrink: 0;
+  width: 100rpx;
+  height: 140rpx;
+  border-radius: 10rpx;
+  overflow: hidden;
+  margin-right: 30rpx;
+}
+.book-cover.placeholder.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f8f8f8;
+  border: 2rpx solid #e0e0e0;
+}
+.book-cover.placeholder .cover-text.data-v-c553b042 {
+  font-size: 40rpx;
+}
+.book-cover .cover-image.data-v-c553b042 {
+  width: 100%;
+  height: 100%;
+}
+.book-info.data-v-c553b042 {
+  flex: 1;
+}
+.book-info .book-title.data-v-c553b042 {
+  display: block;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 10rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.book-info .book-author.data-v-c553b042 {
+  display: block;
+  font-size: 24rpx;
+  color: #666666;
+  margin-bottom: 4rpx;
+}
+.book-info .book-category.data-v-c553b042 {
+  display: block;
+  font-size: 20rpx;
+  color: #999999;
+  margin-bottom: 10rpx;
+}
+.book-info .book-tags.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+.book-info .book-tags .tag.data-v-c553b042 {
+  padding: 2rpx 8rpx;
+  background-color: #f8f8f8;
+  color: #666666;
+  font-size: 20rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid #e0e0e0;
+}
+.book-rank.data-v-c553b042 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 20rpx;
+}
+.book-rank .rank-number.data-v-c553b042 {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #ff6b35;
+}
+.book-rank .rank-label.data-v-c553b042 {
+  font-size: 20rpx;
+  color: #999999;
+}
+.book-description.data-v-c553b042 {
+  margin-bottom: 30rpx;
+  padding: 20rpx;
+  background-color: #f8f8f8;
+  border-radius: 10rpx;
+}
+.book-description .desc-text.data-v-c553b042 {
+  font-size: 24rpx;
+  color: #666666;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.book-stats.data-v-c553b042 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-top: 2rpx solid #e0e0e0;
+  border-bottom: 2rpx solid #e0e0e0;
+  margin-bottom: 20rpx;
+}
+.book-stats .stat-item.data-v-c553b042 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+.book-stats .stat-item .stat-label.data-v-c553b042 {
+  font-size: 20rpx;
+  color: #999999;
+  margin-bottom: 4rpx;
+}
+.book-stats .stat-item .stat-value.data-v-c553b042 {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #333333;
+}
+.book-stats .stat-item .stat-value.status-completed.data-v-c553b042 {
+  color: #4cd964;
+}
+.book-stats .stat-item .stat-value.status-ongoing.data-v-c553b042 {
+  color: #007aff;
+}
+.book-stats .stat-item .stat-value.score.data-v-c553b042 {
+  color: #ff6b35;
+}
+.book-rankings.data-v-c553b042 {
+  margin-bottom: 20rpx;
+}
+.book-rankings .rankings-label.data-v-c553b042 {
+  font-size: 24rpx;
+  color: #666666;
+  margin-bottom: 10rpx;
+}
+.book-rankings .rankings-list.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10rpx;
+}
+.book-rankings .rankings-list .ranking-item.data-v-c553b042 {
+  padding: 4rpx 12rpx;
+  background-color: #007aff;
+  color: white;
+  font-size: 20rpx;
+  border-radius: 10rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150rpx;
+}
+.book-actions.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20rpx;
+}
+.book-actions .action-btn.data-v-c553b042 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10rpx 30rpx;
+  border-radius: 20rpx;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+.book-actions .action-btn .btn-text.data-v-c553b042 {
+  font-size: 24rpx;
+}
+.book-actions .action-btn.data-v-c553b042:active {
+  opacity: 0.7;
+}
+.book-actions .follow-btn.data-v-c553b042 {
+  background-color: #3cc51f;
+}
+.book-actions .follow-btn .btn-text.data-v-c553b042 {
+  color: white;
+}
+.book-actions .read-btn.data-v-c553b042 {
+  background-color: #007aff;
+}
+.book-actions .read-btn .btn-text.data-v-c553b042 {
+  color: white;
+}
+.book-actions .share-btn.data-v-c553b042 {
+  background-color: transparent;
+  border: 2rpx solid #d0d0d0;
+}
+.book-actions .share-btn .btn-text.data-v-c553b042 {
+  color: #666666;
+}

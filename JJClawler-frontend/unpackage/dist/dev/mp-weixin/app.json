@@ -1,13 +1,49 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/ranking/index"
+    "pages/ranking/index",
+    "pages/ranking/detail",
+    "pages/book/detail",
+    "pages/follow/index",
+    "pages/settings/index"
   ],
   "window": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "JJClawler",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
+  },
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#3CC51F",
+    "borderStyle": "white",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "iconPath": "static/icons/tab-home.png",
+        "selectedIconPath": "static/icons/tab-home-current.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/ranking/index",
+        "iconPath": "static/icons/tab-ranking.png",
+        "selectedIconPath": "static/icons/tab-ranking-current.png",
+        "text": "榜单"
+      },
+      {
+        "pagePath": "pages/follow/index",
+        "iconPath": "static/icons/tab-follow.png",
+        "selectedIconPath": "static/icons/tab-follow-current.png",
+        "text": "关注"
+      },
+      {
+        "pagePath": "pages/settings/index",
+        "iconPath": "static/icons/tab-settings.png",
+        "selectedIconPath": "static/icons/tab-settings-current.png",
+        "text": "设置"
+      }
+    ]
   },
   "usingComponents": {}
 }

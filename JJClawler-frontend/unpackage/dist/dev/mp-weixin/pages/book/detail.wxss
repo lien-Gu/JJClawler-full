@@ -1,0 +1,714 @@
+/**
+ * 这里是uni-app内置的常用样式变量
+ * 为了方便开发者使用，将一些常用的颜色进行了定义，开发者可以在这里进行颜色值的统一修改
+ */
+/* 引入样式模块 / Import Style Modules */
+.container.data-v-f3085b2f {
+  padding: 20rpx;
+}
+.container-lg.data-v-f3085b2f {
+  padding: 40rpx;
+}
+.page-container.data-v-f3085b2f {
+  min-height: 100vh;
+  background-color: #f8f8f8;
+  padding: 20rpx;
+}
+.card.data-v-f3085b2f {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+.card-hover.data-v-f3085b2f {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+.card-hover.data-v-f3085b2f:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+}
+.text-primary.data-v-f3085b2f {
+  color: #333333;
+}
+.text-secondary.data-v-f3085b2f {
+  color: #666666;
+}
+.text-placeholder.data-v-f3085b2f {
+  color: #999999;
+}
+.text-light.data-v-f3085b2f {
+  color: #cccccc;
+}
+.text-center.data-v-f3085b2f {
+  text-align: center;
+}
+.text-ellipsis.data-v-f3085b2f {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.text-ellipsis-2.data-v-f3085b2f {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.text-ellipsis-3.data-v-f3085b2f {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.font-xs.data-v-f3085b2f {
+  font-size: 20rpx;
+}
+.font-sm.data-v-f3085b2f {
+  font-size: 24rpx;
+}
+.font-md.data-v-f3085b2f {
+  font-size: 28rpx;
+}
+.font-lg.data-v-f3085b2f {
+  font-size: 32rpx;
+}
+.font-xl.data-v-f3085b2f {
+  font-size: 36rpx;
+}
+.font-xxl.data-v-f3085b2f {
+  font-size: 40rpx;
+}
+.flex.data-v-f3085b2f {
+  display: flex;
+}
+.flex-center.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.flex-between.data-v-f3085b2f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.flex-around.data-v-f3085b2f {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.flex-column.data-v-f3085b2f {
+  display: flex;
+  flex-direction: column;
+}
+.flex-column-center.data-v-f3085b2f {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.flex-1.data-v-f3085b2f {
+  flex: 1;
+}
+.m-xs.data-v-f3085b2f {
+  margin: 10rpx;
+}
+.m-sm.data-v-f3085b2f {
+  margin: 20rpx;
+}
+.m-md.data-v-f3085b2f {
+  margin: 30rpx;
+}
+.m-lg.data-v-f3085b2f {
+  margin: 40rpx;
+}
+.m-xl.data-v-f3085b2f {
+  margin: 60rpx;
+}
+.mt-xs.data-v-f3085b2f {
+  margin-top: 10rpx;
+}
+.mt-sm.data-v-f3085b2f {
+  margin-top: 20rpx;
+}
+.mt-md.data-v-f3085b2f {
+  margin-top: 30rpx;
+}
+.mt-lg.data-v-f3085b2f {
+  margin-top: 40rpx;
+}
+.mt-xl.data-v-f3085b2f {
+  margin-top: 60rpx;
+}
+.mb-xs.data-v-f3085b2f {
+  margin-bottom: 10rpx;
+}
+.mb-sm.data-v-f3085b2f {
+  margin-bottom: 20rpx;
+}
+.mb-md.data-v-f3085b2f {
+  margin-bottom: 30rpx;
+}
+.mb-lg.data-v-f3085b2f {
+  margin-bottom: 40rpx;
+}
+.mb-xl.data-v-f3085b2f {
+  margin-bottom: 60rpx;
+}
+.ml-xs.data-v-f3085b2f {
+  margin-left: 10rpx;
+}
+.ml-sm.data-v-f3085b2f {
+  margin-left: 20rpx;
+}
+.ml-md.data-v-f3085b2f {
+  margin-left: 30rpx;
+}
+.ml-lg.data-v-f3085b2f {
+  margin-left: 40rpx;
+}
+.ml-xl.data-v-f3085b2f {
+  margin-left: 60rpx;
+}
+.mr-xs.data-v-f3085b2f {
+  margin-right: 10rpx;
+}
+.mr-sm.data-v-f3085b2f {
+  margin-right: 20rpx;
+}
+.mr-md.data-v-f3085b2f {
+  margin-right: 30rpx;
+}
+.mr-lg.data-v-f3085b2f {
+  margin-right: 40rpx;
+}
+.mr-xl.data-v-f3085b2f {
+  margin-right: 60rpx;
+}
+.p-xs.data-v-f3085b2f {
+  padding: 10rpx;
+}
+.p-sm.data-v-f3085b2f {
+  padding: 20rpx;
+}
+.p-md.data-v-f3085b2f {
+  padding: 30rpx;
+}
+.p-lg.data-v-f3085b2f {
+  padding: 40rpx;
+}
+.p-xl.data-v-f3085b2f {
+  padding: 60rpx;
+}
+.pt-xs.data-v-f3085b2f {
+  padding-top: 10rpx;
+}
+.pt-sm.data-v-f3085b2f {
+  padding-top: 20rpx;
+}
+.pt-md.data-v-f3085b2f {
+  padding-top: 30rpx;
+}
+.pt-lg.data-v-f3085b2f {
+  padding-top: 40rpx;
+}
+.pt-xl.data-v-f3085b2f {
+  padding-top: 60rpx;
+}
+.pb-xs.data-v-f3085b2f {
+  padding-bottom: 10rpx;
+}
+.pb-sm.data-v-f3085b2f {
+  padding-bottom: 20rpx;
+}
+.pb-md.data-v-f3085b2f {
+  padding-bottom: 30rpx;
+}
+.pb-lg.data-v-f3085b2f {
+  padding-bottom: 40rpx;
+}
+.pb-xl.data-v-f3085b2f {
+  padding-bottom: 60rpx;
+}
+.pl-xs.data-v-f3085b2f {
+  padding-left: 10rpx;
+}
+.pl-sm.data-v-f3085b2f {
+  padding-left: 20rpx;
+}
+.pl-md.data-v-f3085b2f {
+  padding-left: 30rpx;
+}
+.pl-lg.data-v-f3085b2f {
+  padding-left: 40rpx;
+}
+.pl-xl.data-v-f3085b2f {
+  padding-left: 60rpx;
+}
+.pr-xs.data-v-f3085b2f {
+  padding-right: 10rpx;
+}
+.pr-sm.data-v-f3085b2f {
+  padding-right: 20rpx;
+}
+.pr-md.data-v-f3085b2f {
+  padding-right: 30rpx;
+}
+.pr-lg.data-v-f3085b2f {
+  padding-right: 40rpx;
+}
+.pr-xl.data-v-f3085b2f {
+  padding-right: 60rpx;
+}
+.btn-primary.data-v-f3085b2f {
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 40rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+}
+.btn-primary.data-v-f3085b2f:hover {
+  opacity: 0.8;
+}
+.btn-secondary.data-v-f3085b2f {
+  background-color: transparent;
+  color: #007aff;
+  border: 2rpx solid #007aff;
+  border-radius: 40rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+}
+.btn-secondary.data-v-f3085b2f:hover {
+  background-color: #007aff;
+  color: white;
+}
+.input.data-v-f3085b2f {
+  border: 2rpx solid #e0e0e0;
+  border-radius: 40rpx;
+  padding: 20rpx 30rpx;
+  font-size: 28rpx;
+  background-color: #f8f8f8;
+  width: 100%;
+}
+.input.data-v-f3085b2f:focus {
+  border-color: #007aff;
+  outline: none;
+}
+.input.data-v-f3085b2f::-webkit-input-placeholder {
+  color: #999999;
+}
+.input.data-v-f3085b2f::placeholder {
+  color: #999999;
+}
+.tag.data-v-f3085b2f {
+  padding: 20rpx 40rpx;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+  background-color: #f8f8f8;
+  color: #333333;
+  display: inline-block;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+.tag.data-v-f3085b2f:hover {
+  background-color: #007aff;
+  color: white;
+}
+.tag-active.data-v-f3085b2f {
+  padding: 20rpx 40rpx;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  transition: all 0.3s ease;
+  background-color: #007aff;
+  color: white;
+  display: inline-block;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+.divider.data-v-f3085b2f {
+  height: 2rpx;
+  background-color: #e0e0e0;
+  margin: 30rpx 0;
+}
+.divider-thick.data-v-f3085b2f {
+  height: 4rpx;
+  background-color: #d0d0d0;
+  margin: 40rpx 0;
+}
+.shadow-light.data-v-f3085b2f {
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+}
+.shadow-medium.data-v-f3085b2f {
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+}
+.shadow-dark.data-v-f3085b2f {
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+}
+
+/* 行为相关颜色 */
+/* 文字基本颜色 */
+/* 背景颜色 */
+/* 边框颜色 */
+/* 尺寸变量 */
+/* 文字尺寸 */
+/* 图片尺寸 */
+/* Border Radius */
+/* 水平间距 */
+/* 垂直间距 */
+/* 透明度 */
+/* 文章场景相关 */
+.book-detail-page.data-v-f3085b2f {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.book-header.data-v-f3085b2f {
+  position: relative;
+  padding: 40rpx;
+  color: white;
+  overflow: hidden;
+}
+.book-header .header-bg.data-v-f3085b2f {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #007aff, #3cc51f);
+  z-index: -1;
+}
+.book-header .header-content.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  align-items: flex-start;
+  gap: 40rpx;
+}
+.book-header .book-cover-section.data-v-f3085b2f {
+  flex-shrink: 0;
+}
+.book-header .book-cover-section .book-cover.data-v-f3085b2f {
+  width: 200rpx;
+  height: 280rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.book-header .book-cover-section .book-cover .cover-image.data-v-f3085b2f {
+  width: 100%;
+  height: 100%;
+}
+.book-header .book-cover-section .book-cover.placeholder .cover-text.data-v-f3085b2f {
+  font-size: 60rpx;
+  opacity: 0.7;
+}
+.book-header .book-info-section.data-v-f3085b2f {
+  flex: 1;
+}
+.book-header .book-info-section .book-title.data-v-f3085b2f {
+  display: block;
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-bottom: 10rpx;
+  line-height: 1.3;
+}
+.book-header .book-info-section .book-author.data-v-f3085b2f {
+  display: block;
+  font-size: 24rpx;
+  opacity: 0.9;
+  margin-bottom: 10rpx;
+}
+.book-header .book-info-section .book-meta.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 40rpx;
+}
+.book-header .book-info-section .book-meta .meta-item.data-v-f3085b2f {
+  font-size: 20rpx;
+  opacity: 0.8;
+}
+.book-header .book-info-section .book-meta .meta-divider.data-v-f3085b2f {
+  opacity: 0.6;
+}
+.book-header .book-info-section .book-actions.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20rpx;
+}
+.book-header .book-info-section .book-actions .action-btn.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10rpx 30rpx;
+  border-radius: 20rpx;
+  transition: all 0.3s ease;
+}
+.book-header .book-info-section .book-actions .action-btn .btn-text.data-v-f3085b2f {
+  font-size: 24rpx;
+  color: white;
+}
+.book-header .book-info-section .book-actions .action-btn.data-v-f3085b2f:active {
+  opacity: 0.7;
+}
+.book-header .book-info-section .book-actions .follow-btn.data-v-f3085b2f {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.book-header .book-info-section .book-actions .follow-btn.followed.data-v-f3085b2f {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+.book-header .book-info-section .book-actions .read-btn.data-v-f3085b2f {
+  background-color: #ff6b35;
+}
+.book-header .book-info-section .book-actions .share-btn.data-v-f3085b2f {
+  background-color: transparent;
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+}
+.stats-section.data-v-f3085b2f {
+  padding: 40rpx;
+  background-color: white;
+  margin-bottom: 20rpx;
+}
+.stats-section .stats-grid.data-v-f3085b2f {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30rpx;
+}
+.stats-section .stats-grid .stat-item.data-v-f3085b2f {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.stats-section .stats-grid .stat-item .stat-value.data-v-f3085b2f {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #007aff;
+  margin-bottom: 4rpx;
+}
+.stats-section .stats-grid .stat-item .stat-label.data-v-f3085b2f {
+  font-size: 20rpx;
+  color: #666666;
+}
+.description-section.data-v-f3085b2f,
+.tags-section.data-v-f3085b2f,
+.rankings-section.data-v-f3085b2f,
+.recommendations-section.data-v-f3085b2f {
+  background-color: white;
+  margin-bottom: 20rpx;
+  padding: 40rpx;
+}
+.section-header.data-v-f3085b2f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+.section-header .section-title.data-v-f3085b2f {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+}
+.section-header .section-more.data-v-f3085b2f {
+  font-size: 24rpx;
+  color: #007aff;
+}
+.section-header .section-more.data-v-f3085b2f:active {
+  opacity: 0.7;
+}
+.description-content .description-text.data-v-f3085b2f {
+  display: block;
+  font-size: 28rpx;
+  color: #333333;
+  line-height: 1.6;
+}
+.description-content .description-text.data-v-f3085b2f:not(.expanded) {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.description-content .expand-btn.data-v-f3085b2f {
+  margin-top: 20rpx;
+}
+.description-content .expand-btn .expand-text.data-v-f3085b2f {
+  color: #007aff;
+  font-size: 24rpx;
+}
+.description-content .expand-btn.data-v-f3085b2f:active {
+  opacity: 0.7;
+}
+.tags-list.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20rpx;
+  flex-wrap: wrap;
+}
+.tags-list .tag.data-v-f3085b2f {
+  padding: 10rpx 30rpx;
+  background-color: #f8f8f8;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  color: #666666;
+}
+.rankings-list .ranking-card.data-v-f3085b2f {
+  margin-bottom: 20rpx;
+}
+.rankings-list .ranking-card.data-v-f3085b2f:last-child {
+  margin-bottom: 0;
+}
+.empty-state.data-v-f3085b2f,
+.loading-state.data-v-f3085b2f {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 60rpx;
+}
+.empty-state .empty-icon.data-v-f3085b2f,
+.loading-state .empty-icon.data-v-f3085b2f {
+  font-size: 80rpx;
+  margin-bottom: 30rpx;
+}
+.empty-state .empty-text.data-v-f3085b2f,
+.empty-state .loading-text.data-v-f3085b2f,
+.loading-state .empty-text.data-v-f3085b2f,
+.loading-state .loading-text.data-v-f3085b2f {
+  color: #999999;
+  font-size: 28rpx;
+}
+.recommendations-scroll.data-v-f3085b2f {
+  white-space: nowrap;
+}
+.recommendations-scroll .recommendations-list.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30rpx;
+  padding-bottom: 10rpx;
+}
+.recommendations-scroll .recommendation-item.data-v-f3085b2f {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 160rpx;
+}
+.recommendations-scroll .recommendation-item .rec-cover.data-v-f3085b2f {
+  width: 120rpx;
+  height: 160rpx;
+  border-radius: 10rpx;
+  overflow: hidden;
+  background-color: #f8f8f8;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+.recommendations-scroll .recommendation-item .rec-cover .rec-cover-image.data-v-f3085b2f {
+  width: 100%;
+  height: 100%;
+}
+.recommendations-scroll .recommendation-item .rec-cover.placeholder .rec-cover-text.data-v-f3085b2f {
+  font-size: 40rpx;
+  color: #999999;
+}
+.recommendations-scroll .recommendation-item .rec-title.data-v-f3085b2f {
+  display: block;
+  font-size: 24rpx;
+  color: #333333;
+  text-align: center;
+  margin-bottom: 4rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+.recommendations-scroll .recommendation-item .rec-author.data-v-f3085b2f {
+  font-size: 20rpx;
+  color: #666666;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+.recommendations-scroll .recommendation-item.data-v-f3085b2f:active {
+  opacity: 0.7;
+}
+.rankings-popup.data-v-f3085b2f {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.rankings-popup .popup-content.data-v-f3085b2f {
+  background-color: white;
+  border-radius: 40rpx;
+  margin: 40rpx;
+  max-width: 700rpx;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+}
+.rankings-popup .popup-header.data-v-f3085b2f {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-items: center;
+  padding: 40rpx;
+  border-bottom: 2rpx solid #e0e0e0;
+}
+.rankings-popup .popup-header .popup-title.data-v-f3085b2f {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333333;
+}
+.rankings-popup .popup-header .popup-close.data-v-f3085b2f {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+}
+.rankings-popup .popup-header .popup-close .close-text.data-v-f3085b2f {
+  font-size: 36rpx;
+  color: #999999;
+}
+.rankings-popup .popup-header .popup-close.data-v-f3085b2f:active {
+  background-color: #f8f8f8;
+}
+.rankings-popup .popup-scroll.data-v-f3085b2f {
+  max-height: 60vh;
+}
+.rankings-popup .popup-scroll .popup-rankings.data-v-f3085b2f {
+  padding: 40rpx;
+}
+.rankings-popup .popup-scroll .popup-rankings .ranking-card.data-v-f3085b2f {
+  margin-bottom: 20rpx;
+}
+.rankings-popup .popup-scroll .popup-rankings .ranking-card.data-v-f3085b2f:last-child {
+  margin-bottom: 0;
+}
