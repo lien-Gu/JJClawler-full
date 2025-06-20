@@ -409,10 +409,12 @@
   border-radius: 50rpx;
   font-size: 28rpx;
   color: #333;
+  transition: all 0.3s ease;
 }
 .site-tab.active.data-v-55d17871, .channel-tab.active.data-v-55d17871 {
   background-color: #007aff;
   color: white;
+  font-weight: bold;
 }
 .ranking-list.data-v-55d17871 {
   height: 1000rpx;
@@ -440,4 +442,94 @@
   justify-content: space-between;
   font-size: 24rpx;
   color: #999;
+}
+
+/* 夹子书籍列表样式 */
+.book-list-container.data-v-55d17871 {
+  margin-top: 20rpx;
+}
+.section-header.data-v-55d17871 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  margin-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+.section-title.data-v-55d17871 {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+.detail-btn.data-v-55d17871 {
+  padding: 10rpx 20rpx;
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+.book-list.data-v-55d17871 {
+  height: 800rpx;
+}
+.book-item.data-v-55d17871 {
+  display: flex;
+  align-items: center;
+  padding: 25rpx 20rpx;
+  margin-bottom: 15rpx;
+  background-color: white;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+.book-rank.data-v-55d17871 {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #007aff;
+  color: white;
+  border-radius: 50%;
+  font-size: 24rpx;
+  font-weight: bold;
+  margin-right: 20rpx;
+}
+.book-info.data-v-55d17871 {
+  flex: 1;
+}
+.book-title.data-v-55d17871 {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+  line-height: 1.4;
+}
+.book-stats.data-v-55d17871 {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.stat-item.data-v-55d17871 {
+  font-size: 24rpx;
+  color: #666;
+}
+.change-indicator.data-v-55d17871 {
+  margin-left: 10rpx;
+  font-weight: bold;
+}
+.change-indicator.up.data-v-55d17871 {
+  color: #ff4d4f;
+  /* 红色表示上升/增加 */
+}
+.change-indicator.down.data-v-55d17871 {
+  color: #52c41a;
+  /* 绿色表示下降/减少 */
+}
+
+/* 内容容器样式 */
+.content-container.data-v-55d17871 {
+  margin-top: 20rpx;
+}
+.ranking-list-container.data-v-55d17871 {
+  margin-top: 20rpx;
 }

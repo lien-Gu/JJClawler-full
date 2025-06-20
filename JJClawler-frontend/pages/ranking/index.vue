@@ -1,13 +1,5 @@
 <template>
   <view class="ranking-container">
-    <!-- 调试信息 -->
-    <view class="debug-info" style="background: #f0f0f0; padding: 10rpx; margin-bottom: 20rpx; font-size: 24rpx;">
-      <text>当前层级: {{ currentLevel }}</text>
-      <text> | 分站数量: {{ sites.length }}</text>
-      <text> | 选中分站: {{ selectedSite }}</text>
-      <text> | 榜单数量: {{ rankingList.length }}</text>
-    </view>
-    
     <!-- 搜索栏 -->
     <view class="search-section">
       <input 
@@ -19,14 +11,14 @@
     </view>
 
     <!-- 面包屑导航 -->
-    <view class="breadcrumb" v-if="currentLevel > 1">
-      <text class="breadcrumb-item" @tap="goToLevel(1)">{{ currentSite.name }}</text>
-      <text class="breadcrumb-separator" v-if="currentLevel > 2"> > </text>
-      <text class="breadcrumb-item" v-if="currentLevel > 2">{{ currentChannel.name }}</text>
+    <view class="breadcrumb" v-if="selectedSite">
+      <text class="breadcrumb-item" @tap="resetToSiteLevel">{{ currentSite.name }}</text>
+      <text class="breadcrumb-separator" v-if="selectedChannel"> > </text>
+      <text class="breadcrumb-item" v-if="selectedChannel" @tap="resetToChannelLevel">{{ currentChannel.name }}</text>
     </view>
 
-    <!-- 层级1: 分站选择 -->
-    <view class="level-container" v-if="currentLevel === 1">
+    <!-- 第一层级: 分站选择 - 始终显示 -->
+    <view class="level-container">
       <scroll-view class="site-scroll" scroll-x="true">
         <view class="site-tabs">
           <view 
@@ -42,8 +34,8 @@
       </scroll-view>
     </view>
 
-    <!-- 层级2: 频道选择 -->
-    <view class="level-container" v-if="currentLevel === 2 && currentSite.channels.length > 0">
+    <!-- 第二层级: 频道选择 - 当选中分站有子频道时显示 -->
+    <view class="level-container" v-if="showChannelLevel">
       <scroll-view class="channel-scroll" scroll-x="true">
         <view class="channel-tabs">
           <view 
@@ -59,23 +51,63 @@
       </scroll-view>
     </view>
 
-    <!-- 层级3: 榜单列表 -->
-    <view class="level-container" v-if="currentLevel === 3">
-      <scroll-view class="ranking-list" scroll-y="true">
-        <view 
-          class="ranking-card"
-          v-for="ranking in rankingList" 
-          :key="ranking.id"
-          @tap="goToRankingDetail(ranking)"
-        >
-          <view class="ranking-title">{{ ranking.name }}</view>
-          <view class="ranking-desc">{{ ranking.desc }}</view>
-          <view class="ranking-stats">
-            <text class="stat-item">{{ ranking.bookCount }} 本书籍</text>
-            <text class="stat-item">{{ ranking.updateTime }}</text>
-          </view>
+    <!-- 第三层级: 内容展示区域 -->
+    <view class="content-container" v-if="showContentLevel">
+      
+      <!-- 夹子特殊处理：显示书籍列表 -->
+      <view v-if="currentSite.type === 'special'" class="book-list-container">
+        <view class="section-header">
+          <text class="section-title">夹子榜单</text>
+          <button class="detail-btn" @tap="goToJiaziDetail">查看详情</button>
         </view>
-      </scroll-view>
+        
+        <scroll-view class="book-list" scroll-y="true">
+          <view 
+            class="book-item"
+            v-for="(book, index) in bookList" 
+            :key="book.id"
+          >
+            <view class="book-rank">{{ index + 1 }}</view>
+            <view class="book-info">
+              <view class="book-title">{{ book.title }}</view>
+              <view class="book-stats">
+                <text class="stat-item">
+                  收藏: {{ book.collections }}
+                  <text class="change-indicator" :class="book.collectionChange > 0 ? 'up' : 'down'">
+                    {{ book.collectionChange > 0 ? '↑' : '↓' }}{{ Math.abs(book.collectionChange) }}
+                  </text>
+                </text>
+                <text class="stat-item">
+                  排名变化: 
+                  <text class="change-indicator" :class="book.rankChange > 0 ? 'down' : 'up'">
+                    {{ book.rankChange > 0 ? '↓' : '↑' }}{{ Math.abs(book.rankChange) }}
+                  </text>
+                </text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 普通榜单：显示榜单列表 -->
+      <view v-else class="ranking-list-container">
+        <scroll-view class="ranking-list" scroll-y="true">
+          <view 
+            class="ranking-card"
+            v-for="ranking in rankingList" 
+            :key="ranking.id"
+            @tap="goToRankingDetail(ranking)"
+          >
+            <view class="ranking-title">{{ ranking.name }}</view>
+            <view class="ranking-desc">{{ ranking.desc }}</view>
+            <view class="ranking-stats">
+              <text class="stat-item">{{ ranking.bookCount }} 本书籍</text>
+              <text class="stat-item">{{ ranking.updateTime }}</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+      
     </view>
   </view>
 </template>
@@ -87,13 +119,45 @@ export default {
   data() {
     return {
       searchKeyword: '',
-      currentLevel: 1, // 1: 分站选择, 2: 频道选择, 3: 榜单列表
       selectedSite: '',
       selectedChannel: '',
       currentSite: {},
       currentChannel: {},
       sites: [],
-      rankingList: []
+      rankingList: [],
+      bookList: [] // 夹子榜单的书籍列表
+    }
+  },
+  
+  computed: {
+    // 是否显示频道选择层级
+    showChannelLevel() {
+      return this.selectedSite && 
+             this.currentSite.type === 'complex' && 
+             this.currentSite.channels && 
+             this.currentSite.channels.length > 0
+    },
+    
+    // 是否显示内容层级
+    showContentLevel() {
+      if (!this.selectedSite) return false
+      
+      // 夹子：选中即显示
+      if (this.currentSite.type === 'special') {
+        return true
+      }
+      
+      // 简单榜单：选中即显示
+      if (this.currentSite.type === 'simple') {
+        return true
+      }
+      
+      // 复杂榜单：需要选中频道才显示
+      if (this.currentSite.type === 'complex') {
+        return this.selectedChannel !== ''
+      }
+      
+      return false
     }
   },
   
@@ -122,12 +186,19 @@ export default {
       this.selectedSite = site.id
       this.currentSite = site
       
-      if (site.channels && site.channels.length > 0) {
-        this.currentLevel = 2
-      } else {
-        this.currentLevel = 3
+      // 清空频道选择
+      this.selectedChannel = ''
+      this.currentChannel = {}
+      
+      // 根据分站类型加载对应内容
+      if (site.type === 'special') {
+        // 夹子：加载书籍列表
+        this.loadBookList(site.id)
+      } else if (site.type === 'simple') {
+        // 简单榜单：加载榜单列表
         this.loadRankings(site.id)
       }
+      // 复杂榜单：等待用户选择频道
     },
     
     /**
@@ -136,21 +207,32 @@ export default {
     selectChannel(channel) {
       this.selectedChannel = channel.id
       this.currentChannel = channel
-      this.currentLevel = 3
+      
+      // 加载频道对应的榜单
       this.loadRankings(this.selectedSite, channel.id)
     },
     
     /**
-     * 返回指定层级
+     * 重置到分站层级
      */
-    goToLevel(level) {
-      this.currentLevel = level
-      if (level === 1) {
-        this.selectedSite = ''
-        this.selectedChannel = ''
-        this.currentSite = {}
-        this.currentChannel = {}
+    resetToSiteLevel() {
+      this.selectedChannel = ''
+      this.currentChannel = {}
+      
+      // 重新加载分站内容
+      if (this.currentSite.type === 'special') {
+        this.loadBookList(this.selectedSite)
+      } else if (this.currentSite.type === 'simple') {
+        this.loadRankings(this.selectedSite)
       }
+    },
+    
+    /**
+     * 重置到频道层级
+     */
+    resetToChannelLevel() {
+      // 重新加载频道内容
+      this.loadRankings(this.selectedSite, this.selectedChannel)
     },
     
     /**
@@ -161,6 +243,8 @@ export default {
         // 这里应该调用API获取榜单数据
         // const response = await this.$http.get('/api/rankings', { siteId, channelId })
         // this.rankingList = response.data
+        
+        console.log('加载榜单数据:', siteId, channelId)
         
         // 临时模拟数据
         this.rankingList = [
@@ -177,10 +261,71 @@ export default {
             desc: '最新发布的优质作品',
             bookCount: 30,
             updateTime: '1小时前更新'
+          },
+          {
+            id: '3',
+            name: '完结榜单',
+            desc: '已完结的优质作品',
+            bookCount: 25,
+            updateTime: '6小时前更新'
           }
         ]
       } catch (error) {
         console.error('加载榜单数据失败:', error)
+      }
+    },
+    
+    /**
+     * 加载夹子书籍列表
+     */
+    async loadBookList(siteId) {
+      try {
+        // 这里应该调用API获取夹子书籍数据
+        // const response = await this.$http.get('/api/jiazi/books')
+        // this.bookList = response.data
+        
+        console.log('加载夹子书籍数据:', siteId)
+        
+        // 临时模拟数据
+        this.bookList = [
+          {
+            id: '1',
+            title: '重生之商业帝国',
+            collections: 15680,
+            collectionChange: 245,  // 正数表示增加
+            rankChange: -2  // 负数表示排名上升，正数表示排名下降
+          },
+          {
+            id: '2',
+            title: '穿越古代当皇后',
+            collections: 12450,
+            collectionChange: -89,
+            rankChange: 1
+          },
+          {
+            id: '3',
+            title: '现代都市修仙录',
+            collections: 11230,
+            collectionChange: 156,
+            rankChange: 0
+          },
+          {
+            id: '4',
+            title: '娱乐圈的那些事',
+            collections: 9870,
+            collectionChange: 78,
+            rankChange: -1
+          },
+          {
+            id: '5',
+            title: '末世重生女配逆袭',
+            collections: 8950,
+            collectionChange: -23,
+            rankChange: 3
+          }
+        ]
+      } catch (error) {
+        console.error('加载夹子书籍数据失败:', error)
       }
     },
     
@@ -198,6 +343,15 @@ export default {
     goToRankingDetail(ranking) {
       uni.navigateTo({
         url: `/pages/ranking/detail?id=${ranking.id}`
+      })
+    },
+    
+    /**
+     * 跳转到夹子榜单详情
+     */
+    goToJiaziDetail() {
+      uni.navigateTo({
+        url: `/pages/ranking/detail?id=jiazi&type=special`
       })
     }
   }
@@ -258,10 +412,12 @@ export default {
   border-radius: 50rpx;
   font-size: 28rpx;
   color: #333;
+  transition: all 0.3s ease;
   
   &.active {
     background-color: #007aff;
     color: white;
+    font-weight: bold;
   }
 }
 
@@ -295,5 +451,107 @@ export default {
   justify-content: space-between;
   font-size: 24rpx;
   color: #999;
+}
+
+/* 夹子书籍列表样式 */
+.book-list-container {
+  margin-top: 20rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  margin-bottom: 20rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.detail-btn {
+  padding: 10rpx 20rpx;
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+}
+
+.book-list {
+  height: 800rpx;
+}
+
+.book-item {
+  display: flex;
+  align-items: center;
+  padding: 25rpx 20rpx;
+  margin-bottom: 15rpx;
+  background-color: white;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1);
+}
+
+.book-rank {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #007aff;
+  color: white;
+  border-radius: 50%;
+  font-size: 24rpx;
+  font-weight: bold;
+  margin-right: 20rpx;
+}
+
+.book-info {
+  flex: 1;
+}
+
+.book-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10rpx;
+  line-height: 1.4;
+}
+
+.book-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.stat-item {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.change-indicator {
+  margin-left: 10rpx;
+  font-weight: bold;
+  
+  &.up {
+    color: #ff4d4f; /* 红色表示上升/增加 */
+  }
+  
+  &.down {
+    color: #52c41a; /* 绿色表示下降/减少 */
+  }
+}
+
+/* 内容容器样式 */
+.content-container {
+  margin-top: 20rpx;
+}
+
+.ranking-list-container {
+  margin-top: 20rpx;
 }
 </style> 
