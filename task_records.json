@@ -198,5 +198,24 @@
       "说明需要替换的API路径和注意事项",
       "包含开发和生产环境的跨域处理指导"
     ]
+  },
+  {
+    "task": "修复榜单页面JSON模块导入问题",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/data/url.js",
+      "JJClawler-frontend/pages/ranking/index.vue"
+    ],
+    "description": "修复榜单页面无法加载分站数据的问题，将JSON文件转换为JS模块",
+    "timestamp": "2025-06-20T01:10:00Z",
+    "details": [
+      "将data/url.json转换为data/url.js模块，支持ES6导出",
+      "添加getSitesList、getSiteById、getChannelsBySiteId等工具函数",
+      "修复ranking/index.vue中的模块导入问题，使用静态导入替代动态导入",
+      "简化层级3榜单列表的显示逻辑，确保正确渲染",
+      "添加调试信息显示当前页面状态",
+      "提供备用数据确保在导入失败时页面仍能正常工作",
+      "解决UniApp中JSON文件无法通过@别名require的问题"
+    ]
   }
 ] 

@@ -1,5 +1,13 @@
 <template>
   <view class="ranking-container">
+    <!-- 调试信息 -->
+    <view class="debug-info" style="background: #f0f0f0; padding: 10rpx; margin-bottom: 20rpx; font-size: 24rpx;">
+      <text>当前层级: {{ currentLevel }}</text>
+      <text> | 分站数量: {{ sites.length }}</text>
+      <text> | 选中分站: {{ selectedSite }}</text>
+      <text> | 榜单数量: {{ rankingList.length }}</text>
+    </view>
+    
     <!-- 搜索栏 -->
     <view class="search-section">
       <input 
@@ -52,7 +60,7 @@
     </view>
 
     <!-- 层级3: 榜单列表 -->
-    <view class="level-container" v-if="currentLevel === 3 || (currentLevel === 2 && currentSite.channels.length === 0)">
+    <view class="level-container" v-if="currentLevel === 3">
       <scroll-view class="ranking-list" scroll-y="true">
         <view 
           class="ranking-card"
@@ -73,6 +81,8 @@
 </template>
 
 <script>
+import { getSitesList } from '@/data/url.js'
+
 export default {
   data() {
     return {
@@ -95,11 +105,11 @@ export default {
     /**
      * 加载分站数据
      */
-    async loadSites() {
+    loadSites() {
       try {
-        // 从本地数据文件加载或从API获取
-        const urlData = require('@/data/url.json')
-        this.sites = Object.values(urlData.sites)
+        // 从本地数据文件加载
+        this.sites = getSitesList()
+        console.log('分站数据加载成功:', this.sites)
       } catch (error) {
         console.error('加载分站数据失败:', error)
       }

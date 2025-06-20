@@ -221,6 +221,8 @@ JJClawler-frontend/
 - **修复问题**: 解决settings页面中clearSync函数导出问题
 - **API文档**: 创建完整的API.md说明文档，包含跨域配置指导
 - **环境配置**: 详细说明开发环境(localhost:8000)和生产环境的配置
+- **榜单页面**: 修复JSON模块导入问题，将url.json转换为url.js模块
+- **调试优化**: 添加页面状态调试信息，便于问题排查
 
 ## 📱 所需图标资源详细规格 / Required Icon Resources
 

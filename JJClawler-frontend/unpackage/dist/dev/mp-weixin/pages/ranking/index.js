@@ -1,5 +1,6 @@
 "use strict";
 const common_vendor = require("../../common/vendor.js");
+const data_url = require("../../data/url.js");
 const _sfc_main = {
   data() {
     return {
@@ -21,12 +22,12 @@ const _sfc_main = {
     /**
      * 加载分站数据
      */
-    async loadSites() {
+    loadSites() {
       try {
-        const urlData = require("@/data/url.json");
-        this.sites = Object.values(urlData.sites);
+        this.sites = data_url.getSitesList();
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:112", "分站数据加载成功:", this.sites);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:104", "加载分站数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:114", "加载分站数据失败:", error);
       }
     },
     /**
@@ -85,14 +86,14 @@ const _sfc_main = {
           }
         ];
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:173", "加载榜单数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:183", "加载榜单数据失败:", error);
       }
     },
     /**
      * 搜索功能
      */
     onSearch() {
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:182", "搜索关键词:", this.searchKeyword);
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:192", "搜索关键词:", this.searchKeyword);
     },
     /**
      * 跳转到榜单详情
@@ -106,21 +107,25 @@ const _sfc_main = {
 };
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return common_vendor.e({
-    a: common_vendor.o([($event) => $data.searchKeyword = $event.detail.value, (...args) => $options.onSearch && $options.onSearch(...args)]),
-    b: $data.searchKeyword,
-    c: $data.currentLevel > 1
+    a: common_vendor.t($data.currentLevel),
+    b: common_vendor.t($data.sites.length),
+    c: common_vendor.t($data.selectedSite),
+    d: common_vendor.t($data.rankingList.length),
+    e: common_vendor.o([($event) => $data.searchKeyword = $event.detail.value, (...args) => $options.onSearch && $options.onSearch(...args)]),
+    f: $data.searchKeyword,
+    g: $data.currentLevel > 1
   }, $data.currentLevel > 1 ? common_vendor.e({
-    d: common_vendor.t($data.currentSite.name),
-    e: common_vendor.o(($event) => $options.goToLevel(1)),
-    f: $data.currentLevel > 2
+    h: common_vendor.t($data.currentSite.name),
+    i: common_vendor.o(($event) => $options.goToLevel(1)),
+    j: $data.currentLevel > 2
   }, $data.currentLevel > 2 ? {} : {}, {
-    g: $data.currentLevel > 2
+    k: $data.currentLevel > 2
   }, $data.currentLevel > 2 ? {
-    h: common_vendor.t($data.currentChannel.name)
+    l: common_vendor.t($data.currentChannel.name)
   } : {}) : {}, {
-    i: $data.currentLevel === 1
+    m: $data.currentLevel === 1
   }, $data.currentLevel === 1 ? {
-    j: common_vendor.f($data.sites, (site, k0, i0) => {
+    n: common_vendor.f($data.sites, (site, k0, i0) => {
       return {
         a: common_vendor.t(site.name),
         b: $data.selectedSite === site.id ? 1 : "",
@@ -129,9 +134,9 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       };
     })
   } : {}, {
-    k: $data.currentLevel === 2 && $data.currentSite.channels.length > 0
+    o: $data.currentLevel === 2 && $data.currentSite.channels.length > 0
   }, $data.currentLevel === 2 && $data.currentSite.channels.length > 0 ? {
-    l: common_vendor.f($data.currentSite.channels, (channel, k0, i0) => {
+    p: common_vendor.f($data.currentSite.channels, (channel, k0, i0) => {
       return {
         a: common_vendor.t(channel.name),
         b: $data.selectedChannel === channel.id ? 1 : "",
@@ -140,9 +145,9 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       };
     })
   } : {}, {
-    m: $data.currentLevel === 3 || $data.currentLevel === 2 && $data.currentSite.channels.length === 0
-  }, $data.currentLevel === 3 || $data.currentLevel === 2 && $data.currentSite.channels.length === 0 ? {
-    n: common_vendor.f($data.rankingList, (ranking, k0, i0) => {
+    q: $data.currentLevel === 3
+  }, $data.currentLevel === 3 ? {
+    r: common_vendor.f($data.rankingList, (ranking, k0, i0) => {
       return {
         a: common_vendor.t(ranking.name),
         b: common_vendor.t(ranking.desc),
