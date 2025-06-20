@@ -7,6 +7,7 @@ if (!Math) {
   "./pages/ranking/detail.js";
   "./pages/book/detail.js";
   "./pages/follow/index.js";
+  "./pages/settings/index.js";
 }
 const _sfc_main = {
   onLaunch: function() {

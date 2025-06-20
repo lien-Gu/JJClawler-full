@@ -177,5 +177,26 @@
       "支持主题切换弹窗、缓存清理弹窗等交互功能",
       "实现用户登录/退出登录状态管理"
     ]
+  },
+  {
+    "task": "修复storage.js导出问题并创建API说明文档",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/utils/storage.js",
+      "JJClawler-frontend/API.md"
+    ],
+    "description": "修复clearSync函数导出问题，创建完整的API接口说明文档",
+    "timestamp": "2025-06-20T01:05:00Z",
+    "details": [
+      "修复storage.js中clearSync函数未导出的问题，添加clearSync别名函数",
+      "更新默认导出对象，包含clearSync函数",
+      "创建API.md文档，包含完整的API接口定义",
+      "详细说明开发环境(localhost:8000)和生产环境的配置",
+      "提供跨域配置方案：后端CORS配置和UniApp代理配置",
+      "定义8大类API接口：统计数据、榜单、书籍、搜索、关注、用户、反馈、系统",
+      "提供完整的请求参数、响应示例、错误码说明",
+      "说明需要替换的API路径和注意事项",
+      "包含开发和生产环境的跨域处理指导"
+    ]
   }
 ] 

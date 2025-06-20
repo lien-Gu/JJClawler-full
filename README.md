@@ -199,21 +199,28 @@ JJClawler-frontend/
 - [x] 配置TabBar导航和页面路由
 
 ### 阶段五：接口集成 / Phase 5: API Integration
+- [x] 创建API接口说明文档 (API.md)
+- [x] 修复storage.js导出问题
 - [ ] 集成统计数据API
 - [ ] 集成分站频道API
 - [ ] 集成榜单搜索API
 - [ ] 集成书籍搜索API
 - [ ] 集成用户关注API
 
-### 阶段六：测试优化 / Phase 6: Testing & Optimization
+### 阶段六：测试优化 / Phase 6: Testing & Optimization  
 - [ ] 功能测试
 - [ ] 性能优化
 - [ ] 兼容性测试
 - [ ] 用户体验优化
 
 ### 当前状态 / Current Status
-✅ **已完成**: 项目架构设计、样式系统、公共组件、工具类、所有核心页面、TabBar导航配置
+✅ **已完成**: 项目架构设计、样式系统、公共组件、工具类、所有核心页面、TabBar导航配置、API文档
 🔄 **进行中**: API接口集成、最终测试优化
+
+### 最新更新 / Latest Updates
+- **修复问题**: 解决settings页面中clearSync函数导出问题
+- **API文档**: 创建完整的API.md说明文档，包含跨域配置指导
+- **环境配置**: 详细说明开发环境(localhost:8000)和生产环境的配置
 
 ## 📱 所需图标资源详细规格 / Required Icon Resources
 

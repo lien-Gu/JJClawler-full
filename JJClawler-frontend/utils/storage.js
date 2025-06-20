@@ -361,6 +361,14 @@ export function clear() {
 }
 
 /**
+ * 同步清空所有应用存储（clear的别名）
+ * @returns {boolean} 是否成功
+ */
+export function clearSync() {
+  return clear()
+}
+
+/**
  * 设置带默认过期时间的存储
  * @param {string} key 存储键名
  * @param {*} value 存储值
@@ -507,6 +515,7 @@ export default {
   getInfo,
   getAllInfo,
   clear,
+  clearSync,
   clearExpired,
   setWithDefaultExpire,
   setSession,
