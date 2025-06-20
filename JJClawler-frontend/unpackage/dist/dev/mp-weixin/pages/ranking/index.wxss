@@ -380,17 +380,6 @@
   background-color: #f8f8f8;
   font-size: 28rpx;
 }
-.breadcrumb.data-v-55d17871 {
-  margin-bottom: 20rpx;
-  font-size: 24rpx;
-  color: #666;
-}
-.breadcrumb-item.data-v-55d17871 {
-  color: #007aff;
-}
-.breadcrumb-separator.data-v-55d17871 {
-  margin: 0 10rpx;
-}
 .level-container.data-v-55d17871 {
   margin-bottom: 30rpx;
 }

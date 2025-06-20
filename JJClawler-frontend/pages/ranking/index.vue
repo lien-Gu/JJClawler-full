@@ -10,12 +10,7 @@
       />
     </view>
 
-    <!-- 面包屑导航 -->
-    <view class="breadcrumb" v-if="selectedSite">
-      <text class="breadcrumb-item" @tap="resetToSiteLevel">{{ currentSite.name }}</text>
-      <text class="breadcrumb-separator" v-if="selectedChannel"> > </text>
-      <text class="breadcrumb-item" v-if="selectedChannel" @tap="resetToChannelLevel">{{ currentChannel.name }}</text>
-    </view>
+
 
     <!-- 第一层级: 分站选择 - 始终显示 -->
     <view class="level-container">
@@ -142,19 +137,19 @@ export default {
     showContentLevel() {
       if (!this.selectedSite) return false
       
-      // 夹子：选中即显示
+      // 夹子：选中即显示书籍列表
       if (this.currentSite.type === 'special') {
         return true
       }
       
-      // 简单榜单：选中即显示
+      // 简单榜单：选中即显示榜单列表
       if (this.currentSite.type === 'simple') {
         return true
       }
       
-      // 复杂榜单：需要选中频道才显示
+      // 复杂榜单：选中分站即显示分站榜单，选中频道则显示频道榜单
       if (this.currentSite.type === 'complex') {
-        return this.selectedChannel !== ''
+        return true
       }
       
       return false
@@ -194,11 +189,10 @@ export default {
       if (site.type === 'special') {
         // 夹子：加载书籍列表
         this.loadBookList(site.id)
-      } else if (site.type === 'simple') {
-        // 简单榜单：加载榜单列表
+      } else {
+        // 简单榜单和复杂榜单：都加载分站的榜单列表
         this.loadRankings(site.id)
       }
-      // 复杂榜单：等待用户选择频道
     },
     
     /**
@@ -212,28 +206,7 @@ export default {
       this.loadRankings(this.selectedSite, channel.id)
     },
     
-    /**
-     * 重置到分站层级
-     */
-    resetToSiteLevel() {
-      this.selectedChannel = ''
-      this.currentChannel = {}
-      
-      // 重新加载分站内容
-      if (this.currentSite.type === 'special') {
-        this.loadBookList(this.selectedSite)
-      } else if (this.currentSite.type === 'simple') {
-        this.loadRankings(this.selectedSite)
-      }
-    },
-    
-    /**
-     * 重置到频道层级
-     */
-    resetToChannelLevel() {
-      // 重新加载频道内容
-      this.loadRankings(this.selectedSite, this.selectedChannel)
-    },
+
     
     /**
      * 加载榜单数据
@@ -246,33 +219,79 @@ export default {
         
         console.log('加载榜单数据:', siteId, channelId)
         
-        // 临时模拟数据
-        this.rankingList = [
-          {
-            id: '1',
-            name: '热门榜单',
-            desc: '当前最受欢迎的作品',
-            bookCount: 50,
-            updateTime: '2小时前更新'
-          },
-          {
-            id: '2', 
-            name: '新书榜单',
-            desc: '最新发布的优质作品',
-            bookCount: 30,
-            updateTime: '1小时前更新'
-          },
-          {
-            id: '3',
-            name: '完结榜单',
-            desc: '已完结的优质作品',
-            bookCount: 25,
-            updateTime: '6小时前更新'
-          }
-        ]
+        // 根据分站和频道生成不同的测试榜单数据
+        this.rankingList = this.generateTestRankings(siteId, channelId)
       } catch (error) {
         console.error('加载榜单数据失败:', error)
       }
+    },
+    
+    /**
+     * 生成测试榜单数据
+     */
+    generateTestRankings(siteId, channelId = '') {
+      const baseRankings = {
+        // 书城榜单
+        index: [
+          { id: 'index_1', name: '书城热门榜', desc: '书城最受欢迎的作品', bookCount: 100, updateTime: '1小时前更新' },
+          { id: 'index_2', name: '书城新书榜', desc: '书城最新发布的作品', bookCount: 80, updateTime: '2小时前更新' },
+          { id: 'index_3', name: '书城完结榜', desc: '书城已完结的优质作品', bookCount: 60, updateTime: '3小时前更新' }
+        ],
+        
+        // 言情分站榜单
+        yq: [
+          { id: 'yq_1', name: '言情总榜', desc: '言情分站综合排行', bookCount: 200, updateTime: '30分钟前更新' },
+          { id: 'yq_2', name: '言情月榜', desc: '本月最受欢迎的言情作品', bookCount: 150, updateTime: '1小时前更新' },
+          { id: 'yq_3', name: '言情新作榜', desc: '最新发布的言情作品', bookCount: 120, updateTime: '2小时前更新' },
+          { id: 'yq_4', name: '言情完结榜', desc: '已完结的优质言情作品', bookCount: 90, updateTime: '4小时前更新' }
+        ],
+        
+        // 纯爱分站榜单
+        ca: [
+          { id: 'ca_1', name: '纯爱总榜', desc: '纯爱分站综合排行', bookCount: 180, updateTime: '45分钟前更新' },
+          { id: 'ca_2', name: '纯爱热门榜', desc: '最受欢迎的纯爱作品', bookCount: 140, updateTime: '1小时前更新' },
+          { id: 'ca_3', name: '纯爱新书榜', desc: '最新发布的纯爱作品', bookCount: 110, updateTime: '2小时前更新' },
+          { id: 'ca_4', name: '纯爱收藏榜', desc: '收藏量最高的纯爱作品', bookCount: 85, updateTime: '3小时前更新' }
+        ],
+        
+        // 衍生分站榜单
+        ys: [
+          { id: 'ys_1', name: '衍生总榜', desc: '衍生分站综合排行', bookCount: 160, updateTime: '20分钟前更新' },
+          { id: 'ys_2', name: '衍生热门榜', desc: '最受欢迎的衍生作品', bookCount: 130, updateTime: '1小时前更新' },
+          { id: 'ys_3', name: '衍生新作榜', desc: '最新发布的衍生作品', bookCount: 100, updateTime: '2小时前更新' }
+        ],
+        
+        // 无CP+分站榜单
+        nocp_plus: [
+          { id: 'nocp_1', name: '无CP+总榜', desc: '无CP+分站综合排行', bookCount: 140, updateTime: '35分钟前更新' },
+          { id: 'nocp_2', name: '无CP+热门榜', desc: '最受欢迎的无CP+作品', bookCount: 110, updateTime: '1小时前更新' },
+          { id: 'nocp_3', name: '无CP+新书榜', desc: '最新发布的无CP+作品', bookCount: 90, updateTime: '3小时前更新' }
+        ],
+        
+        // 百合分站榜单
+        bh: [
+          { id: 'bh_1', name: '百合热门榜', desc: '最受欢迎的百合作品', bookCount: 80, updateTime: '1小时前更新' },
+          { id: 'bh_2', name: '百合新书榜', desc: '最新发布的百合作品', bookCount: 60, updateTime: '2小时前更新' },
+          { id: 'bh_3', name: '百合完结榜', desc: '已完结的优质百合作品', bookCount: 45, updateTime: '4小时前更新' }
+        ]
+      }
+      
+      // 如果有选中频道，生成频道特定榜单
+      if (channelId) {
+        const channelName = this.currentChannel.name || '频道'
+        return [
+          { id: `${channelId}_1`, name: `${channelName}热门榜`, desc: `${channelName}最受欢迎的作品`, bookCount: 80, updateTime: '30分钟前更新' },
+          { id: `${channelId}_2`, name: `${channelName}新书榜`, desc: `${channelName}最新发布的作品`, bookCount: 60, updateTime: '1小时前更新' },
+          { id: `${channelId}_3`, name: `${channelName}完结榜`, desc: `${channelName}已完结的优质作品`, bookCount: 40, updateTime: '2小时前更新' }
+        ]
+      }
+      
+      // 返回分站榜单，如果没有对应分站则返回默认榜单
+      return baseRankings[siteId] || [
+        { id: 'default_1', name: '热门榜单', desc: '当前最受欢迎的作品', bookCount: 50, updateTime: '2小时前更新' },
+        { id: 'default_2', name: '新书榜单', desc: '最新发布的优质作品', bookCount: 30, updateTime: '1小时前更新' },
+        { id: 'default_3', name: '完结榜单', desc: '已完结的优质作品', bookCount: 25, updateTime: '6小时前更新' }
+      ]
     },
     
     /**
@@ -377,19 +396,7 @@ export default {
   font-size: 28rpx;
 }
 
-.breadcrumb {
-  margin-bottom: 20rpx;
-  font-size: 24rpx;
-  color: #666;
-}
 
-.breadcrumb-item {
-  color: #007aff;
-}
-
-.breadcrumb-separator {
-  margin: 0 10rpx;
-}
 
 .level-container {
   margin-bottom: 30rpx;
