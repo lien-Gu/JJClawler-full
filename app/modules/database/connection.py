@@ -78,83 +78,22 @@ def create_db_and_tables():
         SQLModel.metadata.create_all(engine)
         logger.info("数据库表创建成功")
         
-        # 初始化基础数据
-        _init_base_data()
+        # 注意：榜单数据需要通过爬虫获取，不在此初始化
         
     except Exception as e:
         logger.error(f"创建数据库表失败: {e}")
         raise
 
 
-def _init_base_data():
-    """初始化基础榜单配置数据"""
-    from app.modules.models import Ranking, UpdateFrequency
-    
-    with Session(get_engine()) as session:
-        # 检查是否已有数据
-        existing_rankings = session.exec(select(Ranking)).first()
-        if existing_rankings:
-            logger.info("榜单配置数据已存在，跳过初始化")
-            return
-        
-        # 基础榜单配置
-        base_rankings = [
-            Ranking(
-                ranking_id="jiazi",
-                name="夹子",
-                channel="favObservation",
-                frequency=UpdateFrequency.HOURLY,
-                update_interval=1
-            ),
-            Ranking(
-                ranking_id="yq_gy",
-                name="言情-古言",
-                channel="gywx", 
-                frequency=UpdateFrequency.HOURLY,
-                update_interval=2
-            ),
-            Ranking(
-                ranking_id="yq_xy",
-                name="言情-现言",
-                channel="dsyq",
-                frequency=UpdateFrequency.DAILY,
-                update_interval=24
-            ),
-            Ranking(
-                ranking_id="ca_ds",
-                name="纯爱-都市",
-                channel="xddm",
-                frequency=UpdateFrequency.HOURLY,
-                update_interval=2
-            ),
-            Ranking(
-                ranking_id="ca_gd",
-                name="纯爱-古代",
-                channel="gddm",
-                frequency=UpdateFrequency.DAILY,
-                update_interval=24
-            )
-        ]
-        
-        for ranking in base_rankings:
-            session.add(ranking)
-        
-        try:
-            session.commit()
-            logger.info(f"初始化了 {len(base_rankings)} 个榜单配置")
-        except Exception as e:
-            session.rollback()
-            logger.error(f"初始化基础数据失败: {e}")
-            raise
+# 榜单数据将通过爬虫模块获取并存储，此处不再初始化mock数据
 
 
 def check_database_health() -> bool:
     """检查数据库连接是否正常"""
     try:
-        from app.modules.models import Ranking
         with Session(get_engine()) as session:
-            # 简单查询测试连接
-            result = session.exec(select(Ranking)).first()
+            # 简单查询测试连接（测试一个简单的SQL）
+            session.exec(select(1))
             return True
     except Exception as e:
         logger.error(f"数据库健康检查失败: {e}")
