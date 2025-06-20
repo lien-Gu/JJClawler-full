@@ -1,0 +1,140 @@
+// Flex 布局混入 / Flex Layout Mixins
+@mixin flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@mixin flex-around {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin flex-column-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+// 文字省略混入 / Text Ellipsis Mixins
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin text-ellipsis-multiline($lines: 2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+}
+
+// 卡片样式混入 / Card Style Mixins
+@mixin card-style($radius: $border-radius-medium, $shadow: $shadow-medium) {
+  background-color: $card-background;
+  border-radius: $radius;
+  box-shadow: $shadow;
+}
+
+@mixin card-hover {
+  transition: all 0.3s ease;
+  &:hover {
+    transform: translateY(-2rpx);
+    box-shadow: $shadow-dark;
+  }
+}
+
+// 按钮样式混入 / Button Style Mixins
+@mixin button-primary {
+  background-color: $primary-color;
+  color: white;
+  border: none;
+  border-radius: $border-radius-large;
+  padding: $spacing-sm $spacing-lg;
+  font-size: $font-size-md;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+@mixin button-secondary {
+  background-color: transparent;
+  color: $primary-color;
+  border: 2rpx solid $primary-color;
+  border-radius: $border-radius-large;
+  padding: $spacing-sm $spacing-lg;
+  font-size: $font-size-md;
+  
+  &:hover {
+    background-color: $primary-color;
+    color: white;
+  }
+}
+
+// 输入框样式混入 / Input Style Mixins
+@mixin input-style {
+  border: 2rpx solid $border-light;
+  border-radius: $border-radius-large;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-md;
+  background-color: $background-color;
+  
+  &:focus {
+    border-color: $primary-color;
+    outline: none;
+  }
+  
+  &::placeholder {
+    color: $text-placeholder;
+  }
+}
+
+// 标签样式混入 / Tag Style Mixins
+@mixin tag-style($active: false) {
+  padding: $spacing-sm $spacing-lg;
+  border-radius: $border-radius-large;
+  font-size: $font-size-md;
+  transition: all 0.3s ease;
+  
+  @if $active {
+    background-color: $primary-color;
+    color: white;
+  } @else {
+    background-color: $background-color;
+    color: $text-primary;
+    
+    &:hover {
+      background-color: $primary-color;
+      color: white;
+    }
+  }
+}
+
+// 响应式混入 / Responsive Mixins
+@mixin mobile-only {
+  @media (max-width: 750rpx) {
+    @content;
+  }
+}
+
+@mixin tablet-up {
+  @media (min-width: 751rpx) {
+    @content;
+  }
+} 
