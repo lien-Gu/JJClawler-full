@@ -54,8 +54,8 @@ async def lifespan(app: FastAPI):
     
     # 关闭数据服务
     try:
-        from app.modules.data_service import close_data_service
-        close_data_service()
+        from app.modules.database import close_database_connections
+        close_database_connections()
         logger.info("数据服务已关闭")
     except Exception as e:
         logger.error(f"关闭数据服务失败: {e}")

@@ -101,9 +101,9 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-### 3.3 简化的项目结构
+### 3.3 标准四层架构设计
 
-基于最简单实现的原则，项目采用扁平化结构：
+项目采用经典的四层架构模式，职责分明、结构清晰：
 
 ```
 JJClawer3/
@@ -117,15 +117,24 @@ JJClawer3/
 │   │   ├── rankings.py           # 榜单相关接口
 │   │   ├── books.py              # 书籍相关接口
 │   │   └── crawl.py              # 爬虫管理接口
-│   └── modules/                  # 核心业务模块
-│       ├── __init__.py
-│       ├── database.py           # 数据库连接和配置
-│       ├── data_service.py       # 数据访问服务
-│       ├── models/               # 数据模型包
+│   └── modules/                  # 核心业务模块（四层架构）
+│       ├── database/             # Database层：数据库连接管理
+│       │   ├── __init__.py       # 统一导出接口
+│       │   └── connection.py     # 连接池、会话管理、表创建
+│       ├── models/               # Model层：数据模型定义
 │       │   ├── __init__.py       # 统一导出接口
 │       │   ├── base.py           # 基础类型和枚举
-│       │   ├── database.py       # 数据库表模型（4个表）
-│       │   └── api.py            # API响应模型
+│       │   ├── book.py           # Book领域模型
+│       │   ├── ranking.py        # Ranking领域模型
+│       │   └── api.py            # API请求响应模型
+│       ├── dao/                  # DAO层：数据访问对象
+│       │   ├── __init__.py       # 统一导出接口
+│       │   ├── book_dao.py       # Book数据访问
+│       │   └── ranking_dao.py    # Ranking数据访问
+│       ├── service/              # Service层：业务逻辑
+│       │   ├── __init__.py       # 统一导出接口
+│       │   ├── book_service.py   # Book业务逻辑
+│       │   └── ranking_service.py # Ranking业务逻辑
 │       ├── crawler.py            # 爬虫模块（待实现）
 │       └── task_service.py       # 任务管理（待实现）
 ├── data/
@@ -139,25 +148,58 @@ JJClawer3/
 └── .env.example
 ```
 
-#### 3.3.1 模块职责划分
+#### 3.3.1 四层架构详解
 
-| 模块 | 文件 | 职责 | 数据存储 |
-|------|------|------|----------|
-| 数据模型 | `models.py` | SQLModel定义 | SQLite数据库 |
-| 爬虫模块 | `modules/crawler.py` | 数据采集、解析 | 写入数据库 |
-| 数据服务 | `modules/data_service.py` | 数据查询、分析 | 读取数据库 |
-| 任务管理 | `modules/task_service.py` | 任务调度、状态管理 | JSON文件 |
-| API路由 | `api/*.py` | 接口实现 | 调用业务模块 |
+**🏗️ Database层**
+- **职责**：数据库连接管理、会话控制、表创建
+- **文件**：`modules/database/connection.py`
+- **功能**：SQLite连接池、PRAGMA优化、事务管理
 
-#### 3.3.2 数据存储策略
+**📊 Model层**
+- **职责**：数据模型定义、类型约束、关系映射
+- **文件**：`modules/models/`（按业务领域拆分）
+  - `book.py`：Book + BookSnapshot模型
+  - `ranking.py`：Ranking + RankingSnapshot模型
+  - `api.py`：API请求响应模型
 
-**数据库存储（SQLite）：**
-- 核心业务数据：榜单、书籍、快照数据
-- 需要复杂查询的结构化数据
+**🔧 DAO层**
+- **职责**：数据访问对象、CRUD操作、复杂查询
+- **文件**：`modules/dao/`（按业务领域拆分）
+  - `book_dao.py`：Book数据访问封装
+  - `ranking_dao.py`：Ranking数据访问封装
 
-**文件存储（JSON）：**
-- 任务管理：状态简单，读写频率低
-- 配置信息：基本不变的静态配置
+**⚙️ Service层**
+- **职责**：业务逻辑组合、事务控制、数据转换
+- **文件**：`modules/service/`（按业务领域拆分）
+  - `book_service.py`：Book业务逻辑
+  - `ranking_service.py`：Ranking业务逻辑
+
+**🌐 API层**
+- **职责**：HTTP接口、参数验证、响应格式化
+- **文件**：`api/`（按功能模块拆分）
+- **依赖**：通过依赖注入调用Service层
+
+#### 3.3.2 架构优势
+
+**🔄 分层解耦**
+- 每层职责单一，修改影响最小化
+- 支持单元测试和集成测试
+- 便于团队协作开发
+
+**🚀 高可扩展性**
+- 按业务领域拆分，便于功能扩展
+- Service层可独立复用
+- DAO层支持多数据源切换
+
+**💡 代码复用**
+- SQLModel双重用途（数据库+API模型）
+- 统一的依赖注入机制
+- 标准化的异常处理
+
+**🛡️ 数据安全**
+- 数据库事务控制
+- SQL注入防护
+- 连接池管理
 
 **优势：**
 - 减少数据库表数量，降低复杂度

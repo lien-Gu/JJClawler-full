@@ -1,15 +1,22 @@
 """
-数据模型包
+Model层
 
-导出所有数据模型类，提供统一的导入接口
+统一导出所有数据模型
 """
+# 基础类型
 from .base import UpdateFrequency
-from .database import Ranking, Book, BookSnapshot, RankingSnapshot  
+
+# 数据库模型
+from .book import Book, BookSnapshot
+from .ranking import Ranking, RankingSnapshot
+
+# API模型
 from .api import (
-    BookDetail, RankingInfo, BookInRanking, 
-    BookRankingHistory, BookTrendData, RankingSnapshotSummary
-)
-from .request_response import (
+    # Book相关
+    BookDetail, BookInRanking, BookRankingHistory, BookTrendData,
+    # Ranking相关  
+    RankingInfo, RankingSnapshotSummary,
+    # 请求响应模型
     PageConfig, SubPageConfig, RankingConfig, PagesResponse,
     RankingBooksResponse, RankingHistoryResponse,
     BookRankingsResponse, BookTrendsResponse, BookSearchResponse,
@@ -18,17 +25,20 @@ from .request_response import (
 )
 
 __all__ = [
-    # 枚举
+    # 基础类型
     "UpdateFrequency",
+    
     # 数据库模型
-    "Ranking", "Book", "BookSnapshot", "RankingSnapshot",
+    "Book", "BookSnapshot", "Ranking", "RankingSnapshot",
+    
     # API模型
-    "BookDetail", "RankingInfo", "BookInRanking",
-    "BookRankingHistory", "BookTrendData", "RankingSnapshotSummary",
+    "BookDetail", "BookInRanking", "BookRankingHistory", "BookTrendData",
+    "RankingInfo", "RankingSnapshotSummary",
+    
     # 请求响应模型
     "PageConfig", "SubPageConfig", "RankingConfig", "PagesResponse",
     "RankingBooksResponse", "RankingHistoryResponse",
-    "BookRankingsResponse", "BookTrendsResponse", "BookSearchResponse", 
+    "BookRankingsResponse", "BookTrendsResponse", "BookSearchResponse",
     "CrawlJiaziRequest", "CrawlRankingRequest", "TaskCreateResponse",
     "TaskInfo", "TasksResponse"
 ]
