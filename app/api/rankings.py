@@ -5,12 +5,12 @@
 """
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Query, Path, HTTPException
-from app.schemas.rankings import (
+from app.modules.models import (
     RankingBooksResponse, 
-    RankingHistoryResponse,
-    BookInRanking,
+    RankingHistoryResponse, 
+    RankingConfig,
     RankingInfo,
-    RankingSnapshot
+    BookInRanking
 )
 
 router = APIRouter(prefix="/rankings", tags=["榜单数据"])
@@ -55,7 +55,7 @@ async def get_ranking_books(
     mock_books = []
     for i in range(min(limit, 50)):  # 最多50本书
         if i >= offset:
-            mock_books.append(BookInRanking(
+            book_in_ranking = BookInRanking(
                 book_id=f"{ranking_id}_book_{i+1:03d}",
                 title=f"测试小说{i+1}",
                 author_name=f"作者{i+1}",
@@ -64,7 +64,8 @@ async def get_ranking_books(
                 novel_class="原创-言情-架空历史" if "yq" in ranking_id else "原创-纯爱-近代现代",
                 tags="甜文,轻松,情有独钟",
                 position_change="new" if i < 5 else (f"+{i%3}" if i%2 == 0 else f"-{i%2}")
-            ))
+            )
+            mock_books.append(book_in_ranking.model_dump())
     
     snapshot_time = datetime.now()
     if date:
@@ -74,13 +75,14 @@ async def get_ranking_books(
             raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     
     return RankingBooksResponse(
-        ranking=RankingInfo(
+        ranking=RankingConfig(
             ranking_id=ranking_id,
             name=ranking_names[ranking_id],
-            channel=channels[ranking_id]
+            update_frequency="hourly"
         ),
-        snapshot_time=snapshot_time,
-        total_books=50,
+        total=50,
+        page=offset // limit + 1,
+        limit=limit,
         books=mock_books
     )
 
@@ -121,17 +123,17 @@ async def get_ranking_history(
     mock_snapshots = []
     for i in range(days):
         snapshot_date = datetime.now() - timedelta(days=i)
-        mock_snapshots.append(RankingSnapshot(
-            snapshot_time=snapshot_date,
-            total_books=50 - (i % 5),  # 模拟榜单书籍数量的小幅变化
-            top_book_title=f"当日热门小说{(i+1)%10}" if i < 10 else None
-        ))
+        mock_snapshots.append({
+            "snapshot_time": snapshot_date.isoformat(),
+            "total_books": 50 - (i % 5),  # 模拟榜单书籍数量的小幅变化
+            "top_book_title": f"当日热门小说{(i+1)%10}" if i < 10 else None
+        })
     
     return RankingHistoryResponse(
-        ranking=RankingInfo(
+        ranking=RankingConfig(
             ranking_id=ranking_id,
             name=ranking_names[ranking_id],
-            channel=channels[ranking_id]
+            update_frequency="hourly"
         ),
         days=days,
         snapshots=list(reversed(mock_snapshots))  # 按时间正序返回

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
-from app.schemas.crawl import (
+from app.modules.models import (
     TasksResponse,
     TaskCreateResponse,
     CrawlJiaziRequest,

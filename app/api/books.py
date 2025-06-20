@@ -6,11 +6,11 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Query, Path, HTTPException
-from app.schemas.books import (
+from app.modules.models import (
     BookDetail,
     BookRankingsResponse, 
     BookTrendsResponse,
-    BooksSearchResponse,
+    BookSearchResponse,
     BookRankingHistory,
     BookTrendData
 )
@@ -108,9 +108,9 @@ async def get_book_rankings(
             ))
     
     return BookRankingsResponse(
-        book=mock_book,
-        current_rankings=current_rankings,
-        history=history_records,
+        book=mock_book.model_dump(),
+        current_rankings=[ranking.model_dump() for ranking in current_rankings],
+        history=[record.model_dump() for record in history_records],
         total_records=min(days, 100)  # 模拟总记录数
     )
 
@@ -150,11 +150,11 @@ async def get_book_trends(
         book_id=book_id,
         title=f"测试小说_{book_id}",
         days=days,
-        trends=trends
+        trends=[trend.model_dump() for trend in trends]
     )
 
 
-@router.get("", response_model=BooksSearchResponse)
+@router.get("", response_model=BookSearchResponse)
 async def search_books(
     author: Optional[str] = Query(None, description="作者名筛选"),
     tags: Optional[str] = Query(None, description="标签筛选"),
@@ -187,7 +187,7 @@ async def search_books(
                 latest_chapters=30 + (i+offset)*2
             ))
     
-    return BooksSearchResponse(
+    return BookSearchResponse(
         total=100,  # Mock总数
-        books=mock_books
+        books=[book.model_dump() for book in mock_books]
     )

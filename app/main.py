@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.config import get_settings, ensure_directories
 
@@ -31,7 +30,19 @@ async def lifespan(app: FastAPI):
     ensure_directories()
     logger.info("目录结构检查完成")
     
-    # TODO: 初始化数据库连接
+    # 初始化数据库
+    try:
+        from app.modules.database import create_db_and_tables, check_database_health
+        create_db_and_tables()
+        
+        if check_database_health():
+            logger.info("数据库初始化成功，连接正常")
+        else:
+            logger.warning("数据库连接检查失败")
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        raise
+    
     # TODO: 启动任务调度器
     
     logger.info("应用启动完成")
@@ -40,7 +51,15 @@ async def lifespan(app: FastAPI):
     
     # 关闭时执行
     logger.info("正在关闭应用...")
-    # TODO: 关闭数据库连接
+    
+    # 关闭数据服务
+    try:
+        from app.modules.data_service import close_data_service
+        close_data_service()
+        logger.info("数据服务已关闭")
+    except Exception as e:
+        logger.error(f"关闭数据服务失败: {e}")
+    
     # TODO: 停止任务调度器
     logger.info("应用已关闭")
 

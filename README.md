@@ -110,20 +110,24 @@ JJClawer3/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                   # FastAPI应用入口
-│   ├── models.py                 # SQLModel数据模型（4个表）
-│   ├── database.py               # 数据库连接和配置
 │   ├── config.py                 # 配置管理
-│   ├── api/                      # API路由
+│   ├── api/                      # API路由层
 │   │   ├── __init__.py
 │   │   ├── pages.py              # 页面配置接口
 │   │   ├── rankings.py           # 榜单相关接口
 │   │   ├── books.py              # 书籍相关接口
 │   │   └── crawl.py              # 爬虫管理接口
-│   └── modules/                  # 业务模块
+│   └── modules/                  # 核心业务模块
 │       ├── __init__.py
-│       ├── crawler.py            # 爬虫模块
-│       ├── data_service.py       # 数据服务
-│       └── task_service.py       # 任务管理（JSON文件）
+│       ├── database.py           # 数据库连接和配置
+│       ├── data_service.py       # 数据访问服务
+│       ├── models/               # 数据模型包
+│       │   ├── __init__.py       # 统一导出接口
+│       │   ├── base.py           # 基础类型和枚举
+│       │   ├── database.py       # 数据库表模型（4个表）
+│       │   └── api.py            # API响应模型
+│       ├── crawler.py            # 爬虫模块（待实现）
+│       └── task_service.py       # 任务管理（待实现）
 ├── data/
 │   ├── urls.json                 # 爬取配置
 │   ├── tasks/                    # 任务JSON文件存储

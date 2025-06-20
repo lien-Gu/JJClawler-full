@@ -4,7 +4,7 @@
 提供页面和榜单配置信息的API端点
 """
 from fastapi import APIRouter, Depends
-from app.schemas.pages import PagesResponse, PageConfig, SubPageConfig, RankingConfig
+from app.modules.models import PagesResponse, PageConfig, SubPageConfig, RankingConfig
 
 router = APIRouter(prefix="/pages", tags=["页面配置"])
 
