@@ -3,6 +3,7 @@ $primary-color: #007aff;
 $secondary-color: #3cc51f;
 $accent-color: #ff6b35;
 $background-color: #f8f8f8;
+$page-background: #f5f5f5;
 $card-background: #ffffff;
 
 // 文字色彩 / Text Colors
@@ -44,4 +45,13 @@ $shadow-dark: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
 // TabBar 相关 / TabBar Related
 $tabbar-color: #7a7e83;
 $tabbar-selected-color: #3cc51f;
-$tabbar-background: #ffffff; 
+$tabbar-background: #ffffff;
+
+// 安全区域 / Safe Area
+$safe-area-bottom: env(safe-area-inset-bottom);
+
+// 状态色彩 / Status Colors
+$success-color: #34c759;
+$warning-color: #ff9500;
+$error-color: #ff3b30;
+$info-color: #007aff; 
