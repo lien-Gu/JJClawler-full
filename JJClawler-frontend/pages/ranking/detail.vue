@@ -27,64 +27,132 @@
       </view>
     </view>
     
-    <!-- 统计数据 -->
-    <view class="stats-section">
-      <view class="stats-grid">
-        <view class="stat-item">
-          <text class="stat-value">{{ rankingData.bookCount || 0 }}</text>
-          <text class="stat-label">书籍总数</text>
+    <!-- 第一层：变化曲线 -->
+    <view class="layer-section chart-section">
+      <view class="layer-header">
+        <text class="layer-title">📈 数据变化趋势</text>
+      </view>
+      
+      <!-- Tab切换 -->
+      <view class="chart-tabs">
+        <view 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'totalClicks' }"
+          @tap="switchTab('totalClicks')"
+        >
+          <text class="tab-text">点击量总和</text>
         </view>
-        <view class="stat-item">
-          <text class="stat-value">{{ formatNumber(rankingData.totalViews || 0) }}</text>
-          <text class="stat-label">总浏览量</text>
+        <view 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'avgClicks' }"
+          @tap="switchTab('avgClicks')"
+        >
+          <text class="tab-text">点击量均值</text>
         </view>
-        <view class="stat-item">
-          <text class="stat-value">{{ rankingData.updateFrequency || '每日' }}</text>
-          <text class="stat-label">更新频率</text>
+        <view 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'totalCollects' }"
+          @tap="switchTab('totalCollects')"
+        >
+          <text class="tab-text">收藏量总和</text>
         </view>
-        <view class="stat-item">
-          <text class="stat-value">{{ rankingData.followCount || 0 }}</text>
-          <text class="stat-label">关注人数</text>
+        <view 
+          class="tab-item" 
+          :class="{ 'active': activeTab === 'avgCollects' }"
+          @tap="switchTab('avgCollects')"
+        >
+          <text class="tab-text">收藏量均值</text>
         </view>
       </view>
-    </view>
-    
-    <!-- 筛选和排序 -->
-    <view class="filter-section">
-      <scroll-view class="filter-scroll" scroll-x>
-        <view class="filter-list">
-          <view 
-            class="filter-item" 
-            :class="{ 'active': currentFilter === filter.key }"
-            v-for="filter in filterOptions" 
-            :key="filter.key"
-            @tap="changeFilter(filter.key)"
-          >
-            <text class="filter-text">{{ filter.name }}</text>
+      
+      <!-- 图表区域 -->
+      <view class="chart-container">
+        <view class="chart-area" v-if="chartData.length > 0">
+          <!-- 网格线 -->
+          <view class="chart-grid">
+            <view class="grid-line" v-for="i in 5" :key="i"></view>
+          </view>
+          
+          <!-- 数据点和连线 -->
+          <view class="chart-line">
+            <view 
+              class="data-point" 
+              v-for="(point, index) in chartPoints" 
+              :key="index"
+              :style="{ left: point.x + '%', bottom: point.y + '%' }"
+            >
+              <view class="point-dot"></view>
+              <text class="point-value">{{ point.value }}</text>
+            </view>
+            
+            <!-- SVG连接线 -->
+            <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <polyline 
+                :points="chartLinePoints" 
+                fill="none" 
+                stroke="#007aff" 
+                stroke-width="0.5"
+              />
+            </svg>
           </view>
         </view>
-      </scroll-view>
+        
+        <view class="empty-chart" v-else>
+          <text class="empty-icon">📊</text>
+          <text class="empty-text">暂无数据</text>
+        </view>
+      </view>
       
-      <view class="sort-btn" @tap="showSortOptions">
-        <text class="sort-text">{{ currentSortName }}</text>
-        <text class="sort-icon">▼</text>
+      <!-- 数据概览 -->
+      <view class="chart-summary" v-if="chartData.length > 0">
+        <view class="summary-item">
+          <text class="summary-label">最高值</text>
+          <text class="summary-value">{{ formatNumber(getMaxValue()) }}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">最低值</text>
+          <text class="summary-value">{{ formatNumber(getMinValue()) }}</text>
+        </view>
+        <view class="summary-item">
+          <text class="summary-label">总变化</text>
+          <text class="summary-value">{{ getTotalChange() }}</text>
+        </view>
       </view>
     </view>
     
-    <!-- 书籍列表 -->
-    <view class="books-section">
-      <view class="books-list">
-        <BookCard 
+    <!-- 第二层：书籍列表 -->
+    <view class="layer-section books-section">
+      <view class="layer-header">
+        <text class="layer-title">📚 榜单书籍</text>
+        <text class="book-count">共{{ booksList.length }}本</text>
+      </view>
+      
+      <view class="books-list" v-if="booksList.length > 0">
+        <view 
+          class="book-item"
           v-for="(book, index) in booksList" 
           :key="book.id"
-          :book="{ ...book, rank: index + 1 + (currentPage - 1) * pageSize }"
-          :showRankings="false"
-          :showActions="true"
-          @click="goToBookDetail"
-          @follow="onBookFollow"
-          @read="onBookRead"
-          @share="onBookShare"
-        />
+          @tap="goToBookDetail(book)"
+        >
+          <view class="book-rank">{{ index + 1 }}</view>
+          <view class="book-info">
+            <view class="book-title">{{ book.title }}</view>
+            <view class="book-stats">
+              <text class="stat-item">
+                收藏: {{ formatNumber(book.collections) }}
+                <text class="change-indicator" :class="book.collectionChange > 0 ? 'up' : 'down'">
+                  {{ book.collectionChange > 0 ? '↑' : '↓' }}{{ Math.abs(book.collectionChange) }}
+                </text>
+              </text>
+              <text class="stat-item">
+                排名: 
+                <text class="change-indicator" :class="book.rankChange > 0 ? 'down' : 'up'">
+                  {{ book.rankChange === 0 ? '—' : (book.rankChange > 0 ? '↓' : '↑') }}{{ Math.abs(book.rankChange) }}
+                </text>
+              </text>
+            </view>
+          </view>
+        </view>
       </view>
       
       <!-- 加载更多 -->
@@ -111,47 +179,19 @@
         </view>
       </view>
     </view>
-    
-    <!-- 排序选择弹窗 -->
-    <view class="sort-popup" v-if="showSortPopup" @tap="hideSortOptions">
-      <view class="popup-content" @tap.stop>
-        <view class="popup-header">
-          <text class="popup-title">选择排序方式</text>
-          <view class="popup-close" @tap="hideSortOptions">
-            <text class="close-text">×</text>
-          </view>
-        </view>
-        <view class="sort-options">
-          <view 
-            class="sort-option" 
-            :class="{ 'active': currentSort === option.key }"
-            v-for="option in sortOptions" 
-            :key="option.key"
-            @tap="changeSort(option.key)"
-          >
-            <text class="option-text">{{ option.name }}</text>
-            <text class="option-check" v-if="currentSort === option.key">✓</text>
-          </view>
-        </view>
-      </view>
-    </view>
   </view>
 </template>
 
 <script>
-import BookCard from '@/components/BookCard.vue'
 import { get } from '@/utils/request.js'
 import { getSync, setSync } from '@/utils/storage.js'
 
 /**
- * 榜单详情页面
- * @description 展示榜单统计信息和书籍列表
+ * 榜单详情页面 - 两层数据展示
+ * @description 第一层：变化曲线，第二层：书籍列表
  */
 export default {
   name: 'RankingDetailPage',
-  components: {
-    BookCard
-  },
   
   data() {
     return {
@@ -159,7 +199,25 @@ export default {
       rankingId: '',
       
       // 榜单数据
-      rankingData: {},
+      rankingData: {
+        name: '',
+        description: '',
+        siteName: '',
+        channelName: '',
+        updateTime: ''
+      },
+      
+      // 当前选中的tab
+      activeTab: 'totalClicks', // 'totalClicks' | 'avgClicks' | 'totalCollects' | 'avgCollects'
+      
+      // 图表数据
+      chartStats: {
+        dates: [],
+        totalClicksData: [],    // 点击量增量总和
+        avgClicksData: [],      // 点击量增量平均值
+        totalCollectsData: [],  // 收藏量增量总和
+        avgCollectsData: []     // 收藏量增量平均值
+      },
       
       // 书籍列表
       booksList: [],
@@ -169,25 +227,6 @@ export default {
       pageSize: 20,
       hasMore: true,
       
-      // 筛选选项
-      filterOptions: [
-        { key: 'all', name: '全部' },
-        { key: 'completed', name: '已完结' },
-        { key: 'ongoing', name: '连载中' },
-        { key: 'new', name: '新书' }
-      ],
-      currentFilter: 'all',
-      
-      // 排序选项
-      sortOptions: [
-        { key: 'rank', name: '榜单排名' },
-        { key: 'updateTime', name: '最近更新' },
-        { key: 'wordCount', name: '字数排序' },
-        { key: 'score', name: '评分排序' }
-      ],
-      currentSort: 'rank',
-      showSortPopup: false,
-      
       // 加载状态
       loading: false,
       loadingMore: false
@@ -196,11 +235,45 @@ export default {
   
   computed: {
     /**
-     * 当前排序名称
+     * 当前显示的图表数据
      */
-    currentSortName() {
-      const option = this.sortOptions.find(item => item.key === this.currentSort)
-      return option ? option.name : '榜单排名'
+    chartData() {
+      switch (this.activeTab) {
+        case 'totalClicks':
+          return this.chartStats.totalClicksData || []
+        case 'avgClicks':
+          return this.chartStats.avgClicksData || []
+        case 'totalCollects':
+          return this.chartStats.totalCollectsData || []
+        case 'avgCollects':
+          return this.chartStats.avgCollectsData || []
+        default:
+          return []
+      }
+    },
+    
+    /**
+     * 图表点位数据
+     */
+    chartPoints() {
+      if (this.chartData.length === 0) return []
+      
+      const maxValue = Math.max(...this.chartData)
+      const minValue = Math.min(...this.chartData)
+      const range = maxValue - minValue || 1
+      
+      return this.chartData.map((value, index) => ({
+        x: (index / (this.chartData.length - 1)) * 100,
+        y: ((value - minValue) / range) * 80 + 10,
+        value: this.formatNumber(value)
+      }))
+    },
+    
+    /**
+     * 图表连接线点位
+     */
+    chartLinePoints() {
+      return this.chartPoints.map(point => `${point.x},${100 - point.y}`).join(' ')
     }
   },
   
@@ -239,6 +312,7 @@ export default {
         // 获取最新数据
         await Promise.all([
           this.fetchRankingInfo(),
+          this.fetchChartStats(),
           this.fetchBooksList(true)
         ])
       } catch (error) {
@@ -253,11 +327,16 @@ export default {
      * 加载缓存数据
      */
     loadCachedData() {
-      const cachedRanking = getSync(`ranking_${this.rankingId}`)
+      const cachedRanking = getSync(`ranking_detail_${this.rankingId}`)
+      const cachedChart = getSync(`ranking_chart_${this.rankingId}`)
       const cachedBooks = getSync(`ranking_books_${this.rankingId}`)
       
       if (cachedRanking) {
-        this.rankingData = cachedRanking
+        this.rankingData = { ...this.rankingData, ...cachedRanking }
+      }
+      
+      if (cachedChart) {
+        this.chartStats = cachedChart
       }
       
       if (cachedBooks) {
@@ -270,13 +349,29 @@ export default {
      */
     async fetchRankingInfo() {
       try {
-        const data = await get(`/api/rankings/${this.rankingId}`)
-        if (data) {
-          this.rankingData = data
-          setSync(`ranking_${this.rankingId}`, data, 30 * 60 * 1000) // 缓存30分钟
-        }
+        // 模拟API调用
+        const data = await this.getMockRankingData()
+        
+        this.rankingData = { ...this.rankingData, ...data }
+        setSync(`ranking_detail_${this.rankingId}`, data, 30 * 60 * 1000) // 缓存30分钟
       } catch (error) {
         console.error('获取榜单信息失败:', error)
+        throw error
+      }
+    },
+    
+    /**
+     * 获取图表统计数据
+     */
+    async fetchChartStats() {
+      try {
+        // 模拟API调用
+        const data = await this.getMockChartData()
+        
+        this.chartStats = data
+        setSync(`ranking_chart_${this.rankingId}`, data, 15 * 60 * 1000) // 缓存15分钟
+      } catch (error) {
+        console.error('获取图表数据失败:', error)
         throw error
       }
     },
@@ -291,33 +386,117 @@ export default {
           this.hasMore = true
         }
         
-        const params = {
-          page: this.currentPage,
-          pageSize: this.pageSize,
-          filter: this.currentFilter,
-          sort: this.currentSort
+        // 模拟API调用
+        const data = await this.getMockBooksData(this.currentPage)
+        
+        if (reset) {
+          this.booksList = data.list
+        } else {
+          this.booksList.push(...data.list)
         }
         
-        const data = await get(`/api/rankings/${this.rankingId}/books`, params)
+        this.hasMore = data.hasMore || false
+        this.currentPage++
         
-        if (data && data.list) {
-          if (reset) {
-            this.booksList = data.list
-          } else {
-            this.booksList.push(...data.list)
-          }
-          
-          this.hasMore = data.hasMore || false
-          this.currentPage++
-          
-          // 缓存第一页数据
-          if (reset) {
-            setSync(`ranking_books_${this.rankingId}`, data.list, 15 * 60 * 1000) // 缓存15分钟
-          }
+        // 缓存第一页数据
+        if (reset) {
+          setSync(`ranking_books_${this.rankingId}`, data.list, 15 * 60 * 1000) // 缓存15分钟
         }
       } catch (error) {
         console.error('获取书籍列表失败:', error)
         throw error
+      }
+    },
+    
+    /**
+     * 获取模拟榜单数据
+     */
+    async getMockRankingData() {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      return {
+        name: '言情总榜',
+        description: '言情分站综合排行榜单',
+        siteName: '言情',
+        channelName: '总榜',
+        updateTime: '2024-01-15T10:30:00'
+      }
+    },
+    
+    /**
+     * 获取模拟图表数据
+     */
+    async getMockChartData() {
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // 生成30天的模拟数据
+      const dates = []
+      const totalClicksData = []
+      const avgClicksData = []
+      const totalCollectsData = []
+      const avgCollectsData = []
+      
+      const now = new Date()
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now)
+        date.setDate(date.getDate() - i)
+        dates.push(date.toISOString().split('T')[0])
+        
+        // 模拟点击量增量总和（有波动）
+        const baseTotalClicks = 50000 + i * 1000
+        const totalClicksVariation = Math.random() * 10000 - 5000
+        totalClicksData.push(Math.max(0, Math.floor(baseTotalClicks + totalClicksVariation)))
+        
+        // 模拟点击量增量平均值
+        const baseAvgClicks = 250 + i * 5
+        const avgClicksVariation = Math.random() * 50 - 25
+        avgClicksData.push(Math.max(0, Math.floor(baseAvgClicks + avgClicksVariation)))
+        
+        // 模拟收藏量增量总和
+        const baseTotalCollects = 5000 + i * 100
+        const totalCollectsVariation = Math.random() * 1000 - 500
+        totalCollectsData.push(Math.max(0, Math.floor(baseTotalCollects + totalCollectsVariation)))
+        
+        // 模拟收藏量增量平均值
+        const baseAvgCollects = 25 + i * 0.5
+        const avgCollectsVariation = Math.random() * 5 - 2.5
+        avgCollectsData.push(Math.max(0, Math.floor(baseAvgCollects + avgCollectsVariation)))
+      }
+      
+      return {
+        dates,
+        totalClicksData,
+        avgClicksData,
+        totalCollectsData,
+        avgCollectsData
+      }
+    },
+    
+    /**
+     * 获取模拟书籍数据
+     */
+    async getMockBooksData(page = 1) {
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      const pageSize = 20
+      const totalBooks = 100
+      const startIndex = (page - 1) * pageSize
+      
+      const books = []
+      for (let i = 0; i < pageSize && startIndex + i < totalBooks; i++) {
+        const index = startIndex + i
+        books.push({
+          id: `book_${index + 1}`,
+          title: `榜单书籍${index + 1}`,
+          collections: Math.floor(Math.random() * 50000) + 10000,
+          collectionChange: Math.floor(Math.random() * 1000) - 500,
+          rankChange: Math.floor(Math.random() * 10) - 5
+        })
+      }
+      
+      return {
+        list: books,
+        hasMore: startIndex + pageSize < totalBooks
       }
     },
     
@@ -328,6 +507,7 @@ export default {
       try {
         await Promise.all([
           this.fetchRankingInfo(),
+          this.fetchChartStats(),
           this.fetchBooksList(true)
         ])
         
@@ -359,83 +539,37 @@ export default {
     },
     
     /**
-     * 切换筛选条件
+     * 切换图表Tab
      */
-    changeFilter(filterKey) {
-      if (this.currentFilter === filterKey) return
+    switchTab(tab) {
+      this.activeTab = tab
+    },
+    
+    /**
+     * 获取最大值
+     */
+    getMaxValue() {
+      return Math.max(...this.chartData)
+    },
+    
+    /**
+     * 获取最小值
+     */
+    getMinValue() {
+      return Math.min(...this.chartData)
+    },
+    
+    /**
+     * 获取总变化
+     */
+    getTotalChange() {
+      if (this.chartData.length < 2) return '0%'
       
-      this.currentFilter = filterKey
-      this.fetchBooksList(true)
-    },
-    
-    /**
-     * 显示排序选项
-     */
-    showSortOptions() {
-      this.showSortPopup = true
-    },
-    
-    /**
-     * 隐藏排序选项
-     */
-    hideSortOptions() {
-      this.showSortPopup = false
-    },
-    
-    /**
-     * 切换排序方式
-     */
-    changeSort(sortKey) {
-      if (this.currentSort === sortKey) {
-        this.hideSortOptions()
-        return
-      }
+      const first = this.chartData[0]
+      const last = this.chartData[this.chartData.length - 1]
+      const change = ((last - first) / first * 100).toFixed(1)
       
-      this.currentSort = sortKey
-      this.hideSortOptions()
-      this.fetchBooksList(true)
-    },
-    
-    /**
-     * 切换关注状态
-     */
-    async toggleFollow() {
-      try {
-        const action = this.rankingData.isFollowed ? 'unfollow' : 'follow'
-        await get(`/api/rankings/${this.rankingId}/${action}`, {}, { method: 'POST' })
-        
-        this.rankingData.isFollowed = !this.rankingData.isFollowed
-        
-        uni.showToast({
-          title: this.rankingData.isFollowed ? '关注成功' : '取消关注',
-          icon: 'success',
-          duration: 1500
-        })
-      } catch (error) {
-        this.showError('操作失败')
-      }
-    },
-    
-    /**
-     * 分享榜单
-     */
-    shareRanking() {
-      uni.share({
-        provider: 'weixin',
-        scene: 'WXSceneSession',
-        type: 0,
-        title: this.rankingData.name,
-        summary: this.rankingData.description || '来看看这个热门榜单',
-        success: () => {
-          uni.showToast({
-            title: '分享成功',
-            icon: 'success'
-          })
-        },
-        fail: () => {
-          this.showError('分享失败')
-        }
-      })
+      return change > 0 ? `+${change}%` : `${change}%`
     },
     
     /**
@@ -496,23 +630,17 @@ export default {
     },
     
     /**
-     * 书籍关注事件
+     * 切换关注状态
      */
-    async onBookFollow(event) {
+    async toggleFollow() {
       try {
-        const { book, isFollowed } = event
-        const action = isFollowed ? 'follow' : 'unfollow'
+        const action = this.rankingData.isFollowed ? 'unfollow' : 'follow'
+        await get(`/api/rankings/${this.rankingId}/${action}`, {}, { method: 'POST' })
         
-        await get(`/api/books/${book.id}/${action}`, {}, { method: 'POST' })
-        
-        // 更新本地状态
-        const bookIndex = this.booksList.findIndex(item => item.id === book.id)
-        if (bookIndex !== -1) {
-          this.booksList[bookIndex].isFollowed = isFollowed
-        }
+        this.rankingData.isFollowed = !this.rankingData.isFollowed
         
         uni.showToast({
-          title: isFollowed ? '关注成功' : '取消关注',
+          title: this.rankingData.isFollowed ? '关注成功' : '取消关注',
           icon: 'success',
           duration: 1500
         })
@@ -522,27 +650,15 @@ export default {
     },
     
     /**
-     * 书籍阅读事件
+     * 分享榜单
      */
-    onBookRead(book) {
-      // 这里可以跳转到阅读页面或外部链接
-      console.log('阅读书籍:', book)
-      uni.showToast({
-        title: '功能开发中',
-        icon: 'none'
-      })
-    },
-    
-    /**
-     * 书籍分享事件
-     */
-    onBookShare(book) {
+    shareRanking() {
       uni.share({
         provider: 'weixin',
         scene: 'WXSceneSession',
         type: 0,
-        title: book.name || book.title,
-        summary: `推荐一本好书：${book.author ? '作者 ' + book.author : ''}`,
+        title: this.rankingData.name,
+        summary: this.rankingData.description || '来看看这个热门榜单',
         success: () => {
           uni.showToast({
             title: '分享成功',
@@ -565,9 +681,10 @@ export default {
   padding-bottom: $safe-area-bottom;
 }
 
+// 榜单头部信息
 .ranking-header {
   position: relative;
-  padding: $spacing-lg $spacing-lg $spacing-xl;
+  padding: $spacing-lg;
   color: white;
   overflow: hidden;
   
@@ -582,188 +699,287 @@ export default {
   }
   
   .header-content {
-    @include flex-between;
-    align-items: flex-start;
-  }
-  
-  .ranking-info {
-    flex: 1;
-    margin-right: $spacing-md;
-    
-    .ranking-title {
-      display: block;
-      font-size: $font-size-xl;
-      font-weight: bold;
-      margin-bottom: $spacing-xs;
-      line-height: 1.3;
-    }
-    
-    .ranking-desc {
-      display: block;
-      font-size: $font-size-sm;
-      opacity: 0.9;
-      margin-bottom: $spacing-sm;
-      line-height: 1.4;
-    }
-    
-    .ranking-meta {
-      @include flex-center;
-      gap: $spacing-xs;
-      
-      .meta-item {
-        font-size: $font-size-xs;
-        opacity: 0.8;
-      }
-      
-      .meta-divider {
-        opacity: 0.6;
-      }
-    }
-  }
-  
-  .ranking-actions {
-    @include flex-center;
-    gap: $spacing-sm;
-    
-    .action-btn {
-      @include flex-center;
-      padding: $spacing-xs $spacing-md;
-      border-radius: $border-radius-medium;
-      transition: all 0.3s ease;
-      
-      .btn-text {
-        font-size: $font-size-sm;
-      }
-      
-      &:active {
-        opacity: 0.7;
-      }
-    }
-    
-    .follow-btn {
-      background-color: rgba(255, 255, 255, 0.2);
-      
-      &.followed {
-        background-color: rgba(255, 255, 255, 0.3);
-      }
-      
-      .btn-text {
-        color: white;
-      }
-    }
-    
-    .share-btn {
-      background-color: transparent;
-      border: 2rpx solid rgba(255, 255, 255, 0.3);
-      
-      .btn-text {
-        color: white;
-      }
-    }
-  }
-}
-
-.stats-section {
-  padding: $spacing-lg;
-  background-color: white;
-  margin-bottom: $spacing-sm;
-  
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: $spacing-md;
-    
-    .stat-item {
-      @include flex-column-center;
-      
-      .stat-value {
-        font-size: $font-size-lg;
+    .ranking-info {
+      .ranking-title {
+        display: block;
+        font-size: $font-size-xl;
         font-weight: bold;
-        color: $primary-color;
-        margin-bottom: 4rpx;
+        margin-bottom: $spacing-xs;
+        line-height: 1.3;
       }
       
-      .stat-label {
-        font-size: $font-size-xs;
-        color: $text-secondary;
+      .ranking-desc {
+        display: block;
+        font-size: $font-size-sm;
+        opacity: 0.9;
+        margin-bottom: $spacing-sm;
+        line-height: 1.4;
+      }
+      
+      .ranking-meta {
+        @include flex-center;
+        gap: $spacing-xs;
+        
+        .meta-item {
+          font-size: $font-size-xs;
+          opacity: 0.8;
+        }
+        
+        .meta-divider {
+          opacity: 0.6;
+        }
       }
     }
   }
 }
 
-.filter-section {
-  @include flex-between;
-  align-items: center;
-  padding: $spacing-md $spacing-lg;
+// 层级区域通用样式
+.layer-section {
   background-color: white;
   margin-bottom: $spacing-sm;
+  padding: $spacing-lg;
   
-  .filter-scroll {
-    flex: 1;
-    margin-right: $spacing-md;
-  }
-  
-  .filter-list {
-    @include flex-center;
-    gap: $spacing-md;
-    white-space: nowrap;
+  .layer-header {
+    @include flex-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
     
-    .filter-item {
-      padding: $spacing-xs $spacing-md;
-      border-radius: $border-radius-medium;
+    .layer-title {
+      font-size: $font-size-lg;
+      font-weight: bold;
+      color: $text-primary;
+    }
+    
+    .book-count {
+      font-size: $font-size-sm;
+      color: $text-secondary;
+    }
+  }
+}
+
+// 第一层：图表区域
+.chart-section {
+  .chart-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $spacing-xs;
+    background-color: $background-color;
+    border-radius: $border-radius-medium;
+    padding: 6rpx;
+    margin-bottom: $spacing-lg;
+    
+    .tab-item {
+      @include flex-center;
+      padding: $spacing-sm;
+      border-radius: $border-radius-small;
       transition: all 0.3s ease;
       
-      .filter-text {
-        font-size: $font-size-sm;
+      .tab-text {
+        font-size: $font-size-xs;
         color: $text-secondary;
+        text-align: center;
       }
       
       &.active {
-        background-color: $primary-color;
+        background-color: white;
+        box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
         
-        .filter-text {
-          color: white;
+        .tab-text {
+          color: $primary-color;
+          font-weight: bold;
         }
       }
     }
   }
   
-  .sort-btn {
-    @include flex-center;
-    gap: 4rpx;
-    padding: $spacing-xs $spacing-sm;
-    border: 2rpx solid $border-medium;
-    border-radius: $border-radius-medium;
+  .chart-container {
+    margin-bottom: $spacing-lg;
     
-    .sort-text {
-      font-size: $font-size-sm;
-      color: $text-primary;
+    .chart-area {
+      position: relative;
+      height: 300rpx;
+      background-color: #fafbfc;
+      border-radius: $border-radius-medium;
+      padding: $spacing-lg;
+      overflow: hidden;
+      
+      .chart-grid {
+        position: absolute;
+        top: $spacing-lg;
+        left: $spacing-lg;
+        right: $spacing-lg;
+        bottom: $spacing-lg;
+        
+        .grid-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 2rpx;
+          background-color: #e5e7eb;
+          
+          &:nth-child(1) { top: 0; }
+          &:nth-child(2) { top: 25%; }
+          &:nth-child(3) { top: 50%; }
+          &:nth-child(4) { top: 75%; }
+          &:nth-child(5) { bottom: 0; }
+        }
+      }
+      
+      .chart-line {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        
+        .chart-svg {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+        }
+        
+        .data-point {
+          position: absolute;
+          transform: translate(-50%, 50%);
+          
+          .point-dot {
+            width: 8rpx;
+            height: 8rpx;
+            background-color: $primary-color;
+            border-radius: 50%;
+            margin: 0 auto;
+          }
+          
+          .point-value {
+            display: block;
+            font-size: $font-size-xs;
+            color: $text-secondary;
+            text-align: center;
+            margin-top: 6rpx;
+            white-space: nowrap;
+          }
+        }
+      }
     }
     
-    .sort-icon {
-      font-size: $font-size-xs;
-      color: $text-placeholder;
-      transition: transform 0.3s ease;
+    .empty-chart {
+      @include flex-column-center;
+      height: 300rpx;
+      background-color: #fafbfc;
+      border-radius: $border-radius-medium;
+      
+      .empty-icon {
+        font-size: 60rpx;
+        margin-bottom: $spacing-sm;
+      }
+      
+      .empty-text {
+        color: $text-placeholder;
+        font-size: $font-size-sm;
+      }
     }
+  }
+  
+  .chart-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $spacing-md;
     
-    &:active {
+    .summary-item {
+      @include flex-column-center;
+      padding: $spacing-sm;
       background-color: $background-color;
+      border-radius: $border-radius-medium;
+      
+      .summary-label {
+        font-size: $font-size-xs;
+        color: $text-secondary;
+        margin-bottom: 4rpx;
+      }
+      
+      .summary-value {
+        font-size: $font-size-sm;
+        font-weight: bold;
+        color: $text-primary;
+      }
     }
   }
 }
 
+// 第二层：书籍列表
 .books-section {
   .books-list {
-    padding: 0 $spacing-lg;
+    .book-item {
+      @include flex-center;
+      padding: $spacing-lg;
+      border-bottom: 2rpx solid $border-light;
+      transition: background-color 0.3s ease;
+      
+      &:last-child {
+        border-bottom: none;
+      }
+      
+      &:active {
+        background-color: $background-color;
+      }
+      
+      .book-rank {
+        @include flex-center;
+        width: 60rpx;
+        height: 60rpx;
+        background-color: $primary-color;
+        color: white;
+        border-radius: 50%;
+        font-size: $font-size-sm;
+        font-weight: bold;
+        margin-right: $spacing-md;
+        flex-shrink: 0;
+      }
+      
+      .book-info {
+        flex: 1;
+        
+        .book-title {
+          font-size: $font-size-md;
+          font-weight: bold;
+          color: $text-primary;
+          margin-bottom: $spacing-xs;
+          @include text-ellipsis;
+        }
+        
+        .book-stats {
+          @include flex-center;
+          gap: $spacing-lg;
+          
+          .stat-item {
+            font-size: $font-size-sm;
+            color: $text-secondary;
+            
+            .change-indicator {
+              margin-left: $spacing-xs;
+              font-size: $font-size-xs;
+              
+              &.up {
+                color: #22c55e;
+              }
+              
+              &.down {
+                color: #ef4444;
+              }
+            }
+          }
+        }
+      }
+    }
   }
   
   .load-more {
-    padding: $spacing-lg;
+    padding: $spacing-lg 0;
     
     .load-btn {
       @include flex-center;
       padding: $spacing-md;
-      background-color: white;
+      background-color: $background-color;
       border-radius: $border-radius-medium;
       
       .load-text {
@@ -772,7 +988,7 @@ export default {
       }
       
       &:active {
-        background-color: $background-color;
+        opacity: 0.7;
       }
     }
     
@@ -789,7 +1005,7 @@ export default {
   
   .no-more {
     @include flex-center;
-    padding: $spacing-lg;
+    padding: $spacing-lg 0;
     
     .no-more-text {
       color: $text-placeholder;
@@ -826,91 +1042,6 @@ export default {
       &:active {
         opacity: 0.8;
       }
-    }
-  }
-}
-
-.sort-popup {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  @include flex-center;
-  z-index: 1000;
-  
-  .popup-content {
-    background-color: white;
-    border-radius: $border-radius-large;
-    margin: $spacing-lg;
-    max-width: 600rpx;
-    width: 100%;
-    max-height: 60vh;
-    overflow: hidden;
-  }
-  
-  .popup-header {
-    @include flex-between;
-    align-items: center;
-    padding: $spacing-lg;
-    border-bottom: 2rpx solid $border-light;
-    
-    .popup-title {
-      font-size: $font-size-lg;
-      font-weight: bold;
-      color: $text-primary;
-    }
-    
-    .popup-close {
-      @include flex-center;
-      width: 60rpx;
-      height: 60rpx;
-      border-radius: 50%;
-      
-      .close-text {
-        font-size: $font-size-xl;
-        color: $text-placeholder;
-      }
-      
-      &:active {
-        background-color: $background-color;
-      }
-    }
-  }
-  
-  .sort-options {
-    max-height: 50vh;
-    overflow-y: auto;
-  }
-  
-  .sort-option {
-    @include flex-between;
-    align-items: center;
-    padding: $spacing-lg;
-    transition: background-color 0.3s ease;
-    
-    .option-text {
-      font-size: $font-size-md;
-      color: $text-primary;
-    }
-    
-    .option-check {
-      font-size: $font-size-lg;
-      color: $primary-color;
-    }
-    
-    &.active {
-      background-color: $background-color;
-      
-      .option-text {
-        color: $primary-color;
-        font-weight: bold;
-      }
-    }
-    
-    &:active {
-      background-color: $background-color;
     }
   }
 }

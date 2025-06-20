@@ -46,9 +46,9 @@ const _sfc_main = {
     loadSites() {
       try {
         this.sites = data_url.getSitesList();
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:171", "分站数据加载成功:", this.sites);
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:170", "分站数据加载成功:", this.sites);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:173", "加载分站数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:172", "加载分站数据失败:", error);
       }
     },
     /**
@@ -78,10 +78,10 @@ const _sfc_main = {
      */
     async loadRankings(siteId, channelId = "") {
       try {
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:220", "加载榜单数据:", siteId, channelId);
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:219", "加载榜单数据:", siteId, channelId);
         this.rankingList = this.generateTestRankings(siteId, channelId);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:225", "加载榜单数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:224", "加载榜单数据失败:", error);
       }
     },
     /**
@@ -147,7 +147,7 @@ const _sfc_main = {
      */
     async loadBookList(siteId) {
       try {
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:306", "加载夹子书籍数据:", siteId);
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:305", "加载夹子书籍数据:", siteId);
         this.bookList = [
           {
             id: "1",
@@ -188,14 +188,14 @@ const _sfc_main = {
           }
         ];
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:347", "加载夹子书籍数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:346", "加载夹子书籍数据失败:", error);
       }
     },
     /**
      * 搜索功能
      */
     onSearch() {
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:356", "搜索关键词:", this.searchKeyword);
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:355", "搜索关键词:", this.searchKeyword);
     },
     /**
      * 跳转到榜单详情
@@ -242,8 +242,9 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   }, $options.showContentLevel ? common_vendor.e({
     g: $data.currentSite.type === "special"
   }, $data.currentSite.type === "special" ? {
-    h: common_vendor.o((...args) => $options.goToJiaziDetail && $options.goToJiaziDetail(...args)),
-    i: common_vendor.f($data.bookList, (book, index, i0) => {
+    h: common_vendor.t($data.currentSite.name),
+    i: common_vendor.t($data.bookList.length),
+    j: common_vendor.f($data.bookList, (book, index, i0) => {
       return {
         a: common_vendor.t(index + 1),
         b: common_vendor.t(book.title),
@@ -258,7 +259,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       };
     })
   } : {
-    j: common_vendor.f($data.rankingList, (ranking, k0, i0) => {
+    k: common_vendor.f($data.rankingList, (ranking, k0, i0) => {
       return {
         a: common_vendor.t(ranking.name),
         b: common_vendor.t(ranking.desc),

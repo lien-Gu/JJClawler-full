@@ -49,13 +49,12 @@
     <!-- 第三层级: 内容展示区域 -->
     <view class="content-container" v-if="showContentLevel">
       
-      <!-- 夹子特殊处理：显示书籍列表 -->
+      <!-- 夹子榜单：显示书籍列表 -->
       <view v-if="currentSite.type === 'special'" class="book-list-container">
-        <view class="section-header">
-          <text class="section-title">夹子榜单</text>
-          <button class="detail-btn" @tap="goToJiaziDetail">查看详情</button>
+        <view class="jiazi-header">
+          <text class="jiazi-title">{{ currentSite.name }}</text>
+          <text class="jiazi-count">共{{ bookList.length }}本</text>
         </view>
-        
         <scroll-view class="book-list" scroll-y="true">
           <view 
             class="book-item"
@@ -397,7 +396,6 @@ export default {
 }
 
 
-
 .level-container {
   margin-bottom: 30rpx;
 }
@@ -465,7 +463,7 @@ export default {
   margin-top: 20rpx;
 }
 
-.section-header {
+.jiazi-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -474,19 +472,15 @@ export default {
   border-bottom: 2rpx solid #f0f0f0;
 }
 
-.section-title {
+.jiazi-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #333;
 }
 
-.detail-btn {
-  padding: 10rpx 20rpx;
-  background-color: #007aff;
-  color: white;
-  border: none;
-  border-radius: 20rpx;
+.jiazi-count {
   font-size: 24rpx;
+  color: #999;
 }
 
 .book-list {
