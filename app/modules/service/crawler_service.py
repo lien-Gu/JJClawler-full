@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 from contextlib import asynccontextmanager
 
-from app.modules.crawler import CrawlerController
+from app.modules.crawler import JiaziCrawler, PageCrawler
 from app.modules.service import BookService, RankingService
 from app.modules.models import Book, BookSnapshot, Ranking, RankingSnapshot
 from app.modules.database import get_session_sync
@@ -42,19 +42,30 @@ class CrawlerService:
     
     def __init__(self):
         """初始化爬虫服务"""
-        self.crawler_controller = None
+        self.jiazi_crawler = None
+        self.page_crawler = None
         self.book_service = BookService()
         self.ranking_service = RankingService()
     
     @asynccontextmanager
-    async def _get_crawler(self):
-        """获取爬虫控制器的上下文管理器"""
-        self.crawler_controller = CrawlerController()
+    async def _get_jiazi_crawler(self):
+        """获取甲子榜爬虫的上下文管理器"""
+        self.jiazi_crawler = JiaziCrawler()
         try:
-            yield self.crawler_controller
+            yield self.jiazi_crawler
         finally:
-            await self.crawler_controller.close()
-            self.crawler_controller = None
+            await self.jiazi_crawler.close()
+            self.jiazi_crawler = None
+    
+    @asynccontextmanager
+    async def _get_page_crawler(self):
+        """获取分类页面爬虫的上下文管理器"""
+        self.page_crawler = PageCrawler()
+        try:
+            yield self.page_crawler
+        finally:
+            await self.page_crawler.close()
+            self.page_crawler = None
     
     async def crawl_and_save_jiazi(self) -> Dict[str, Any]:
         """
@@ -67,8 +78,8 @@ class CrawlerService:
         
         try:
             # 抓取数据
-            async with self._get_crawler() as crawler:
-                books, book_snapshots = await crawler.crawl_jiazi_ranking()
+            async with self._get_jiazi_crawler() as crawler:
+                books, book_snapshots = await crawler.crawl()
             
             # 保存数据
             result = await self._save_crawled_data(
@@ -98,8 +109,8 @@ class CrawlerService:
         
         try:
             # 抓取数据
-            async with self._get_crawler() as crawler:
-                books, book_snapshots = await crawler.crawl_page_ranking(channel)
+            async with self._get_page_crawler() as crawler:
+                books, book_snapshots = await crawler.crawl(channel)
             
             # 保存数据
             result = await self._save_crawled_data(

@@ -1,10 +1,12 @@
 """
 页面配置接口
 
-提供静态页面结构配置信息的API端点
+提供动态页面结构配置信息的API端点
+使用PageService从配置文件获取页面信息
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.modules.models import PagesResponse, PageConfig, SubPageConfig, RankingConfig
+from app.modules.service.page_service import get_page_service
 
 router = APIRouter(prefix="/pages", tags=["页面配置"])
 
@@ -14,61 +16,45 @@ async def get_pages():
     """
     获取页面配置
     
-    返回前端需要的静态页面结构配置，
+    从配置文件动态获取页面结构配置，
     用于生成导航和页面布局
     """
-    # 静态页面配置（不依赖数据库）
-    pages = [
-        PageConfig(
+    try:
+        page_service = get_page_service()
+        config_pages = page_service.get_all_pages()
+        
+        # 转换为API响应格式
+        pages = []
+        
+        # 榜单页面
+        ranking_sub_pages = []
+        for config_page in config_pages:
+            if config_page.get('parent_id') is None:  # 只处理根页面
+                rankings = []
+                for ranking in config_page.get('rankings', []):
+                    rankings.append(RankingConfig(
+                        ranking_id=ranking['ranking_id'],
+                        name=ranking['name'],
+                        update_frequency=ranking['update_frequency']
+                    ))
+                
+                # 构建子页面路径
+                page_path = f"/rankings/{config_page['page_id']}"
+                ranking_sub_pages.append(SubPageConfig(
+                    name=config_page['name'],
+                    path=page_path,
+                    rankings=rankings
+                ))
+        
+        # 主榜单页面
+        pages.append(PageConfig(
             name="榜单页面",
             path="/rankings",
-            sub_pages=[
-                SubPageConfig(
-                    name="夹子榜",
-                    path="/rankings/jiazi",
-                    rankings=[
-                        RankingConfig(
-                            ranking_id="jiazi",
-                            name="夹子",
-                            update_frequency="hourly"
-                        )
-                    ]
-                ),
-                SubPageConfig(
-                    name="言情榜单",
-                    path="/rankings/romance", 
-                    rankings=[
-                        RankingConfig(
-                            ranking_id="yq_gy",
-                            name="言情-古言",
-                            update_frequency="hourly"
-                        ),
-                        RankingConfig(
-                            ranking_id="yq_xy",
-                            name="言情-现言",
-                            update_frequency="daily"
-                        )
-                    ]
-                ),
-                SubPageConfig(
-                    name="纯爱榜单",
-                    path="/rankings/bl",
-                    rankings=[
-                        RankingConfig(
-                            ranking_id="ca_ds",
-                            name="纯爱-都市",
-                            update_frequency="hourly"
-                        ),
-                        RankingConfig(
-                            ranking_id="ca_gd",
-                            name="纯爱-古代",
-                            update_frequency="daily"
-                        )
-                    ]
-                )
-            ]
-        ),
-        PageConfig(
+            sub_pages=ranking_sub_pages
+        ))
+        
+        # 书籍页面
+        pages.append(PageConfig(
             name="书籍页面",
             path="/books",
             sub_pages=[
@@ -83,8 +69,10 @@ async def get_pages():
                     rankings=[]
                 )
             ]
-        ),
-        PageConfig(
+        ))
+        
+        # 爬虫管理页面
+        pages.append(PageConfig(
             name="爬虫管理",
             path="/crawl",
             sub_pages=[
@@ -99,18 +87,51 @@ async def get_pages():
                     rankings=[]
                 )
             ]
+        ))
+        
+        # 计算榜单总数
+        total_rankings = sum(
+            len(sub_page.rankings) 
+            for page in pages 
+            for sub_page in page.sub_pages
         )
-    ]
+        
+        return PagesResponse(
+            pages=pages,
+            total_pages=len(pages),
+            total_rankings=total_rankings
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取页面配置失败: {str(e)}")
+
+
+@router.get("/statistics")
+async def get_page_statistics():
+    """
+    获取页面统计信息
     
-    # 计算榜单总数
-    total_rankings = sum(
-        len(sub_page.rankings) 
-        for page in pages 
-        for sub_page in page.sub_pages
-    )
+    Returns:
+        页面配置统计数据
+    """
+    try:
+        page_service = get_page_service()
+        return page_service.get_page_statistics()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取页面统计失败: {str(e)}")
+
+
+@router.post("/refresh")
+async def refresh_page_config():
+    """
+    刷新页面配置缓存
     
-    return PagesResponse(
-        pages=pages,
-        total_pages=len(pages),
-        total_rankings=total_rankings
-    )
+    Returns:
+        操作结果
+    """
+    try:
+        page_service = get_page_service()
+        page_service.refresh_config()
+        return {"message": "页面配置缓存已刷新", "timestamp": ""}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"刷新配置失败: {str(e)}")

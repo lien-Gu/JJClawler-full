@@ -14,7 +14,7 @@ from app.modules.models import (
     CrawlRankingRequest,
     TaskInfo
 )
-from app.modules.task_manager import (
+from app.modules.service.task_service import (
     get_task_manager,
     create_jiazi_task,
     create_page_task,
@@ -22,7 +22,7 @@ from app.modules.task_manager import (
     execute_page_task,
     TaskType
 )
-from app.modules.crawler import CrawlerController
+from app.modules.service.crawler_service import CrawlerService
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 

@@ -135,8 +135,9 @@ JJClawer3/
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   ├── book_service.py   # ✅ Book业务逻辑（含空数据处理）
 │       │   └── ranking_service.py # ✅ Ranking业务逻辑（含空数据处理）
-│       ├── crawler.py            # 爬虫模块（待实现）
-│       └── task_service.py       # 任务管理（待实现）
+│       ├── crawler.py            # ✅ 爬虫模块（已实现）
+│       ├── crawler_service.py    # ✅ 爬虫服务层（已实现）
+│       └── task_manager.py       # ✅ 任务管理（已实现）
 ├── data/
 │   ├── urls.json                 # 爬取配置
 │   ├── tasks/                    # 任务JSON文件存储
