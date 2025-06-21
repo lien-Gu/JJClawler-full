@@ -724,13 +724,465 @@ curl -X GET "http://localhost:8000/api/v1/stats"
 
 ---
 
-## 10. 版本历史
+## 10. 数据模型
+
+### 10.1 数据库架构
+
+本系统采用SQLModel ORM，基于SQLite数据库，支持类型安全的数据模型定义。数据库架构分为核心业务表和文件存储两部分：
+
+**数据库表（4个核心表）：**
+- `rankings`：榜单配置元数据
+- `books`：书籍静态信息
+- `book_snapshots`：书籍动态统计快照
+- `ranking_snapshots`：榜单排名快照
+
+**文件存储：**
+- `data/tasks/tasks.json`：任务管理状态
+- `data/urls.json`：爬取配置信息
+
+### 10.2 核心数据模型
+
+#### 10.2.1 榜单配置模型
+
+```python
+from sqlmodel import SQLModel, Field
+from datetime import datetime
+from typing import Optional
+from enum import Enum
+
+class UpdateFrequency(str, Enum):
+    HOURLY = "hourly"
+    DAILY = "daily"
+
+# 榜单配置表
+class Ranking(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ranking_id: str = Field(unique=True, index=True)
+    name: str  # 中文名
+    channel: str  # API频道参数
+    frequency: UpdateFrequency
+    update_interval: int
+    parent_id: Optional[str] = Field(default=None)  # 父级榜单
+```
+
+#### 10.2.2 书籍数据模型
+
+**书籍基础信息表（静态数据）：**
+```python
+# 书籍表（仅静态信息）
+class Book(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    book_id: str = Field(unique=True, index=True)
+    title: str
+    author_id: str = Field(index=True)
+    author_name: str = Field(index=True)
+    novel_class: Optional[str] = None
+    tags: Optional[str] = None  # JSON字符串
+    first_seen: datetime = Field(default_factory=datetime.now)
+    last_updated: datetime = Field(default_factory=datetime.now)
+```
+
+**书籍统计快照表（动态数据）：**
+```python
+from sqlmodel import Index
+
+# 书籍快照表（存储书籍级别的动态信息）
+class BookSnapshot(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    book_id: str = Field(foreign_key="book.book_id", index=True)
+    total_clicks: Optional[int] = None  # 总点击量
+    total_favorites: Optional[int] = None  # 总收藏量
+    comment_count: Optional[int] = None  # 评论数
+    chapter_count: Optional[int] = None  # 章节数
+    snapshot_time: datetime = Field(index=True)
+    
+    __table_args__ = (
+        Index("idx_book_snapshot_time", "book_id", "snapshot_time"),
+    )
+```
+
+#### 10.2.3 榜单快照模型
+
+```python
+# 榜单快照表（存储榜单维度的数据）
+class RankingSnapshot(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ranking_id: str = Field(foreign_key="ranking.ranking_id", index=True)
+    book_id: str = Field(foreign_key="book.book_id", index=True)
+    position: int  # 榜单位置
+    snapshot_time: datetime = Field(index=True)
+    
+    # 榜单期间的统计（可能与书籍总统计不同）
+    ranking_clicks: Optional[int] = None  # 在榜期间点击量
+    ranking_favorites: Optional[int] = None  # 在榜期间收藏量
+    
+    __table_args__ = (
+        Index("idx_ranking_time", "ranking_id", "snapshot_time"),
+        Index("idx_book_ranking_time", "book_id", "snapshot_time"),
+        Index("idx_ranking_position", "ranking_id", "position", "snapshot_time"),
+    )
+```
+
+### 10.3 API请求响应模型
+
+#### 10.3.1 分页模型
+
+```python
+class PaginationInfo(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    has_next: bool
+```
+
+#### 10.3.2 书籍相关模型
+
+```python
+class BookDetail(BaseModel):
+    book_id: str
+    title: str
+    author_id: str
+    author_name: str
+    novel_class: Optional[str] = None
+    tags: Optional[str] = None
+    first_seen: datetime
+    last_updated: datetime
+    latest_stats: Optional[Dict[str, Any]] = None
+
+class BookTrendData(BaseModel):
+    date: str
+    total_clicks: Optional[int] = None
+    total_favorites: Optional[int] = None
+    comment_count: Optional[int] = None
+    chapter_count: Optional[int] = None
+```
+
+#### 10.3.3 榜单相关模型
+
+```python
+class RankingInfo(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
+class RankingBookItem(BaseModel):
+    book_id: str
+    title: str
+    author: str
+    position: int
+    total_clicks: Optional[int] = None
+    total_favorites: Optional[int] = None
+    comment_count: Optional[int] = None
+    chapter_count: Optional[int] = None
+    position_change: Optional[str] = None
+    novel_class: Optional[str] = None
+    tags: Optional[str] = None
+```
+
+### 10.4 数据库优化配置
+
+#### 10.4.1 SQLite性能优化
+
+```python
+# 针对爬虫项目的SQLite优化
+SQLITE_PRAGMAS = {
+    "journal_mode": "WAL",  # 写前日志，提高并发写入性能
+    "cache_size": -64000,   # 64MB缓存，适合频繁查询
+    "synchronous": "NORMAL", # 平衡性能和数据安全
+    "foreign_keys": "ON",   # 启用外键约束
+    "temp_store": "MEMORY", # 临时表存内存，加速复杂查询
+}
+```
+
+#### 10.4.2 索引设计
+
+**核心查询场景优化：**
+
+```sql
+-- 1. 书籍趋势分析查询
+SELECT snapshot_time, total_clicks, total_favorites, comment_count, chapter_count
+FROM BookSnapshot 
+WHERE book_id = ? AND snapshot_time >= ?
+ORDER BY snapshot_time;
+
+-- 2. 书籍榜单历史查询
+SELECT r.name, rs.position, rs.snapshot_time
+FROM RankingSnapshot rs JOIN Ranking r ON rs.ranking_id = r.ranking_id
+WHERE rs.book_id = ?
+ORDER BY rs.snapshot_time DESC;
+
+-- 3. 榜单当前快照查询
+SELECT book_id, position, snapshot_time
+FROM RankingSnapshot 
+WHERE ranking_id = ? AND snapshot_time = (
+    SELECT MAX(snapshot_time) FROM RankingSnapshot WHERE ranking_id = ?
+)
+ORDER BY position;
+```
+
+### 10.5 数据设计优势
+
+#### 10.5.1 分离静态与动态数据
+
+**设计理念：**
+- **静态信息**：书籍标题、作者等基本不变的信息存储在Books表
+- **动态信息**：点击量、收藏量等随时间变化的统计信息存储在BookSnapshot表
+- **时序数据**：支持完整的趋势分析和历史数据查询
+
+**查询优化：**
+- 基本信息查询：仅访问Books表，速度快
+- 趋势分析：BookSnapshot表有针对性索引
+- 榜单查询：RankingSnapshot表支持复杂排名查询
+
+#### 10.5.2 混合存储策略
+
+**数据库存储（适合复杂查询）：**
+- Book相关的结构化数据
+- 需要关联查询的榜单数据
+- 时间序列的快照数据
+
+**JSON文件存储（适合简单状态管理）：**
+- 任务状态管理（data/tasks/tasks.json）
+- 爬取配置信息（data/urls.json）
+- 临时状态和日志信息
+
+---
+
+## 11. 系统架构
+
+### 11.1 五层模块化架构
+
+本系统采用接口驱动的五层架构设计，实现了清晰的职责分离和高度的模块化：
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  API接口层                           │
+│         (FastAPI路由, 请求响应处理)                    │
+└─────────────────────────────────────────────────────┘
+                            │
+                    根据接口确定业务功能
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                 Service业务层                        │
+│   BookService  RankingService  CrawlerService      │
+└─────────────────────────────────────────────────────┘
+                            │
+                    数据访问和持久化
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                DAO数据访问层                          │
+│     BookDAO    RankingDAO    Database连接管理       │
+└─────────────────────────────────────────────────────┘
+                            │
+                    专业功能模块支持
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│               专业功能模块层                          │
+│  爬虫模块   调度器模块   任务管理   页面配置模块       │
+└─────────────────────────────────────────────────────┘
+                            │
+                    通用工具和基础设施
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                工具支持层 (Utils)                     │
+│  HTTP工具  文件工具  时间工具  日志工具  数据工具      │
+└─────────────────────────────────────────────────────┘
+```
+
+### 11.2 架构层级详解
+
+**🌐 API接口层**
+- **职责**：HTTP接口、参数验证、响应格式化
+- **实现**：FastAPI路由、Pydantic模型验证、依赖注入
+- **文件**：`api/` 目录下的路由模块
+
+**⚙️ Service业务层**
+- **职责**：业务逻辑组合、事务控制、数据转换
+- **实现**：业务规则封装、DAO层组合、异常处理
+- **文件**：`modules/service/` 目录下的服务模块
+
+**🔧 DAO数据访问层**
+- **职责**：数据访问对象、CRUD操作、复杂查询
+- **实现**：SQLModel ORM、数据库事务、资源管理
+- **文件**：`modules/dao/` 目录下的数据访问模块
+
+**🏗️ 专业功能模块层**
+- **职责**：领域特定功能、专业逻辑实现
+- **实现**：爬虫、调度器、任务管理等专业模块
+- **文件**：`modules/crawler/`、`modules/service/scheduler_service.py` 等
+
+**🛠️ 工具支持层**
+- **职责**：通用工具函数、横切关注点、基础设施
+- **实现**：HTTP客户端、文件工具、时间工具、数据处理等
+- **文件**：`utils/` 目录下的工具模块
+
+### 11.3 关键技术特性
+
+**依赖注入机制**
+```python
+# FastAPI依赖注入示例
+@app.get("/api/v1/books/{book_id}")
+async def get_book_detail(
+    book_id: str,
+    book_service: BookService = Depends(get_book_service)
+):
+    return await book_service.get_book_detail(book_id)
+```
+
+**自动资源管理**
+```python
+# Service层自动Session管理
+class BookService:
+    def __init__(self, session: Session):
+        self.session = session
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            self.session.rollback()
+        else:
+            self.session.commit()
+        self.session.close()
+```
+
+**统一异常处理**
+```python
+# 统一API异常响应格式
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.detail.get("code", "UNKNOWN_ERROR"),
+                "message": exc.detail.get("message", str(exc.detail)),
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+    )
+```
+
+---
+
+## 13. 接口设计原则
+
+### 13.1 API优先设计方法
+
+本项目采用严格的“API优先”开发方法论：
+
+1. **接口定义优先**：基于业务需求定义所有API端点
+2. **Mock API支持**：创建返回虚拟数据的Mock API支持前端开发
+3. **Pydantic模型验证**：使用类型安全的请求/响应模型
+4. **逐步替换实现**：将Mock API替换为真实实现
+
+### 13.2 核心业务接口设计
+
+#### 13.2.1 页面配置接口
+```
+GET /api/v1/pages
+功能: 获取所有榜单页面配置（动态配置服务）
+响应: {
+  "pages": [
+    {"page_id": "yq", "name": "言情", "rankings": [...]},
+    {"page_id": "ca", "name": "纯爱", "rankings": [...]}
+  ]
+}
+```
+
+#### 13.2.2 榜单数据接口
+```
+GET /api/v1/rankings/{ranking_id}/books
+功能: 获取特定榜单的书籍列表及排名变化
+参数: date (可选), limit, offset
+响应: {
+  "ranking": {"id": "jiazi", "name": "夹子"},
+  "snapshot_time": "2024-01-01T12:00:00Z",
+  "books": [
+    {
+      "book_id": "123", "title": "书名", "author": "作者",
+      "position": 1, "clicks": 1000, "favorites": 500,
+      "position_change": "+2"  // 相比上次的排名变化
+    }
+  ]
+}
+
+GET /api/v1/rankings/{ranking_id}/history
+功能: 获取榜单历史快照数据
+参数: days (默认7天)
+响应: {"snapshots": [{"snapshot_time": "...", "total_books": 50}]}
+```
+
+#### 13.2.3 书籍信息接口
+```
+GET /api/v1/books/{book_id}
+功能: 获取书籍详细信息
+响应: {book基础信息 + 最新统计数据}
+
+GET /api/v1/books/{book_id}/rankings
+功能: 获取书籍出现在哪些榜单中及历史表现
+响应: {
+  "book": {"book_id": "123", "title": "书名"},
+  "current_rankings": [
+    {"ranking_id": "jiazi", "position": 5, "snapshot_time": "..."}
+  ],
+  "history": [...]
+}
+
+GET /api/v1/books/{book_id}/trends
+功能: 获取书籍点击量、收藏量变化趋势
+参数: days (默认30天)
+响应: {
+  "trends": [
+    {"date": "2024-01-01", "clicks": 1000, "favorites": 500},
+    {"date": "2024-01-02", "clicks": 1200, "favorites": 520}
+  ]
+}
+```
+
+#### 13.2.4 爬虫管理接口
+```
+POST /api/v1/crawl/jiazi
+功能: 触发夹子榜单爬取
+响应: {"task_id": "xxx", "message": "Task started"}
+
+POST /api/v1/crawl/page/{channel}
+功能: 触发特定榜单爬取
+响应: {"task_id": "xxx", "message": "Task started"}
+
+GET /api/v1/crawl/tasks
+功能: 获取爬取任务状态
+响应: {"tasks": [{"task_id": "xxx", "status": "running", "progress": "50%"}]}
+```
+
+### 13.3 接口设计特性
+
+**RESTful设计原则**
+- 使用标准HTTP方法（GET, POST, PUT, DELETE）
+- 资源层级化URL路径设计
+- 统一的响应格式和错误处理
+
+**分页机制**
+- 基于offset/limit的分页方式
+- 所有列表接口支持分页参数
+- 响应中包含pagination对象
+
+**数据过滤**
+- 支持日期范围过滤（date参数）
+- 支持分类和关键词过滤
+- 支持排序参数（sort, order）
+
+---
+
+## 14. 版本历史
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
 | v1.0.0 | 2024-01-01 | 初始版本，包含基础功能 |
 | v1.1.0 | 2024-01-01 | T4.4完成 - API实现层完整实现 |
-| v1.2.0 | 待定 | 计划添加用户认证和权限管理 |
+| v1.2.0 | 2024-06-21 | 数据模型迁移 - 完整数据库设计和架构文档 |
+| v1.3.0 | 待定 | 计划添加用户认证和权限管理 |
 
 ---
 

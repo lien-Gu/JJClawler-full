@@ -80,31 +80,46 @@
 - 更丰富的文档（SQLModel文档已足够）
 - 更多的社区支持（项目规模较小，遇到复杂问题概率低）
 
-### 3.2 基于接口驱动的模块化架构
+### 3.2 基于接口驱动的五层模块化架构 ✅ 已完成
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  API接口层                           │
-│              (定义所有对外接口)                       │
+│         (FastAPI路由, 请求响应处理)                    │
 └─────────────────────────────────────────────────────┘
                             │
-                    根据接口确定功能模块
+                    根据接口确定业务功能
                             ▼
 ┌─────────────────────────────────────────────────────┐
-│                  功能模块层                          │
-│   爬虫模块    数据模块    统计模块    任务模块        │
+│                 Service业务层                        │
+│   BookService  RankingService  CrawlerService      │
 └─────────────────────────────────────────────────────┘
                             │
+                    数据访问和持久化
                             ▼
 ┌─────────────────────────────────────────────────────┐
-│                  工具支持层                          │
-│      HTTP工具   文件工具   时间工具   日志工具       │
+│                DAO数据访问层                          │
+│     BookDAO    RankingDAO    Database连接管理       │
+└─────────────────────────────────────────────────────┘
+                            │
+                    专业功能模块支持
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│               专业功能模块层                          │
+│  爬虫模块   调度器模块   任务管理   页面配置模块       │
+└─────────────────────────────────────────────────────┘
+                            │
+                    通用工具和基础设施
+                            ▼
+┌─────────────────────────────────────────────────────┐
+│                工具支持层 (Utils)                     │
+│  HTTP工具  文件工具  时间工具  日志工具  数据工具      │
 └─────────────────────────────────────────────────────┘
 ```
 
-### 3.3 标准四层架构设计（T4.2已完成）
+### 3.3 完整五层架构设计（T4.4已完成）
 
-项目采用经典的四层架构模式，职责分明、结构清晰。**T4.2重构已完成**，实现了模块化的enterprise级架构：
+项目采用现代化的五层架构模式，职责分明、结构清晰。**T4.4重构已完成**，实现了完整的企业级模块化架构：
 
 ```
 JJClawer3/
@@ -112,13 +127,20 @@ JJClawer3/
 │   ├── __init__.py
 │   ├── main.py                   # FastAPI应用入口
 │   ├── config.py                 # 配置管理
-│   ├── api/                      # ✅ API路由层（已重构）
+│   ├── api/                      # ✅ API路由层（T4.4完成）
 │   │   ├── __init__.py
-│   │   ├── pages.py              # ✅ 页面配置接口（动态配置+T4.2实现）
+│   │   ├── pages.py              # ✅ 页面配置接口（动态配置服务）
 │   │   ├── rankings.py           # ✅ 榜单相关接口（依赖注入）
 │   │   ├── books.py              # ✅ 书籍相关接口（依赖注入）
-│   │   └── crawl.py              # ✅ 爬虫管理接口（已重构）
-│   └── modules/                  # ✅ 核心业务模块（四层架构已实现）
+│   │   └── crawl.py              # ✅ 爬虫管理接口（调度器集成）
+│   ├── utils/                    # ✅ 工具支持层（新增T4.4）
+│   │   ├── __init__.py           # ✅ 统一工具导出
+│   │   ├── http_client.py        # ✅ HTTP客户端工具（统一实现）
+│   │   ├── file_utils.py         # ✅ 文件操作工具（JSON/目录管理）
+│   │   ├── time_utils.py         # ✅ 时间处理工具（格式化/时区）
+│   │   ├── log_utils.py          # ✅ 日志工具（配置/装饰器）
+│   │   └── data_utils.py         # ✅ 数据处理工具（验证/清洗/解析）
+│   └── modules/                  # ✅ 核心业务模块（五层架构已实现）
 │       ├── database/             # ✅ Database层：数据库连接管理
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   └── connection.py     # ✅ 连接池、会话管理、表创建、SQLite优化
@@ -132,19 +154,20 @@ JJClawer3/
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   ├── book_dao.py       # ✅ Book数据访问（CRUD + 复杂查询）
 │       │   └── ranking_dao.py    # ✅ Ranking数据访问（CRUD + 复杂查询）
-│       ├── service/              # ✅ Service层：业务逻辑（按领域拆分+T4.2完成）
+│       ├── service/              # ✅ Service层：业务逻辑（按领域拆分+T4.4完成）
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   ├── book_service.py   # ✅ Book业务逻辑（含空数据处理）
 │       │   ├── ranking_service.py # ✅ Ranking业务逻辑（含空数据处理）
 │       │   ├── crawler_service.py # ✅ 爬虫业务逻辑（T4.2重构）
-│       │   ├── task_service.py   # ✅ 任务管理业务逻辑（T4.2重构）
-│       │   └── page_service.py   # ✅ 页面配置业务逻辑（T4.2新增）
-│       └── crawler/              # ✅ 爬虫实现层（T4.2模块化拆分）
+│       │   ├── task_service.py   # ✅ 任务管理业务逻辑（使用utils工具）
+│       │   ├── page_service.py   # ✅ 页面配置业务逻辑（使用utils工具）
+│       │   └── scheduler_service.py # ✅ 调度器业务逻辑（T4.3完成）
+│       └── crawler/              # ✅ 爬虫实现层（T4.4模块化拆分）
 │           ├── __init__.py       # ✅ 爬虫模块导出
-│           ├── base.py           # ✅ HTTP客户端基础设施
+│           ├── base.py           # ✅ 爬虫基础工具（移除重复HTTP实现）
 │           ├── parser.py         # ✅ 数据解析器
-│           ├── jiazi_crawler.py  # ✅ 甲子榜专用爬虫
-│           └── page_crawler.py   # ✅ 分类页面爬虫
+│           ├── jiazi_crawler.py  # ✅ 甲子榜专用爬虫（使用utils/http_client）
+│           └── page_crawler.py   # ✅ 分类页面爬虫（使用utils/http_client）
 ├── data/
 │   ├── urls.json                 # 爬取配置
 │   ├── tasks/                    # 任务JSON文件存储
@@ -156,7 +179,7 @@ JJClawer3/
 └── .env.example
 ```
 
-#### 3.3.1 四层架构详解（T4.2重构完成）
+#### 3.3.1 五层架构详解（T4.4重构完成）
 
 **🏗️ Database层（已实现）**
 - **职责**：数据库连接管理、会话控制、表创建
@@ -191,25 +214,35 @@ JJClawer3/
   - `scheduler_service.py`：**调度器业务逻辑（T4.3完成）**
 - **特性**：DAO组合、空数据处理、业务模型转换、依赖注入支持、**任务调度管理**
 
-**🕷️ 爬虫实现层（T4.2新增）**
-- **职责**：专业爬虫功能实现、HTTP客户端管理、数据解析
-- **文件**：`modules/crawler/`（模块化设计）
-  - `base.py`：HTTP客户端基础设施（连接池、重试、限流）
-  - `parser.py`：数据解析器（清洗、标准化）
-  - `jiazi_crawler.py`：甲子榜专用爬虫
-  - `page_crawler.py`：分类页面爬虫
-- **特性**：单一职责、高效简洁、易于扩展、模块化管理
+**🛠️ 工具支持层（T4.4新增）**
+- **职责**：通用工具函数和基础设施、横切关注点
+- **文件**：`utils/`（按功能类型拆分）
+  - `http_client.py`：统一HTTP客户端（重试、限流、错误处理）
+  - `file_utils.py`：文件操作工具（JSON读写、目录管理、配置工具）
+  - `time_utils.py`：时间处理工具（格式化、时区转换、时间计算）
+  - `log_utils.py`：日志工具（配置管理、装饰器、上下文记录）
+  - `data_utils.py`：数据处理工具（验证、清洗、解析、转换）
+- **特性**：代码复用、横切关注点、标准化实现、模块化导出
 
-**🌐 API层（T4.2完成）**
+**🕷️ 爬虫实现层（T4.4重构）**
+- **职责**：专业爬虫功能实现、数据解析、爬虫配置
+- **文件**：`modules/crawler/`（模块化设计）
+  - `base.py`：爬虫基础工具（配置管理、数据验证、统计）
+  - `parser.py`：数据解析器（清洗、标准化）
+  - `jiazi_crawler.py`：甲子榜专用爬虫（使用utils/http_client）
+  - `page_crawler.py`：分类页面爬虫（使用utils/http_client）
+- **特性**：单一职责、复用utils工具、易于扩展、模块化管理
+
+**🌐 API层（T4.4完成）**
 - **职责**：HTTP接口、参数验证、响应格式化
 - **文件**：`api/`（按功能模块拆分）
-  - `pages.py`：动态页面配置（T4.2使用PageService）
+  - `pages.py`：动态页面配置（使用PageService）
   - `books.py`：书籍相关接口（依赖注入BookService）
   - `rankings.py`：榜单相关接口（依赖注入RankingService）
-  - `crawl.py`：**爬虫管理接口（T4.2重构+T4.3调度器集成）**
+  - `crawl.py`：**爬虫管理接口（调度器集成+实时状态）**
 - **特性**：FastAPI依赖注入、自动资源清理、Pydantic验证、**调度器API集成**
 
-#### 3.3.2 T4.2重构架构优势
+#### 3.3.2 T4.4五层架构优势
 
 **🔄 分层解耦（已实现）**
 - 每层职责单一，修改影响最小化
@@ -249,224 +282,47 @@ JJClawer3/
 
 ### 3.4 数据库设计
 
-#### 3.4.1 表结构设计
+数据库采用SQLModel ORM，基于SQLite，设计了四个核心表和混合存储策略：
 
-**核心表设计思路：**
-- **rankings**：榜单配置表，存储榜单元数据
-- **books**：书籍信息表，存储书籍基础信息
-- **ranking_snapshots**：榜单快照表，存储时间序列数据（核心表）
-- **crawl_tasks**：爬取任务表，存储任务状态和历史
+**数据库表（4个核心表）：**
+- `rankings`：榜单配置元数据
+- `books`：书籍静态信息
+- `book_snapshots`：书籍动态统计快照
+- `ranking_snapshots`：榜单排名快照
 
-**关键设计决策：**
-1. **时间序列存储**：使用snapshot模式，每次爬取创建新快照
-2. **查询优化**：针对常用查询场景创建复合索引
-3. **数据完整性**：通过外键约束保证数据一致性
+**文件存储：**
+- `data/tasks/tasks.json`：任务管理状态
+- `data/urls.json`：爬取配置信息
 
-#### 3.4.2 SQLite优化配置
+**设计特点：**
+- **静态与动态分离**：书籍基础信息与统计信息分表存储
+- **时间序列设计**：使用snapshot模式支持趋势分析
+- **混合存储**：数据库+JSON文件，各司其职
+- **SQLite优化**：WAL模式、64MB缓存、复合索引
 
-```python
-# 针对爬虫项目的SQLite优化
-SQLITE_PRAGMAS = {
-    "journal_mode": "WAL",  # 写前日志，提高并发写入性能
-    "cache_size": -64000,   # 64MB缓存，适合频繁查询
-    "synchronous": "NORMAL", # 平衡性能和数据安全
-    "foreign_keys": "ON",   # 启用外键约束
-    "temp_store": "MEMORY", # 临时表存内存，加速复杂查询
-}
-```
+> 📄 **详细数据模型和API设计请参考：[API.md](./API.md)**
 
-#### 3.4.3 核心数据模型设计
 
-**优化方案：增加BookSnapshot表存储书籍动态信息**
-
-基于分析，书籍信息分为两类：
-- **静态信息**：title, author等基本不变的信息
-- **动态信息**：点击量、收藏量等随时间变化的统计信息
-
-为支持"书籍变化情况"分析需求，采用以下设计：
-
-```python
-from sqlmodel import SQLModel, Field, Index
-from datetime import datetime
-from typing import Optional
-from enum import Enum
-
-class UpdateFrequency(str, Enum):
-    HOURLY = "hourly"
-    DAILY = "daily"
-
-# 1. 榜单配置表
-class Ranking(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    ranking_id: str = Field(unique=True, index=True)
-    name: str  # 中文名
-    channel: str  # API频道参数
-    frequency: UpdateFrequency
-    update_interval: int
-    parent_id: Optional[str] = Field(default=None)  # 父级榜单
-
-# 2. 书籍表（仅静态信息）
-class Book(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    book_id: str = Field(unique=True, index=True)
-    title: str
-    author_id: str = Field(index=True)
-    author_name: str = Field(index=True)
-    novel_class: Optional[str] = None
-    tags: Optional[str] = None  # JSON字符串
-    first_seen: datetime = Field(default_factory=datetime.now)
-    last_updated: datetime = Field(default_factory=datetime.now)
-
-# 3. 书籍快照表（存储书籍级别的动态信息）
-class BookSnapshot(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    book_id: str = Field(foreign_key="book.book_id", index=True)
-    total_clicks: Optional[int] = None  # 总点击量
-    total_favorites: Optional[int] = None  # 总收藏量
-    comment_count: Optional[int] = None  # 评论数
-    chapter_count: Optional[int] = None  # 章节数
-    snapshot_time: datetime = Field(index=True)
-    
-    __table_args__ = (
-        Index("idx_book_snapshot_time", "book_id", "snapshot_time"),
-    )
-
-# 4. 榜单快照表（存储榜单维度的数据）
-class RankingSnapshot(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    ranking_id: str = Field(foreign_key="ranking.ranking_id", index=True)
-    book_id: str = Field(foreign_key="book.book_id", index=True)
-    position: int  # 榜单位置
-    snapshot_time: datetime = Field(index=True)
-    
-    # 榜单期间的统计（可能与书籍总统计不同）
-    ranking_clicks: Optional[int] = None  # 在榜期间点击量
-    ranking_favorites: Optional[int] = None  # 在榜期间收藏量
-    
-    __table_args__ = (
-        Index("idx_ranking_time", "ranking_id", "snapshot_time"),
-        Index("idx_book_ranking_time", "book_id", "snapshot_time"),
-        Index("idx_ranking_position", "ranking_id", "position", "snapshot_time"),
-    )
-
-# 注：任务管理不使用数据库，采用JSON文件存储
-# 任务信息存储在 data/tasks/tasks.json 中
-```
-
-#### 3.4.4 设计优势分析
-
-**数据存储设计：**
-- **数据库存储**：Book、BookSnapshot、RankingSnapshot、Ranking四个表
-- **文件存储**：任务管理使用JSON文件存储在data/tasks/目录
-- **配置存储**：urls.json存储爬取配置信息
-
-**查询场景优化：**
-```sql
--- 书籍趋势分析
-SELECT snapshot_time, total_clicks, total_favorites, comment_count, chapter_count
-FROM BookSnapshot 
-WHERE book_id = ? AND snapshot_time >= ?
-
--- 书籍榜单历史
-SELECT r.name, rs.position, rs.snapshot_time
-FROM RankingSnapshot rs JOIN Ranking r ON rs.ranking_id = r.ranking_id
-WHERE rs.book_id = ?
-
--- 榜单当前快照
-SELECT book_id, position, snapshot_time
-FROM RankingSnapshot 
-WHERE ranking_id = ? AND snapshot_time = (
-    SELECT MAX(snapshot_time) FROM RankingSnapshot WHERE ranking_id = ?
-)
-ORDER BY position
-```
 
 ## 4. 详细设计
 
 ### 4.1 API接口优先设计
 
-根据需求分析，按优先级定义接口：
+本项目采用严格的"API优先"开发方法论：
 
-#### 4.1.1 核心业务接口设计
+1. **接口定义优先**：基于业务需求定义所有API端点
+2. **Mock API支持**：创建返回虚拟数据的Mock API支持前端开发
+3. **Pydantic模型验证**：使用类型安全的请求/响应模型
+4. **逐步替换实现**：将Mock API替换为真实实现
 
-基于数据库结构，重新设计核心API接口：
+**核心API分类：**
+- 📄 **页面配置接口**：`GET /api/v1/pages` - 动态配置服务
+- 📊 **榜单数据接口**：`GET /api/v1/rankings/*` - 榜单查询和历史数据
+- 📚 **书籍信息接口**：`GET /api/v1/books/*` - 书籍详情、趋势、排名历史
+- 🕷️ **爬虫管理接口**：`POST /api/v1/crawl/*` - 任务触发和状态监控
+- 🔧 **系统状态接口**：`GET /health`, `/api/v1/stats` - 健康检查和统计
 
-**1. 页面配置接口**
-```
-GET /api/v1/pages
-功能: 获取所有榜单页面配置（固定数据）
-响应: {
-  "pages": [
-    {"page_id": "yq", "name": "言情", "rankings": [...]},
-    {"page_id": "ca", "name": "纯爱", "rankings": [...]}
-  ]
-}
-```
-
-**2. 榜单接口**
-```
-GET /api/v1/rankings/{ranking_id}/books
-功能: 获取特定榜单的书籍列表及排名变化
-参数: date (可选), limit, offset
-响应: {
-  "ranking": {"id": "jiazi", "name": "夹子"},
-  "snapshot_time": "2024-01-01T12:00:00Z",
-  "books": [
-    {
-      "book_id": "123", "title": "书名", "author": "作者",
-      "position": 1, "clicks": 1000, "favorites": 500,
-      "position_change": "+2"  // 相比上次的排名变化
-    }
-  ]
-}
-
-GET /api/v1/rankings/{ranking_id}/history
-功能: 获取榜单历史快照数据
-参数: days (默认7天)
-响应: {"snapshots": [{"snapshot_time": "...", "total_books": 50}]}
-```
-
-**3. 书籍接口**
-```
-GET /api/v1/books/{book_id}
-功能: 获取书籍详细信息
-响应: {book基础信息 + 最新统计数据}
-
-GET /api/v1/books/{book_id}/rankings
-功能: 获取书籍出现在哪些榜单中及历史表现
-响应: {
-  "book": {"book_id": "123", "title": "书名"},
-  "current_rankings": [
-    {"ranking_id": "jiazi", "position": 5, "snapshot_time": "..."}
-  ],
-  "history": [...]
-}
-
-GET /api/v1/books/{book_id}/trends
-功能: 获取书籍点击量、收藏量变化趋势
-参数: days (默认30天)
-响应: {
-  "trends": [
-    {"date": "2024-01-01", "clicks": 1000, "favorites": 500},
-    {"date": "2024-01-02", "clicks": 1200, "favorites": 520}
-  ]
-}
-```
-
-**4. 爬虫管理接口**
-```
-POST /api/v1/crawl/jiazi
-功能: 触发夹子榜单爬取
-响应: {"task_id": "xxx", "message": "Task started"}
-
-POST /api/v1/crawl/ranking/{ranking_id}
-功能: 触发特定榜单爬取
-响应: {"task_id": "xxx", "message": "Task started"}
-
-GET /api/v1/tasks
-功能: 获取爬取任务状态
-响应: {"tasks": [{"task_id": "xxx", "status": "running", "progress": "50%"}]}
-```
+> 📋 **完整API接口文档请参考：[API.md](./API.md)**
 
 ### 4.2 基于接口的功能模块拆分
 
@@ -511,14 +367,14 @@ GET /api/v1/tasks
 - **重试机制**: 失败重试3次，指数退避
 
 #### 4.3.2 调度策略（T4.3已实现）
-| 页面类型 | 更新频率 | 说明 | 调度时间 |
-|------|---------|------|---------|
-| **甲子榜单** | **1小时** | **热度榜单，更新频繁** | **每小时整点执行** |
+| 页面类型     | 更新频率 | 说明 | 调度时间 |
+|----------|---------|------|---------|
+| **夹子榜单** | **1小时** | **热度榜单，更新频繁** | **每小时整点执行** |
 | **分类榜单** | **24小时** | **日更新即可** | **凌晨1-6点错开执行** |
 | **任务清理** | **7天** | **清理旧任务记录** | **每周日凌晨2点** |
 
 **T4.3实现的调度功能：**
-- ✅ **自动调度**：24个定时任务（1个甲子榜+22个分类榜+1个清理任务）
+- ✅ **自动调度**：24个定时任务（1个夹子榜+22个分类榜+1个清理任务）
 - ✅ **手动触发**：支持通过API立即执行任务
 - ✅ **错误处理**：任务失败重试和错误统计
 - ✅ **监控统计**：任务执行次数、成功率、最后执行时间
@@ -710,7 +566,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
 
 **📋 任务配置：**
 ```
-甲子榜单: CronTrigger(minute=0) - 每小时整点
+夹子榜单: CronTrigger(minute=0) - 每小时整点
 分类页面: CronTrigger(hour=1-6, minute=错开) - 22个任务分散执行  
 任务清理: CronTrigger(day_of_week=0, hour=2) - 每周日凌晨
 ```

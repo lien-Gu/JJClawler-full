@@ -14,12 +14,13 @@
 4. 易于扩展：支持新增页面类型
 """
 
-import json
 import logging
 import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from app.utils.file_utils import read_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -70,20 +71,19 @@ class PageService:
             current_time - self._cache_timestamp < self._cache_ttl):
             return self._config_cache
         
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                
-            # 更新缓存
-            self._config_cache = config
-            self._cache_timestamp = current_time
-            
-            logger.debug("页面配置加载成功")
-            return config
-            
-        except Exception as e:
-            logger.error(f"页面配置加载失败: {e}")
-            raise
+        # 使用utils中的文件读取函数
+        config = read_json_file(self.config_path)
+        
+        if config is None:
+            logger.error("页面配置加载失败")
+            raise FileNotFoundError(f"无法读取配置文件: {self.config_path}")
+        
+        # 更新缓存
+        self._config_cache = config
+        self._cache_timestamp = current_time
+        
+        logger.debug("页面配置加载成功")
+        return config
     
     def get_all_pages(self) -> List[Dict[str, Any]]:
         """

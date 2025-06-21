@@ -15,7 +15,6 @@
 """
 
 import asyncio
-import json
 import logging
 import os
 import threading
@@ -25,6 +24,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, asdict
 from uuid import uuid4
+
+from app.utils.file_utils import read_json_file, write_json_file, ensure_directory
+from app.utils.time_utils import to_iso_string, parse_iso_datetime
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -110,46 +112,25 @@ class TaskFileManager:
     def _read_tasks_file(self) -> Dict[str, Any]:
         """安全读取任务文件"""
         with self.lock:
-            try:
-                if self.tasks_file.exists():
-                    with open(self.tasks_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        # 确保所有必需的字段都存在
-                        if "failed_tasks" not in data:
-                            data["failed_tasks"] = []
-                        return data
-                else:
-                    return {"current_tasks": [], "completed_tasks": [], "failed_tasks": []}
-            except (json.JSONDecodeError, IOError) as e:
-                logger.error(f"读取任务文件失败: {e}")
-                return {"current_tasks": [], "completed_tasks": [], "failed_tasks": []}
+            default_data = {"current_tasks": [], "completed_tasks": [], "failed_tasks": []}
+            data = read_json_file(self.tasks_file, default=default_data)
+            
+            # 确保所有必需的字段都存在
+            if "failed_tasks" not in data:
+                data["failed_tasks"] = []
+            
+            return data
     
     def _write_tasks_file(self, data: Dict[str, Any]):
         """安全写入任务文件"""
         with self.lock:
-            try:
-                # 创建备份
-                if self.tasks_file.exists():
-                    backup_file = self.tasks_file.with_suffix('.json.backup')
-                    self.tasks_file.rename(backup_file)
-                
-                # 写入新数据
-                data["last_updated"] = datetime.now().isoformat()
-                with open(self.tasks_file, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                
-                # 删除备份（写入成功）
-                backup_file = self.tasks_file.with_suffix('.json.backup')
-                if backup_file.exists():
-                    backup_file.unlink()
-                    
-            except IOError as e:
-                logger.error(f"写入任务文件失败: {e}")
-                # 恢复备份
-                backup_file = self.tasks_file.with_suffix('.json.backup')
-                if backup_file.exists():
-                    backup_file.rename(self.tasks_file)
-                raise
+            # 添加时间戳
+            data["last_updated"] = to_iso_string(datetime.now())
+            
+            # 使用utils中的写入函数，自动处理备份
+            success = write_json_file(self.tasks_file, data, backup=True)
+            if not success:
+                raise IOError("任务文件写入失败")
     
     def add_task(self, task: TaskInfo) -> bool:
         """

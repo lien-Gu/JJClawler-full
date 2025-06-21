@@ -2,10 +2,11 @@
 爬虫模块 - 晋江文学城数据抓取
 
 本模块提供完整的数据抓取解决方案，采用模块化设计：
-- base: HTTP客户端基础设施
 - parser: 数据解析和清洗
 - jiazi_crawler: 甲子榜专用爬虫
 - page_crawler: 分类页面爬虫
+
+HTTP客户端现在统一使用 app.utils.http_client.HTTPClient
 
 设计原则：
 1. 单一职责：每个模块负责特定功能
@@ -14,7 +15,7 @@
 4. 可扩展性：支持新增爬虫类型
 """
 
-from .base import HTTPClient
+from app.utils.http_client import HTTPClient
 from .parser import DataParser
 from .jiazi_crawler import JiaziCrawler
 from .page_crawler import PageCrawler

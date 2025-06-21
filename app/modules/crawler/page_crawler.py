@@ -12,7 +12,7 @@ import logging
 import os
 from typing import List, Tuple, Dict, Any
 
-from .base import HTTPClient
+from app.utils.http_client import HTTPClient
 from .parser import DataParser
 from app.modules.models import Book, BookSnapshot
 
