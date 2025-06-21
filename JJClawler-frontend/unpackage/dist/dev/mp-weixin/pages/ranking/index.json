@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "榜单",
-  "usingComponents": {}
+  "usingComponents": {
+    "book-list": "../../components/BookList"
+  }
 }

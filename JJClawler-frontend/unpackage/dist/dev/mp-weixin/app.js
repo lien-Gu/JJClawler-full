@@ -8,6 +8,7 @@ if (!Math) {
   "./pages/book/detail.js";
   "./pages/follow/index.js";
   "./pages/settings/index.js";
+  "./pages/webview/index.js";
 }
 const _sfc_main = {
   onLaunch: function() {

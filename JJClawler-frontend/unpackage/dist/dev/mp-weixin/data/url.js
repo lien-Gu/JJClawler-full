@@ -201,5 +201,14 @@ const sitesData = {
 function getSitesList() {
   return Object.values(sitesData.sites);
 }
+function getSiteById(siteId) {
+  return sitesData.sites[siteId] || null;
+}
+function getChannelsBySiteId(siteId) {
+  const site = getSiteById(siteId);
+  return site ? site.channels : [];
+}
+exports.getChannelsBySiteId = getChannelsBySiteId;
+exports.getSiteById = getSiteById;
 exports.getSitesList = getSitesList;
 //# sourceMappingURL=../../.sourcemap/mp-weixin/data/url.js.map

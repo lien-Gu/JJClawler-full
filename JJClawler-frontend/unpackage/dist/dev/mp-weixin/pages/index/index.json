@@ -1,6 +1,4 @@
 {
   "navigationBarTitleText": "首页",
-  "usingComponents": {
-    "stats-card": "../../components/StatsCard"
-  }
+  "usingComponents": {}
 }

@@ -5,7 +5,8 @@
     "pages/ranking/detail",
     "pages/book/detail",
     "pages/follow/index",
-    "pages/settings/index"
+    "pages/settings/index",
+    "pages/webview/index"
   ],
   "window": {
     "navigationBarTextStyle": "black",
@@ -14,10 +15,10 @@
     "backgroundColor": "#F8F8F8"
   },
   "tabBar": {
-    "color": "#7A7E83",
-    "selectedColor": "#3CC51F",
+    "color": "#000000",
+    "selectedColor": "#000000",
     "borderStyle": "white",
-    "backgroundColor": "#ffffff",
+    "backgroundColor": "rgba(255, 255, 255, 0.5)",
     "list": [
       {
         "pagePath": "pages/index/index",

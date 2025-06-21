@@ -1,7 +1,6 @@
 {
   "navigationBarTitleText": "关注",
   "usingComponents": {
-    "ranking-card": "../../components/RankingCard",
-    "book-card": "../../components/BookCard"
+    "book-list": "../../components/BookList"
   }
 }

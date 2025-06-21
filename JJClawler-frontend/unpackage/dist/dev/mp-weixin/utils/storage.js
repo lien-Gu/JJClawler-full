@@ -64,28 +64,6 @@ function removeSync(key) {
     return false;
   }
 }
-function clear() {
-  try {
-    const info = common_vendor.index.getStorageInfoSync();
-    info.keys.forEach((fullKey) => {
-      if (fullKey.startsWith(STORAGE_PREFIX)) {
-        try {
-          common_vendor.index.removeStorageSync(fullKey);
-        } catch (e) {
-        }
-      }
-    });
-    return true;
-  } catch (error) {
-    common_vendor.index.__f__("error", "at utils/storage.js:358", "Storage clear error:", error);
-    return false;
-  }
-}
-function clearSync() {
-  return clear();
-}
-exports.clearSync = clearSync;
 exports.getSync = getSync;
-exports.removeSync = removeSync;
 exports.setSync = setSync;
 //# sourceMappingURL=../../.sourcemap/mp-weixin/utils/storage.js.map

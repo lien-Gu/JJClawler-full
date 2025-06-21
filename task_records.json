@@ -299,5 +299,179 @@
       "书籍列表采用统一的展示格式，支持点击跳转到书籍详情",
       "使用模拟数据演示所有功能，包含100本书籍的分页加载"
     ]
+  },
+  {
+    "task": "首页重构为Figma设计样式",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/pages/index/index.vue",
+      "JJClawler-frontend/pages/webview/index.vue",
+      "JJClawler-frontend/pages.json"
+    ],
+    "description": "根据Figma设计重构首页，实现统计报告卡片和分项统计，添加后端接口跳转功能",
+    "timestamp": "2025-06-20T01:20:00Z",
+    "details": [
+      "完全重构首页布局，按照Figma设计实现：",
+      "- 问候语：嗨~ (Inter字体，Semi Bold，32px)",
+      "- 统计报告卡片：灰色背景，包含标题和绿色查看详情按钮",
+      "- 分项统计：三个绿色卡片（榜单统计、书籍统计、频道统计）",
+      "使用Figma设计变量：主色#64A347，背景#F4F0EB，文字色#454444",
+      "实现直接跳转到后端接口的功能：",
+      "- 统计详情：/api/statistics/detail",
+      "- 榜单统计：/api/statistics/rankings",
+      "- 书籍统计：/api/statistics/books",
+      "- 频道统计：/api/statistics/channels",
+      "创建WebView页面用于显示后端接口内容",
+      "支持小程序、H5、APP等多平台的URL打开方式",
+      "添加自定义导航栏、加载状态、错误处理等完整功能",
+      "在pages.json中注册webview页面，使用自定义导航栏样式"
+    ]
+  },
+  {
+    "task": "根据Figma设计重构榜单、关注、设置页面",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/pages/ranking/index.vue",
+      "JJClawler-frontend/pages/follow/index.vue",
+      "JJClawler-frontend/pages/settings/index.vue"
+    ],
+    "description": "按照Figma设计重构三个主要页面，保持原有功能逻辑的同时更新视觉样式",
+    "timestamp": "2025-06-20T02:00:00Z",
+    "details": [
+      "榜单页面重构：",
+      "- 保持原有三层级导航逻辑（分站选择、频道选择、内容显示）",
+      "- 更新为Figma设计样式：搜索栏、分站标签、榜单列表",
+      "- 应用统一的颜色方案和圆角设计",
+      "- 夹子榜单显示书籍列表，其他分站显示榜单列表",
+      "关注页面重构：",
+      "- 实现'我的关注'大标题卡片（灰色背景，白色文字）",
+      "- 添加搜索栏功能",
+      "- 'Follow Books'标题和书籍列表",
+      "- 书籍项目显示排名、书名、点击量、收藏量",
+      "- 简化为单一书籍关注列表，移除复杂的标签和筛选功能",
+      "设置页面重构：",
+      "- 用户信息区域：橙色圆形头像 + 绿色login按钮",
+      "- 三个设置开关：自动刷新、数据缓存、自动订阅",
+      "- 自定义开关样式：绿色激活状态，灰色关闭状态",
+      "- 实现登录/退出功能和设置保存到本地存储",
+      "统一设计元素：",
+      "- 背景色：#f4f0eb",
+      "- 主色：#64a347",
+      "- 卡片背景：#c3c3c3",
+      "- 圆角设计和Inter字体应用"
+    ]
+  },
+  {
+    "task": "小程序布局设计优化 - 现代化设计系统应用",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/pages/index/index.vue",
+      "JJClawler-frontend/pages/ranking/index.vue",
+      "JJClawler-frontend/pages/settings/index.vue",
+      "JJClawler-frontend/styles/variables.scss"
+    ],
+    "description": "应用现代移动端设计原则，优化整体布局和用户体验",
+    "timestamp": "2025-06-20T02:30:00Z",
+    "details": [
+      "首页分项统计优化：改为横向滑动布局，减少高度，添加渐变背景和阴影效果",
+      "修复榜单页面夹子逻辑：先显示榜单选择，点击后再显示书籍列表",
+      "设置页面间距优化：在用户信息区域和设置选项之间添加适当间距",
+      "建立现代设计系统：8px网格间距系统、统一圆角和阴影、颜色层次",
+      "应用设计变量：$spacing-*、$radius-*、$shadow-*、$transition-*等",
+      "添加交互反馈：按钮按下效果、过渡动画、渐变背景",
+      "优化视觉层次：合适的字体大小、行高、颜色对比度",
+      "统一卡片设计：阴影效果、内边距、圆角一致性"
+    ]
+  },
+  {
+    "task": "TabBar导航栏图标间距优化",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/pages.json",
+      "JJClawler-frontend/styles/tabbar.scss",
+      "JJClawler-frontend/uni.scss"
+    ],
+    "description": "优化TabBar导航栏图标与边缘的间距，提升视觉体验和触摸体验",
+    "timestamp": "2025-06-20T02:35:00Z",
+    "details": [
+      "优化pages.json中TabBar配置：增加高度、字体大小、图标宽度、间距等参数",
+      "修改选中颜色为主题色#64a347，保持与整体设计一致",
+      "创建专门的tabbar.scss样式文件，提供精细的间距控制",
+      "增加TabBar整体内边距：左右48rpx，上下16rpx",
+      "增加每个tab项的内边距：32rpx 16rpx",
+      "增加tab项之间的间距：8rpx",
+      "增大图标尺寸：52rpx x 52rpx（微信小程序56rpx x 56rpx）",
+      "增加图标与文字间距：16rpx",
+      "添加激活状态的背景色反馈：rgba(100, 163, 71, 0.08)",
+      "针对不同平台（微信小程序、H5、APP）提供专门的样式优化",
+      "添加TabBar阴影效果和边框，提升视觉层次",
+      "在uni.scss中引入tabbar.scss，确保样式生效"
+    ]
+  },
+  {
+    "task": "基于Figma设计重构TabBar导航栏和优化设置页面间距",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/styles/tabbar.scss",
+      "JJClawler-frontend/pages.json",
+      "JJClawler-frontend/pages/settings/index.vue"
+    ],
+    "description": "根据Figma设计重构TabBar为简洁优雅样式，优化设置页面区域间距",
+    "timestamp": "2025-06-20T02:40:00Z",
+    "details": [
+      "TabBar设计重构：",
+      "- 采用半透明白色背景：rgba(255, 255, 255, 0.5)",
+      "- 移除边框和阴影，保持简洁",
+      "- 首页tab激活时显示绿色圆角背景：rgba(100, 163, 71, 0.5)",
+      "- 图标尺寸调整为48rpx × 48rpx（24px × 24px）",
+      "- 文字使用Inter字体，14px大小，Regular字重",
+      "- TabBar高度设置为196rpx（98px）",
+      "- 文字和图标颜色统一为黑色#000000",
+      "设置页面间距优化：",
+      "- 用户信息区域与设置选项间距增加到96rpx",
+      "- 设置选项区域顶部增加32rpx内边距",
+      "- 添加视觉分隔线，使区域划分更清晰",
+      "- 分隔线使用半透明样式，不会过于突兀",
+      "整体效果：",
+      "- TabBar更加简洁现代，符合Figma设计",
+      "- 设置页面区域分离更明显，视觉层次清晰",
+      "- 保持整体设计的一致性和优雅感"
+    ]
+  },
+  {
+    "task": "榜单页面历史记忆功能和夹子书籍列表复用实现",
+    "status": "completed",
+    "files": [
+      "JJClawler-frontend/pages/ranking/index.vue",
+      "JJClawler-frontend/pages/follow/index.vue",
+      "JJClawler-frontend/components/BookList.vue",
+      "JJClawler-frontend/styles/variables.scss"
+    ],
+    "description": "实现榜单页面历史记忆功能和创建可复用的书籍列表组件",
+    "timestamp": "2025-06-20T03:00:00Z",
+    "details": [
+      "榜单页面历史记忆功能：",
+      "- 添加restoreLastSelection方法，自动恢复用户上次选择的tab",
+      "- 添加saveCurrentSelection方法，保存当前选择到本地存储",
+      "- 支持分站和频道的历史记忆，包含时间戳",
+      "- 如果没有历史信息，默认选中夹子tab",
+      "- 页面加载时优先恢复历史选择，提升用户体验",
+      "夹子书籍列表优化：",
+      "- 夹子选中后直接在当前页面显示书籍列表，不再跳转",
+      "- 修改selectSite逻辑，夹子直接进入level 3显示书籍",
+      "可复用BookList组件创建：",
+      "- 支持多种显示模式：排名、数量、操作按钮等",
+      "- 统一的书籍数据格式：点击量、收藏量、变化数据",
+      "- 智能数据格式化：数字缩写、变化趋势显示",
+      "- 灵活的事件系统：book-tap、unfollow等事件",
+      "- 完整的样式系统：过渡动画、颜色状态等",
+      "组件复用实现：",
+      "- 榜单页面使用BookList显示夹子书籍，支持排名和数量显示",
+      "- 关注页面使用BookList显示关注书籍，支持取消关注操作",
+      "- 两个页面共享相同的书籍显示逻辑和样式",
+      "修复样式变量：",
+      "- 添加缺失的$radius-*系列变量到variables.scss",
+      "- 确保所有页面的样式变量都有正确定义"
+    ]
   }
 ] 

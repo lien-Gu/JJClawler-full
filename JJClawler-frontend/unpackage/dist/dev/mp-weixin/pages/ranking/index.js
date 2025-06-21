@@ -1,275 +1,270 @@
 "use strict";
 const common_vendor = require("../../common/vendor.js");
 const data_url = require("../../data/url.js");
+const BookList = () => "../../components/BookList.js";
 const _sfc_main = {
+  name: "RankingPage",
+  components: {
+    BookList
+  },
   data() {
     return {
       searchKeyword: "",
-      selectedSite: "",
-      selectedChannel: "",
-      currentSite: {},
-      currentChannel: {},
       sites: [],
-      rankingList: [],
-      bookList: []
-      // 夹子榜单的书籍列表
+      selectedSite: null,
+      selectedChannel: null,
+      currentChannels: [],
+      currentRankings: [],
+      books: [],
+      level: 1,
+      // 1: 分站选择, 2: 频道选择, 3: 内容显示
+      currentRankingTitle: ""
     };
   },
-  computed: {
-    // 是否显示频道选择层级
-    showChannelLevel() {
-      return this.selectedSite && this.currentSite.type === "complex" && this.currentSite.channels && this.currentSite.channels.length > 0;
-    },
-    // 是否显示内容层级
-    showContentLevel() {
-      if (!this.selectedSite)
-        return false;
-      if (this.currentSite.type === "special") {
-        return true;
+  onLoad(options) {
+    this.initData();
+    if (options.site) {
+      const site = data_url.getSiteById(options.site);
+      if (site) {
+        this.selectSite(site);
       }
-      if (this.currentSite.type === "simple") {
-        return true;
-      }
-      if (this.currentSite.type === "complex") {
-        return true;
-      }
-      return false;
+    } else {
+      this.restoreLastSelection();
     }
-  },
-  onLoad() {
-    this.loadSites();
   },
   methods: {
     /**
-     * 加载分站数据
+     * 初始化数据
      */
-    loadSites() {
+    initData() {
       try {
         this.sites = data_url.getSitesList();
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:170", "分站数据加载成功:", this.sites);
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:133", "加载分站列表:", this.sites);
       } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:172", "加载分站数据失败:", error);
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:135", "加载分站数据失败:", error);
+        this.sites = [
+          { id: "jj", name: "夹子", type: "special" },
+          { id: "shu", name: "书城", type: "simple" },
+          { id: "yan", name: "言情", type: "complex" }
+        ];
+      }
+    },
+    /**
+     * 恢复上次选择的tab
+     */
+    restoreLastSelection() {
+      try {
+        const lastSelection = common_vendor.index.getStorageSync("ranking_last_selection");
+        if (lastSelection && lastSelection.siteId) {
+          common_vendor.index.__f__("log", "at pages/ranking/index.vue:152", "恢复历史选择:", lastSelection);
+          const site = data_url.getSiteById(lastSelection.siteId);
+          if (site) {
+            this.selectSite(site, false);
+            if (lastSelection.channelId && site.type === "complex") {
+              const channels = data_url.getChannelsBySiteId(site.id);
+              const channel = channels.find((ch) => ch.id === lastSelection.channelId);
+              if (channel) {
+                setTimeout(() => {
+                  this.selectChannel(channel, false);
+                }, 100);
+              }
+            }
+            return;
+          }
+        }
+      } catch (error) {
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:171", "恢复历史选择失败:", error);
+      }
+      const jiaziSite = this.sites.find((site) => site.id === "jj");
+      if (jiaziSite) {
+        this.selectSite(jiaziSite);
+      }
+    },
+    /**
+     * 保存当前选择到历史
+     */
+    saveCurrentSelection() {
+      var _a, _b;
+      try {
+        const selection = {
+          siteId: (_a = this.selectedSite) == null ? void 0 : _a.id,
+          channelId: (_b = this.selectedChannel) == null ? void 0 : _b.id,
+          timestamp: Date.now()
+        };
+        common_vendor.index.setStorageSync("ranking_last_selection", selection);
+        common_vendor.index.__f__("log", "at pages/ranking/index.vue:192", "保存选择历史:", selection);
+      } catch (error) {
+        common_vendor.index.__f__("error", "at pages/ranking/index.vue:194", "保存选择历史失败:", error);
       }
     },
     /**
      * 选择分站
      */
-    selectSite(site) {
-      this.selectedSite = site.id;
-      this.currentSite = site;
-      this.selectedChannel = "";
-      this.currentChannel = {};
-      if (site.type === "special") {
-        this.loadBookList(site.id);
+    selectSite(site, saveHistory = true) {
+      this.selectedSite = site;
+      this.selectedChannel = null;
+      this.level = 2;
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:206", "选择分站:", site);
+      if (saveHistory) {
+        this.saveCurrentSelection();
+      }
+      if (site.type === "special" && site.id === "jj") {
+        this.level = 3;
+        this.currentRankingTitle = "夹子榜单";
+        this.loadJiaziBooks();
+      } else if (site.type === "complex") {
+        this.currentChannels = data_url.getChannelsBySiteId(site.id);
+        this.loadSiteRankings(site);
       } else {
-        this.loadRankings(site.id);
+        this.loadSiteRankings(site);
       }
     },
     /**
      * 选择频道
      */
-    selectChannel(channel) {
-      this.selectedChannel = channel.id;
-      this.currentChannel = channel;
-      this.loadRankings(this.selectedSite, channel.id);
-    },
-    /**
-     * 加载榜单数据
-     */
-    async loadRankings(siteId, channelId = "") {
-      try {
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:219", "加载榜单数据:", siteId, channelId);
-        this.rankingList = this.generateTestRankings(siteId, channelId);
-      } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:224", "加载榜单数据失败:", error);
+    selectChannel(channel, saveHistory = true) {
+      this.selectedChannel = channel;
+      this.level = 3;
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:234", "选择频道:", channel);
+      if (saveHistory) {
+        this.saveCurrentSelection();
       }
+      this.loadChannelRankings(this.selectedSite, channel);
     },
     /**
-     * 生成测试榜单数据
+     * 加载分站榜单
      */
-    generateTestRankings(siteId, channelId = "") {
-      const baseRankings = {
-        // 书城榜单
-        index: [
-          { id: "index_1", name: "书城热门榜", desc: "书城最受欢迎的作品", bookCount: 100, updateTime: "1小时前更新" },
-          { id: "index_2", name: "书城新书榜", desc: "书城最新发布的作品", bookCount: 80, updateTime: "2小时前更新" },
-          { id: "index_3", name: "书城完结榜", desc: "书城已完结的优质作品", bookCount: 60, updateTime: "3小时前更新" }
+    loadSiteRankings(site) {
+      const siteRankings = {
+        jj: [
+          { id: "jj_main", name: "夹子总榜", type: "books" },
+          { id: "jj_rising", name: "夹子新星榜", type: "books" },
+          { id: "jj_hot", name: "夹子热门榜", type: "books" }
         ],
-        // 言情分站榜单
-        yq: [
-          { id: "yq_1", name: "言情总榜", desc: "言情分站综合排行", bookCount: 200, updateTime: "30分钟前更新" },
-          { id: "yq_2", name: "言情月榜", desc: "本月最受欢迎的言情作品", bookCount: 150, updateTime: "1小时前更新" },
-          { id: "yq_3", name: "言情新作榜", desc: "最新发布的言情作品", bookCount: 120, updateTime: "2小时前更新" },
-          { id: "yq_4", name: "言情完结榜", desc: "已完结的优质言情作品", bookCount: 90, updateTime: "4小时前更新" }
+        shu: [
+          { id: "shu_hot", name: "热门榜" },
+          { id: "shu_new", name: "新书榜" },
+          { id: "shu_finish", name: "完结榜" }
         ],
-        // 纯爱分站榜单
-        ca: [
-          { id: "ca_1", name: "纯爱总榜", desc: "纯爱分站综合排行", bookCount: 180, updateTime: "45分钟前更新" },
-          { id: "ca_2", name: "纯爱热门榜", desc: "最受欢迎的纯爱作品", bookCount: 140, updateTime: "1小时前更新" },
-          { id: "ca_3", name: "纯爱新书榜", desc: "最新发布的纯爱作品", bookCount: 110, updateTime: "2小时前更新" },
-          { id: "ca_4", name: "纯爱收藏榜", desc: "收藏量最高的纯爱作品", bookCount: 85, updateTime: "3小时前更新" }
+        yan: [
+          { id: "yan_monthly", name: "月榜" },
+          { id: "yan_weekly", name: "周榜" },
+          { id: "yan_daily", name: "日榜" }
         ],
-        // 衍生分站榜单
-        ys: [
-          { id: "ys_1", name: "衍生总榜", desc: "衍生分站综合排行", bookCount: 160, updateTime: "20分钟前更新" },
-          { id: "ys_2", name: "衍生热门榜", desc: "最受欢迎的衍生作品", bookCount: 130, updateTime: "1小时前更新" },
-          { id: "ys_3", name: "衍生新作榜", desc: "最新发布的衍生作品", bookCount: 100, updateTime: "2小时前更新" }
-        ],
-        // 无CP+分站榜单
-        nocp_plus: [
-          { id: "nocp_1", name: "无CP+总榜", desc: "无CP+分站综合排行", bookCount: 140, updateTime: "35分钟前更新" },
-          { id: "nocp_2", name: "无CP+热门榜", desc: "最受欢迎的无CP+作品", bookCount: 110, updateTime: "1小时前更新" },
-          { id: "nocp_3", name: "无CP+新书榜", desc: "最新发布的无CP+作品", bookCount: 90, updateTime: "3小时前更新" }
-        ],
-        // 百合分站榜单
-        bh: [
-          { id: "bh_1", name: "百合热门榜", desc: "最受欢迎的百合作品", bookCount: 80, updateTime: "1小时前更新" },
-          { id: "bh_2", name: "百合新书榜", desc: "最新发布的百合作品", bookCount: 60, updateTime: "2小时前更新" },
-          { id: "bh_3", name: "百合完结榜", desc: "已完结的优质百合作品", bookCount: 45, updateTime: "4小时前更新" }
+        chun: [
+          { id: "chun_popular", name: "人气榜" },
+          { id: "chun_recommend", name: "推荐榜" }
         ]
       };
-      if (channelId) {
-        const channelName = this.currentChannel.name || "频道";
-        return [
-          { id: `${channelId}_1`, name: `${channelName}热门榜`, desc: `${channelName}最受欢迎的作品`, bookCount: 80, updateTime: "30分钟前更新" },
-          { id: `${channelId}_2`, name: `${channelName}新书榜`, desc: `${channelName}最新发布的作品`, bookCount: 60, updateTime: "1小时前更新" },
-          { id: `${channelId}_3`, name: `${channelName}完结榜`, desc: `${channelName}已完结的优质作品`, bookCount: 40, updateTime: "2小时前更新" }
-        ];
-      }
-      return baseRankings[siteId] || [
-        { id: "default_1", name: "热门榜单", desc: "当前最受欢迎的作品", bookCount: 50, updateTime: "2小时前更新" },
-        { id: "default_2", name: "新书榜单", desc: "最新发布的优质作品", bookCount: 30, updateTime: "1小时前更新" },
-        { id: "default_3", name: "完结榜单", desc: "已完结的优质作品", bookCount: 25, updateTime: "6小时前更新" }
+      this.currentRankings = siteRankings[site.id] || [
+        { id: `${site.id}_default`, name: "默认榜单" }
+      ];
+    },
+    /**
+     * 加载频道榜单
+     */
+    loadChannelRankings(site, channel) {
+      this.currentRankings = [
+        { id: `${site.id}_${channel.id}_hot`, name: `${channel.name}热门榜` },
+        { id: `${site.id}_${channel.id}_new`, name: `${channel.name}新作榜` }
       ];
     },
     /**
      * 加载夹子书籍列表
      */
-    async loadBookList(siteId) {
-      try {
-        common_vendor.index.__f__("log", "at pages/ranking/index.vue:305", "加载夹子书籍数据:", siteId);
-        this.bookList = [
-          {
-            id: "1",
-            title: "重生之商业帝国",
-            collections: 15680,
-            collectionChange: 245,
-            // 正数表示增加
-            rankChange: -2
-            // 负数表示排名上升，正数表示排名下降
-          },
-          {
-            id: "2",
-            title: "穿越古代当皇后",
-            collections: 12450,
-            collectionChange: -89,
-            rankChange: 1
-          },
-          {
-            id: "3",
-            title: "现代都市修仙录",
-            collections: 11230,
-            collectionChange: 156,
-            rankChange: 0
-          },
-          {
-            id: "4",
-            title: "娱乐圈的那些事",
-            collections: 9870,
-            collectionChange: 78,
-            rankChange: -1
-          },
-          {
-            id: "5",
-            title: "末世重生女配逆袭",
-            collections: 8950,
-            collectionChange: -23,
-            rankChange: 3
-          }
-        ];
-      } catch (error) {
-        common_vendor.index.__f__("error", "at pages/ranking/index.vue:346", "加载夹子书籍数据失败:", error);
-      }
+    loadJiaziBooks() {
+      this.books = Array.from({ length: 50 }, (_, index) => ({
+        id: `book_${index + 1}`,
+        title: `重生之农女${index + 1}`,
+        collections: 193 + Math.floor(Math.random() * 1e3),
+        collectionChange: Math.floor(Math.random() * 100) - 50,
+        rankChange: Math.floor(Math.random() * 10) - 5
+      }));
     },
     /**
-     * 搜索功能
+     * 搜索输入
      */
-    onSearch() {
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:355", "搜索关键词:", this.searchKeyword);
+    onSearchInput(e) {
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:305", "搜索:", e.detail.value);
     },
     /**
      * 跳转到榜单详情
      */
     goToRankingDetail(ranking) {
+      if (ranking.type === "books") {
+        this.level = 3;
+        this.currentRankingTitle = ranking.name;
+        this.loadJiaziBooks();
+        return;
+      }
       common_vendor.index.navigateTo({
-        url: `/pages/ranking/detail?id=${ranking.id}`
+        url: `/pages/ranking/detail?id=${ranking.id}&name=${encodeURIComponent(ranking.name)}`
       });
     },
     /**
-     * 跳转到夹子榜单详情
+     * 处理书籍点击（BookList组件事件）
      */
-    goToJiaziDetail() {
+    handleBookTap({ book, index }) {
+      this.goToBookDetail(book);
+    },
+    /**
+     * 跳转到书籍详情
+     */
+    goToBookDetail(book) {
       common_vendor.index.navigateTo({
-        url: `/pages/ranking/detail?id=jiazi&type=special`
+        url: `/pages/book/detail?id=${book.id}`
       });
     }
   }
 };
+if (!Array) {
+  const _component_BookList = common_vendor.resolveComponent("BookList");
+  _component_BookList();
+}
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return common_vendor.e({
-    a: common_vendor.o([($event) => $data.searchKeyword = $event.detail.value, (...args) => $options.onSearch && $options.onSearch(...args)]),
+    a: common_vendor.o([($event) => $data.searchKeyword = $event.detail.value, (...args) => $options.onSearchInput && $options.onSearchInput(...args)]),
     b: $data.searchKeyword,
     c: common_vendor.f($data.sites, (site, k0, i0) => {
       return {
         a: common_vendor.t(site.name),
-        b: $data.selectedSite === site.id ? 1 : "",
+        b: $data.selectedSite && $data.selectedSite.id === site.id ? 1 : "",
         c: site.id,
         d: common_vendor.o(($event) => $options.selectSite(site), site.id)
       };
     }),
-    d: $options.showChannelLevel
-  }, $options.showChannelLevel ? {
-    e: common_vendor.f($data.currentSite.channels, (channel, k0, i0) => {
+    d: $data.selectedSite && $data.selectedSite.type === "complex"
+  }, $data.selectedSite && $data.selectedSite.type === "complex" ? {
+    e: common_vendor.f($data.currentChannels, (channel, k0, i0) => {
       return {
         a: common_vendor.t(channel.name),
-        b: $data.selectedChannel === channel.id ? 1 : "",
+        b: $data.selectedChannel && $data.selectedChannel.id === channel.id ? 1 : "",
         c: channel.id,
         d: common_vendor.o(($event) => $options.selectChannel(channel), channel.id)
       };
     })
   } : {}, {
-    f: $options.showContentLevel
-  }, $options.showContentLevel ? common_vendor.e({
-    g: $data.currentSite.type === "special"
-  }, $data.currentSite.type === "special" ? {
-    h: common_vendor.t($data.currentSite.name),
-    i: common_vendor.t($data.bookList.length),
-    j: common_vendor.f($data.bookList, (book, index, i0) => {
-      return {
-        a: common_vendor.t(index + 1),
-        b: common_vendor.t(book.title),
-        c: common_vendor.t(book.collections),
-        d: common_vendor.t(book.collectionChange > 0 ? "↑" : "↓"),
-        e: common_vendor.t(Math.abs(book.collectionChange)),
-        f: common_vendor.n(book.collectionChange > 0 ? "up" : "down"),
-        g: common_vendor.t(book.rankChange > 0 ? "↓" : "↑"),
-        h: common_vendor.t(Math.abs(book.rankChange)),
-        i: common_vendor.n(book.rankChange > 0 ? "down" : "up"),
-        j: book.id
-      };
+    f: $data.selectedSite && $data.selectedSite.id === "jj" && $data.level === 3
+  }, $data.selectedSite && $data.selectedSite.id === "jj" && $data.level === 3 ? {
+    g: common_vendor.o($options.handleBookTap),
+    h: common_vendor.p({
+      books: $data.books,
+      title: $data.currentRankingTitle,
+      ["show-count"]: true,
+      ["show-rank"]: true,
+      ["show-actions"]: false
     })
-  } : {
-    k: common_vendor.f($data.rankingList, (ranking, k0, i0) => {
+  } : $data.selectedSite && $data.level >= 2 ? {
+    j: common_vendor.f($data.currentRankings, (ranking, k0, i0) => {
       return {
         a: common_vendor.t(ranking.name),
-        b: common_vendor.t(ranking.desc),
-        c: common_vendor.t(ranking.bookCount),
-        d: common_vendor.t(ranking.updateTime),
-        e: ranking.id,
-        f: common_vendor.o(($event) => $options.goToRankingDetail(ranking), ranking.id)
+        b: ranking.id,
+        c: common_vendor.o(($event) => $options.goToRankingDetail(ranking), ranking.id)
       };
     })
-  }) : {});
+  } : {}, {
+    i: $data.selectedSite && $data.level >= 2
+  });
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render], ["__scopeId", "data-v-55d17871"]]);
 wx.createPage(MiniProgramPage);
