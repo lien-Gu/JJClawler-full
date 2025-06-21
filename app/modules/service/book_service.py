@@ -27,6 +27,23 @@ class BookService:
         self.book_dao.close()
         self.ranking_dao.close()
     
+    def get_total_books(self) -> int:
+        """获取书籍总数"""
+        try:
+            return self.book_dao.count_books()
+        except Exception as e:
+            logger.error(f"获取书籍总数失败: {e}")
+            return 0
+    
+    def get_recent_snapshots_count(self, hours: int = 24) -> int:
+        """获取最近N小时的快照数量"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=hours)
+            return self.book_dao.count_snapshots_since(cutoff_time)
+        except Exception as e:
+            logger.error(f"获取最近快照数量失败: {e}")
+            return 0
+    
     def get_book_detail(self, book_id: str) -> Optional[BookDetail]:
         """获取书籍详细信息（包含最新动态数据）"""
         book = self.book_dao.get_by_id(book_id)

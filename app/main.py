@@ -118,6 +118,32 @@ def setup_routes(app: FastAPI):
             "version": get_settings().VERSION
         }
     
+    @app.get("/stats", tags=["基础"])
+    async def get_system_stats():
+        """获取系统统计信息"""
+        try:
+            from app.modules.crawler_service import get_crawler_service
+            crawler_service = get_crawler_service()
+            stats = await crawler_service.get_crawl_statistics()
+            crawler_service.close()
+            
+            from app.modules.task_manager import get_task_manager
+            task_manager = get_task_manager()
+            task_summary = task_manager.get_task_summary()
+            
+            return {
+                "status": "ok",
+                "timestamp": datetime.now().isoformat(),
+                "crawler_stats": stats,
+                "task_stats": task_summary
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e)
+            }
+    
     # 注册API v1路由
     from app.api import pages, rankings, books, crawl
     

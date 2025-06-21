@@ -247,3 +247,7 @@ class RankingDAO:
         )
         
         return list(self.session.exec(statement))
+    def count_rankings(self) -> int:
+        """获取榜单总数"""
+        statement = select(func.count(Ranking.ranking_id))
+        return self.session.exec(statement).first() or 0

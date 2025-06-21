@@ -188,6 +188,18 @@ class BookDAO:
                 results.append((book, latest_snapshot))
         return results
     
+    def count_books(self) -> int:
+        """获取书籍总数"""
+        statement = select(func.count(Book.book_id))
+        return self.session.exec(statement).first() or 0
+    
+    def count_snapshots_since(self, since_time: datetime) -> int:
+        """获取指定时间以来的快照数量"""
+        statement = select(func.count(BookSnapshot.id)).where(
+            BookSnapshot.snapshot_time >= since_time
+        )
+        return self.session.exec(statement).first() or 0
+    
     def get_books_by_author(self, author_id: str) -> List[Book]:
         """获取指定作者的所有书籍"""
         statement = select(Book).where(Book.author_id == author_id)

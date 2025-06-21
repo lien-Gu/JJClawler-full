@@ -27,6 +27,14 @@ class RankingService:
         self.ranking_dao.close()
         self.book_dao.close()
     
+    def get_total_rankings(self) -> int:
+        """获取榜单总数"""
+        try:
+            return self.ranking_dao.count_rankings()
+        except Exception as e:
+            logger.error(f"获取榜单总数失败: {e}")
+            return 0
+    
     def get_ranking_info(self, ranking_id: str) -> Optional[RankingInfo]:
         """获取榜单信息"""
         ranking = self.ranking_dao.get_by_id(ranking_id)
