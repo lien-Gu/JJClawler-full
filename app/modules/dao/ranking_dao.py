@@ -251,3 +251,23 @@ class RankingDAO:
         """获取榜单总数"""
         statement = select(func.count(Ranking.ranking_id))
         return self.session.exec(statement).first() or 0
+    
+    def count_ranking_books(self, ranking_id: str, snapshot_time: Optional[datetime] = None) -> int:
+        """获取指定榜单在指定时间的书籍总数"""
+        # 如果没有指定时间，使用最新快照时间
+        if snapshot_time is None:
+            snapshot_time = self.get_latest_snapshot_time(ranking_id)
+            if not snapshot_time:
+                return 0
+        
+        statement = (
+            select(func.count(RankingSnapshot.id))
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.snapshot_time == snapshot_time
+                )
+            )
+        )
+        
+        return self.session.exec(statement).first() or 0

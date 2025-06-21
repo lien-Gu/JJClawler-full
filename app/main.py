@@ -43,7 +43,14 @@ async def lifespan(app: FastAPI):
         logger.error(f"数据库初始化失败: {e}")
         raise
     
-    # TODO: 启动任务调度器
+    # 启动任务调度器
+    try:
+        from app.modules.service.scheduler_service import start_scheduler
+        await start_scheduler()
+        logger.info("任务调度器启动成功")
+    except Exception as e:
+        logger.error(f"任务调度器启动失败: {e}")
+        # 不阻止应用启动，调度器可以后续手动启动
     
     logger.info("应用启动完成")
     
@@ -60,7 +67,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"关闭数据服务失败: {e}")
     
-    # TODO: 停止任务调度器
+    # 停止任务调度器
+    try:
+        from app.modules.service.scheduler_service import stop_scheduler
+        stop_scheduler()
+        logger.info("任务调度器已停止")
+    except Exception as e:
+        logger.error(f"停止任务调度器失败: {e}")
+    
     logger.info("应用已关闭")
 
 
@@ -122,20 +136,24 @@ def setup_routes(app: FastAPI):
     async def get_system_stats():
         """获取系统统计信息"""
         try:
-            from app.modules.crawler_service import get_crawler_service
-            crawler_service = get_crawler_service()
+            from app.modules.service.crawler_service import CrawlerService
+            crawler_service = CrawlerService()
             stats = await crawler_service.get_crawl_statistics()
             crawler_service.close()
             
-            from app.modules.task_manager import get_task_manager
+            from app.modules.service.task_service import get_task_manager
             task_manager = get_task_manager()
             task_summary = task_manager.get_task_summary()
+            
+            from app.modules.service.scheduler_service import get_scheduler_stats
+            scheduler_stats = get_scheduler_stats()
             
             return {
                 "status": "ok",
                 "timestamp": datetime.now().isoformat(),
                 "crawler_stats": stats,
-                "task_stats": task_summary
+                "task_stats": task_summary,
+                "scheduler_stats": scheduler_stats
             }
         except Exception as e:
             return {

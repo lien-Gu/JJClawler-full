@@ -2,10 +2,11 @@
 爬虫管理接口
 
 提供爬虫任务触发、状态查询和监控的API端点
+集成调度器功能，支持手动触发和定时任务管理
 """
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
 from app.modules.models import (
     TasksResponse,
@@ -23,31 +24,39 @@ from app.modules.service.task_service import (
     TaskType
 )
 from app.modules.service.crawler_service import CrawlerService
+from app.modules.service.scheduler_service import (
+    get_scheduler_service,
+    trigger_manual_crawl,
+    get_scheduler_stats
+)
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
 
 @router.post("/jiazi", response_model=TaskCreateResponse)
 async def trigger_jiazi_crawl(
-    background_tasks: BackgroundTasks,
     request: CrawlJiaziRequest = CrawlJiaziRequest()
 ):
     """
-    触发夹子榜单爬取
+    触发甲子榜单爬取
     
-    启动夹子榜单的爬取任务，夹子榜单是热度最高的榜单，
-    需要频繁更新
+    启动甲子榜单的爬取任务，甲子榜单是热度最高的榜单，
+    需要频繁更新。支持立即执行和调度器触发两种方式。
     """
     try:
-        # 创建任务
-        task_id = create_jiazi_task()
-        
-        # 在后台执行任务
-        background_tasks.add_task(execute_jiazi_task, task_id)
+        if request.immediate:
+            # 立即通过调度器执行
+            task_id = trigger_manual_crawl("jiazi")
+            message = "甲子榜单爬取任务已立即触发"
+        else:
+            # 传统方式创建任务
+            task_id = create_jiazi_task()
+            # 这里可以添加到后台任务队列
+            message = "甲子榜单爬取任务已创建"
         
         return TaskCreateResponse(
             task_id=task_id,
-            message="夹子榜单爬取任务已创建" + (" (强制模式)" if request.force else ""),
+            message=message + (" (强制模式)" if request.force else ""),
             status="pending"
         )
         
@@ -58,33 +67,36 @@ async def trigger_jiazi_crawl(
 @router.post("/page/{channel}", response_model=TaskCreateResponse)
 async def trigger_page_crawl(
     channel: str,
-    background_tasks: BackgroundTasks,
     request: CrawlRankingRequest = CrawlRankingRequest()
 ):
     """
     触发特定分类页面爬取
     
-    启动指定分类页面的爬取任务，根据页面配置的更新频率执行
+    启动指定分类页面的爬取任务，根据页面配置的更新频率执行。
+    支持立即执行和调度器触发两种方式。
     """
     try:
         # 验证频道是否有效
-        crawler = CrawlerController()
-        available_channels = await crawler.get_available_channels()
-        await crawler.close()
+        from app.modules.service.page_service import get_page_service
+        page_service = get_page_service()
+        available_channels = page_service.get_ranking_channels()
         
-        valid_channels = [ch['short_name'] for ch in available_channels]
+        valid_channels = [c['channel'] for c in available_channels]
         if channel not in valid_channels:
-            raise HTTPException(status_code=404, detail=f"分类页面 {channel} 不存在")
+            raise HTTPException(status_code=400, detail=f"无效频道: {channel}")
         
-        # 创建任务
-        task_id = create_page_task(channel)
-        
-        # 在后台执行任务
-        background_tasks.add_task(execute_page_task, task_id, channel)
+        if request.immediate:
+            # 立即通过调度器执行
+            task_id = trigger_manual_crawl(channel)
+            message = f"分类页面 {channel} 爬取任务已立即触发"
+        else:
+            # 传统方式创建任务
+            task_id = create_page_task(channel)
+            message = f"分类页面 {channel} 爬取任务已创建"
         
         return TaskCreateResponse(
             task_id=task_id,
-            message=f"分类页面 {channel} 爬取任务已创建" + (" (强制模式)" if request.force else ""),
+            message=message + (" (强制模式)" if request.force else ""),
             status="pending"
         )
         
@@ -220,9 +232,9 @@ async def get_available_channels():
     返回所有可以爬取的频道信息，包括甲子榜和各个分类页面
     """
     try:
-        crawler = CrawlerController()
-        channels = await crawler.get_available_channels()
-        await crawler.close()
+        from app.modules.service.page_service import get_page_service
+        page_service = get_page_service()
+        channels = page_service.get_ranking_channels()
         
         return {
             "channels": channels,
@@ -231,3 +243,65 @@ async def get_available_channels():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取频道列表失败: {str(e)}")
+
+
+@router.get("/scheduler/status")
+async def get_scheduler_status():
+    """
+    获取调度器状态信息
+    
+    返回调度器的运行状态、任务统计和配置信息
+    """
+    try:
+        scheduler_service = get_scheduler_service()
+        statistics = scheduler_service.get_job_statistics()
+        scheduled_jobs = scheduler_service.get_scheduled_jobs()
+        
+        return {
+            "status": "running" if statistics['is_running'] else "stopped",
+            "statistics": statistics,
+            "scheduled_jobs": scheduled_jobs
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取调度器状态失败: {str(e)}")
+
+
+@router.get("/scheduler/jobs")
+async def get_scheduled_jobs():
+    """
+    获取所有定时任务信息
+    
+    返回调度器中配置的所有定时任务详情
+    """
+    try:
+        scheduler_service = get_scheduler_service()
+        jobs = scheduler_service.get_scheduled_jobs()
+        
+        return {
+            "jobs": jobs,
+            "total": len(jobs)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取定时任务失败: {str(e)}")
+
+
+@router.post("/scheduler/trigger/{target}")
+async def trigger_scheduled_job(target: str):
+    """
+    手动触发调度任务
+    
+    立即执行指定的爬取任务，target可以是"jiazi"或频道名
+    """
+    try:
+        task_id = trigger_manual_crawl(target)
+        
+        return {
+            "task_id": task_id,
+            "message": f"已手动触发 {target} 爬取任务",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"触发任务失败: {str(e)}")

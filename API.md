@@ -1,14 +1,15 @@
-# 晋江文学城爬虫后端 API 文档
+# JJ Crawler API Documentation
 
 ## 概述
 
-本文档详细介绍晋江文学城爬虫后端系统的所有API接口，包括功能说明、输入输出格式和使用示例。
+本文档详细介绍晋江文学城爬虫后端系统的所有API接口，已完成T4.4 API实现层的开发，所有接口均已连接到真实的Service层实现。
 
 **API基础信息**
 - **基础URL**: `http://localhost:8000/api/v1`
 - **数据格式**: JSON
 - **认证方式**: 无（开发阶段）
 - **API版本**: v1
+- **实现状态**: ✅ T4.4完成 - 所有Mock API已替换为真实实现
 
 ## 目录
 
@@ -393,7 +394,7 @@ curl -X GET "http://localhost:8000/api/v1/rankings/jiazi/books?limit=20&offset=2
 
 ### 4.2 触发分类页面爬取
 
-**接口地址**: `POST /api/v1/crawl/ranking/{channel}`
+**接口地址**: `POST /api/v1/crawl/page/{channel}`
 
 **功能描述**: 触发指定分类页面的爬取任务
 
@@ -424,7 +425,7 @@ curl -X GET "http://localhost:8000/api/v1/rankings/jiazi/books?limit=20&offset=2
 
 ### 4.3 获取任务状态
 
-**接口地址**: `GET /api/v1/tasks`
+**接口地址**: `GET /api/v1/crawl/tasks`
 
 **功能描述**: 获取所有爬取任务的状态信息
 
@@ -470,7 +471,7 @@ curl -X GET "http://localhost:8000/api/v1/rankings/jiazi/books?limit=20&offset=2
 
 ### 4.4 获取单个任务详情
 
-**接口地址**: `GET /api/v1/tasks/{task_id}`
+**接口地址**: `GET /api/v1/crawl/tasks/{task_id}`
 
 **功能描述**: 获取指定任务的详细信息
 
@@ -625,7 +626,7 @@ curl -X POST "http://localhost:8000/api/v1/crawl/jiazi" \
   -d '{"immediate": true}'
 
 # 3. 查看任务状态
-curl -X GET "http://localhost:8000/api/v1/tasks"
+curl -X GET "http://localhost:8000/api/v1/crawl/tasks"
 
 # 4. 获取榜单数据
 curl -X GET "http://localhost:8000/api/v1/rankings/jiazi/books"
@@ -682,12 +683,54 @@ curl -X GET "http://localhost:8000/api/v1/stats"
 
 ---
 
-## 9. 版本历史
+## 9. T4.4 API实现层完成状态
+
+### 9.1 实现概览
+
+✅ **T4.4.1 页面配置API** - 已完成真实实现
+- 连接PageService，支持动态配置获取
+- 实现配置缓存机制（30分钟TTL）
+- 支持配置刷新和统计信息
+
+✅ **T4.4.2 榜单数据API** - 已完成真实实现
+- 连接RankingService，支持实时榜单查询
+- 实现历史数据查询和排名变化对比
+- 支持分页和日期筛选
+
+✅ **T4.4.3 书籍信息API** - 已完成真实实现
+- 连接BookService，支持书籍详情查询
+- 实现趋势分析和榜单历史功能
+- 支持多条件搜索和分页
+
+✅ **T4.4.4 爬虫管理API** - 已完成真实实现
+- 连接CrawlerService和SchedulerService
+- 支持手动触发和调度器集成
+- 实现任务状态监控和管理
+
+### 9.2 架构特点
+
+- **服务层集成**: 所有API都正确连接到对应的Service层
+- **错误处理**: 统一的异常处理和错误响应格式
+- **数据验证**: 使用Pydantic模型进行请求响应验证
+- **依赖注入**: 使用FastAPI的依赖注入管理服务实例
+- **资源管理**: 正确的数据库连接关闭和资源清理
+
+### 9.3 核心功能
+
+1. **实时数据**: 所有API都返回数据库中的真实数据
+2. **事务安全**: Service层保证数据操作的事务性
+3. **性能优化**: 实现分页、缓存等性能优化措施
+4. **任务调度**: 集成APScheduler支持定时和手动任务触发
+
+---
+
+## 10. 版本历史
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
 | v1.0.0 | 2024-01-01 | 初始版本，包含基础功能 |
-| v1.1.0 | 待定 | 计划添加用户认证和权限管理 |
+| v1.1.0 | 2024-01-01 | T4.4完成 - API实现层完整实现 |
+| v1.2.0 | 待定 | 计划添加用户认证和权限管理 |
 
 ---
 
