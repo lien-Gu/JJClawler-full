@@ -101,9 +101,9 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-### 3.3 标准四层架构设计（已实现）
+### 3.3 标准四层架构设计（T4.2已完成）
 
-项目采用经典的四层架构模式，职责分明、结构清晰。**T3重构已完成**，实现了标准的enterprise级架构：
+项目采用经典的四层架构模式，职责分明、结构清晰。**T4.2重构已完成**，实现了模块化的enterprise级架构：
 
 ```
 JJClawer3/
@@ -113,10 +113,10 @@ JJClawer3/
 │   ├── config.py                 # 配置管理
 │   ├── api/                      # ✅ API路由层（已重构）
 │   │   ├── __init__.py
-│   │   ├── pages.py              # ✅ 页面配置接口（静态配置）
+│   │   ├── pages.py              # ✅ 页面配置接口（动态配置+T4.2实现）
 │   │   ├── rankings.py           # ✅ 榜单相关接口（依赖注入）
 │   │   ├── books.py              # ✅ 书籍相关接口（依赖注入）
-│   │   └── crawl.py              # 爬虫管理接口（待实现）
+│   │   └── crawl.py              # ✅ 爬虫管理接口（已重构）
 │   └── modules/                  # ✅ 核心业务模块（四层架构已实现）
 │       ├── database/             # ✅ Database层：数据库连接管理
 │       │   ├── __init__.py       # ✅ 统一导出接口
@@ -131,13 +131,19 @@ JJClawer3/
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   ├── book_dao.py       # ✅ Book数据访问（CRUD + 复杂查询）
 │       │   └── ranking_dao.py    # ✅ Ranking数据访问（CRUD + 复杂查询）
-│       ├── service/              # ✅ Service层：业务逻辑（按领域拆分）
+│       ├── service/              # ✅ Service层：业务逻辑（按领域拆分+T4.2完成）
 │       │   ├── __init__.py       # ✅ 统一导出接口
 │       │   ├── book_service.py   # ✅ Book业务逻辑（含空数据处理）
-│       │   └── ranking_service.py # ✅ Ranking业务逻辑（含空数据处理）
-│       ├── crawler.py            # ✅ 爬虫模块（已实现）
-│       ├── crawler_service.py    # ✅ 爬虫服务层（已实现）
-│       └── task_manager.py       # ✅ 任务管理（已实现）
+│       │   ├── ranking_service.py # ✅ Ranking业务逻辑（含空数据处理）
+│       │   ├── crawler_service.py # ✅ 爬虫业务逻辑（T4.2重构）
+│       │   ├── task_service.py   # ✅ 任务管理业务逻辑（T4.2重构）
+│       │   └── page_service.py   # ✅ 页面配置业务逻辑（T4.2新增）
+│       └── crawler/              # ✅ 爬虫实现层（T4.2模块化拆分）
+│           ├── __init__.py       # ✅ 爬虫模块导出
+│           ├── base.py           # ✅ HTTP客户端基础设施
+│           ├── parser.py         # ✅ 数据解析器
+│           ├── jiazi_crawler.py  # ✅ 甲子榜专用爬虫
+│           └── page_crawler.py   # ✅ 分类页面爬虫
 ├── data/
 │   ├── urls.json                 # 爬取配置
 │   ├── tasks/                    # 任务JSON文件存储
@@ -149,7 +155,7 @@ JJClawer3/
 └── .env.example
 ```
 
-#### 3.3.1 四层架构详解（T3重构实现）
+#### 3.3.1 四层架构详解（T4.2重构完成）
 
 **🏗️ Database层（已实现）**
 - **职责**：数据库连接管理、会话控制、表创建
@@ -173,22 +179,35 @@ JJClawer3/
   - `ranking_dao.py`：Ranking数据访问封装（榜单、历史、统计）
 - **特性**：会话管理、复合查询、批量操作、资源清理
 
-**⚙️ Service层（已实现）**
+**⚙️ Service层（T4.2完成）**
 - **职责**：业务逻辑组合、事务控制、数据转换
 - **文件**：`modules/service/`（按业务领域拆分）
   - `book_service.py`：Book业务逻辑（详情、搜索、趋势、排名历史）
   - `ranking_service.py`：Ranking业务逻辑（榜单、历史、排名变化）
+  - `crawler_service.py`：爬虫业务逻辑（T4.2重构）
+  - `task_service.py`：任务管理业务逻辑（T4.2重构）
+  - `page_service.py`：页面配置业务逻辑（T4.2新增）
 - **特性**：DAO组合、空数据处理、业务模型转换、依赖注入支持
 
-**🌐 API层（已实现）**
+**🕷️ 爬虫实现层（T4.2新增）**
+- **职责**：专业爬虫功能实现、HTTP客户端管理、数据解析
+- **文件**：`modules/crawler/`（模块化设计）
+  - `base.py`：HTTP客户端基础设施（连接池、重试、限流）
+  - `parser.py`：数据解析器（清洗、标准化）
+  - `jiazi_crawler.py`：甲子榜专用爬虫
+  - `page_crawler.py`：分类页面爬虫
+- **特性**：单一职责、高效简洁、易于扩展、模块化管理
+
+**🌐 API层（T4.2完成）**
 - **职责**：HTTP接口、参数验证、响应格式化
 - **文件**：`api/`（按功能模块拆分）
-  - `pages.py`：静态页面配置（无数据库依赖）
+  - `pages.py`：动态页面配置（T4.2使用PageService）
   - `books.py`：书籍相关接口（依赖注入BookService）
   - `rankings.py`：榜单相关接口（依赖注入RankingService）
+  - `crawl.py`：爬虫管理接口（T4.2重构）
 - **特性**：FastAPI依赖注入、自动资源清理、Pydantic验证
 
-#### 3.3.2 T3重构架构优势
+#### 3.3.2 T4.2重构架构优势
 
 **🔄 分层解耦（已实现）**
 - 每层职责单一，修改影响最小化
