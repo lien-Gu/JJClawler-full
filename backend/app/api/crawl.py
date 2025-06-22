@@ -38,21 +38,21 @@ async def trigger_jiazi_crawl(
     request: CrawlJiaziRequest = CrawlJiaziRequest()
 ):
     """
-    触发甲子榜单爬取
+    触发夹子榜单爬取
     
-    启动甲子榜单的爬取任务，甲子榜单是热度最高的榜单，
+    启动夹子榜单的爬取任务，夹子榜单是热度最高的榜单，
     需要频繁更新。支持立即执行和调度器触发两种方式。
     """
     try:
         if request.immediate:
             # 立即通过调度器执行
             task_id = trigger_manual_crawl("jiazi")
-            message = "甲子榜单爬取任务已立即触发"
+            message = "夹子榜单爬取任务已立即触发"
         else:
             # 传统方式创建任务
             task_id = create_jiazi_task()
             # 这里可以添加到后台任务队列
-            message = "甲子榜单爬取任务已创建"
+            message = "夹子榜单爬取任务已创建"
         
         return TaskCreateResponse(
             task_id=task_id,
@@ -229,7 +229,7 @@ async def get_available_channels():
     """
     获取可用的爬取频道列表
     
-    返回所有可以爬取的频道信息，包括甲子榜和各个分类页面
+    返回所有可以爬取的频道信息，包括夹子榜和各个分类页面
     """
     try:
         from app.modules.service.page_service import get_page_service

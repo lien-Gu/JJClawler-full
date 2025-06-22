@@ -3,7 +3,7 @@
 
 本模块提供完整的数据抓取解决方案，采用模块化设计：
 - parser: 数据解析和清洗
-- jiazi_crawler: 甲子榜专用爬虫
+- jiazi_crawler: 夹子榜专用爬虫
 - page_crawler: 分类页面爬虫
 
 HTTP客户端现在统一使用 app.utils.http_client.HTTPClient

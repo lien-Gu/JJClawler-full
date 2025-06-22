@@ -327,7 +327,7 @@ paths:
             type: string
           required: false
           description: 榜单名称搜索关键词（支持模糊匹配）
-          example: 甲子
+          example: 夹子
         - in: query
           name: limit
           schema:
@@ -365,20 +365,20 @@ paths:
                           example: jiazi
                         name:
                           type: string
-                          example: 甲子榜
+                          example: 夹子榜
                         update_frequency:
                           type: string
                           example: hourly
                         page_name:
                           type: string
-                          example: 甲子榜页面
+                          example: 夹子榜页面
                   total:
                     type: integer
                     example: 1
                   query:
                     type: string
                     nullable: true
-                    example: 甲子
+                    example: 夹子
                   has_next:
                     type: boolean
                     example: false
@@ -587,7 +587,7 @@ paths:
                           example: jiazi
                         ranking_name:
                           type: string
-                          example: 甲子榜
+                          example: 夹子榜
                         position:
                           type: integer
                           example: 5
@@ -691,11 +691,11 @@ paths:
                         example: 2023-12-25
   /crawl/jiazi:
     post:
-      summary: 触发甲子榜爬取
+      summary: 触发夹子榜爬取
       operationId: triggerJiaziCrawl
       tags:
         - Crawler Management
-      description: 手动触发甲子榜数据爬取任务
+      description: 手动触发夹子榜数据爬取任务
       requestBody:
         required: true
         content:
@@ -714,7 +714,7 @@ paths:
                       example: manual
                     description:
                       type: string
-                      example: 手动触发的甲子榜爬取
+                      example: 手动触发的夹子榜爬取
       responses:
         "200":
           description: 成功创建爬取任务
@@ -728,7 +728,7 @@ paths:
                     example: jiazi_20240101_120000_abc123
                   message:
                     type: string
-                    example: 甲子榜爬取任务已创建
+                    example: 夹子榜爬取任务已创建
                   estimated_duration:
                     type: string
                     example: 2-3分钟

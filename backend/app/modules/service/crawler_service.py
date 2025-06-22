@@ -49,7 +49,7 @@ class CrawlerService:
     
     @asynccontextmanager
     async def _get_jiazi_crawler(self):
-        """获取甲子榜爬虫的上下文管理器"""
+        """获取夹子榜爬虫的上下文管理器"""
         self.jiazi_crawler = JiaziCrawler()
         try:
             yield self.jiazi_crawler
@@ -69,12 +69,12 @@ class CrawlerService:
     
     async def crawl_and_save_jiazi(self) -> Dict[str, Any]:
         """
-        抓取并保存甲子榜数据
+        抓取并保存夹子榜数据
         
         Returns:
             采集结果统计
         """
-        logger.info("开始甲子榜数据采集任务")
+        logger.info("开始夹子榜数据采集任务")
         
         try:
             # 抓取数据
@@ -84,15 +84,15 @@ class CrawlerService:
             # 保存数据
             result = await self._save_crawled_data(
                 books, book_snapshots, 
-                ranking_name="甲子榜", 
+                ranking_name="夹子榜", 
                 ranking_type="jiazi"
             )
             
-            logger.info(f"甲子榜数据采集完成: {result}")
+            logger.info(f"夹子榜数据采集完成: {result}")
             return result
             
         except Exception as e:
-            logger.error(f"甲子榜数据采集失败: {e}")
+            logger.error(f"夹子榜数据采集失败: {e}")
             raise
     
     async def crawl_and_save_page(self, channel: str) -> Dict[str, Any]:
@@ -392,7 +392,7 @@ def get_crawler_service() -> CrawlerService:
 # 便捷函数
 async def crawl_jiazi() -> Dict[str, Any]:
     """
-    便捷函数：抓取甲子榜数据
+    便捷函数：抓取夹子榜数据
     
     Returns:
         采集结果统计

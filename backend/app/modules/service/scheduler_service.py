@@ -3,7 +3,7 @@
 
 使用APScheduler 3.x AsyncIOScheduler实现定时爬取功能，完善任务管理系统：
 - 集成AsyncIOScheduler到FastAPI应用
-- 实现定时任务配置（甲子榜每小时，其他榜单每日）
+- 实现定时任务配置（夹子榜每小时，其他榜单每日）
 - 实现任务重试和错误处理机制
 - 完善任务状态监控和日志记录
 
@@ -152,7 +152,7 @@ class SchedulerService:
     def _configure_scheduled_jobs(self) -> None:
         """配置所有定时任务"""
         
-        # 配置甲子榜定时任务（每小时）
+        # 配置夹子榜定时任务（每小时）
         self.scheduler.add_job(
             func=self._execute_jiazi_crawl,
             trigger=CronTrigger(minute=0),  # 每小时整点执行
@@ -184,7 +184,7 @@ class SchedulerService:
             
             for i, channel_info in enumerate(channels):
                 channel = channel_info['channel']
-                if channel == 'jiazi':  # 甲子榜已单独配置
+                if channel == 'jiazi':  # 夹子榜已单独配置
                     continue
                 
                 # 错开执行时间，避免同时爬取
@@ -207,11 +207,11 @@ class SchedulerService:
             logger.error(f"配置每日爬取任务失败: {e}")
     
     async def _execute_jiazi_crawl(self) -> None:
-        """执行甲子榜爬取任务"""
+        """执行夹子榜爬取任务"""
         task_id = None
         
         try:
-            logger.info("开始执行甲子榜定时爬取")
+            logger.info("开始执行夹子榜定时爬取")
             
             # 创建任务记录
             task_id = self.task_manager.create_task(
@@ -231,11 +231,11 @@ class SchedulerService:
             )
             
             self._job_stats['total_succeeded'] += 1
-            logger.info(f"甲子榜定时爬取完成: {result}")
+            logger.info(f"夹子榜定时爬取完成: {result}")
             
         except Exception as e:
             self._job_stats['total_failed'] += 1
-            error_msg = f"甲子榜定时爬取失败: {e}"
+            error_msg = f"夹子榜定时爬取失败: {e}"
             logger.error(error_msg)
             
             if task_id:

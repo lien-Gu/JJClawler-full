@@ -2,7 +2,7 @@
 数据解析模块
 
 负责将API响应数据转换为标准化的模型对象：
-- 甲子榜数据解析
+- 夹子榜数据解析
 - 分类页面数据解析
 - 书籍信息标准化
 - 数据清洗和验证
@@ -22,7 +22,7 @@ class DataParser:
     数据解析器
     
     负责将API响应数据转换为标准化的模型对象：
-    - 甲子榜数据解析
+    - 夹子榜数据解析
     - 分类页面数据解析
     - 书籍信息标准化
     - 数据清洗和验证
@@ -31,7 +31,7 @@ class DataParser:
     @staticmethod
     def parse_jiazi_data(raw_data: Dict[str, Any]) -> Tuple[List[Book], List[BookSnapshot]]:
         """
-        解析甲子榜数据
+        解析夹子榜数据
         
         Args:
             raw_data: API原始响应数据
@@ -60,10 +60,10 @@ class DataParser:
                 snapshots.append(snapshot)
                 
         except Exception as e:
-            logger.error(f"甲子榜数据解析失败: {e}")
+            logger.error(f"夹子榜数据解析失败: {e}")
             raise
         
-        logger.info(f"甲子榜数据解析完成: {len(books)} 本书籍")
+        logger.info(f"夹子榜数据解析完成: {len(books)} 本书籍")
         return books, snapshots
     
     @staticmethod

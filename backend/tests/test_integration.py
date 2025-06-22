@@ -21,7 +21,7 @@ class TestEndToEndIntegration:
 
     def test_complete_crawl_to_api_flow(self, client: TestClient):
         """测试完整的爬取到API响应流程"""
-        # 1. 触发甲子榜爬取
+        # 1. 触发夹子榜爬取
         crawl_response = client.post("/api/v1/crawl/jiazi", 
                                    json={"immediate": True})
         assert crawl_response.status_code == 200
@@ -68,12 +68,12 @@ class TestEndToEndIntegration:
         assert "jobs" in jobs_data
         assert len(jobs_data["jobs"]) > 0
         
-        # 3. 验证甲子榜任务存在
+        # 3. 验证夹子榜任务存在
         jiazi_job_exists = any(
             job["id"] == "jiazi_crawl" 
             for job in jobs_data["jobs"]
         )
-        assert jiazi_job_exists, "甲子榜定时任务应该存在"
+        assert jiazi_job_exists, "夹子榜定时任务应该存在"
 
     def test_error_handling_integration(self, client: TestClient):
         """测试错误处理集成"""
@@ -281,7 +281,7 @@ class TestServiceIntegration:
         assert "total_pages" in data
         assert "total_rankings" in data
         
-        # 3. 验证至少有甲子榜
+        # 3. 验证至少有夹子榜
         page_ids = [page["page_id"] for page in data["pages"]]
         assert "jiazi" in page_ids
         

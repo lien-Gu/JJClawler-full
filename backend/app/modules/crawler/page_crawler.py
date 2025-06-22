@@ -38,8 +38,6 @@ class PageCrawler:
         """
         self.http_client = http_client or HTTPClient(
             timeout=30,
-            max_retries=3,
-            retry_delay=1.0,
             rate_limit_delay=1.0
         )
         self.parser = DataParser()

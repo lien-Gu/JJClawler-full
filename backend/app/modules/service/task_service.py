@@ -43,7 +43,7 @@ class TaskStatus(Enum):
 
 class TaskType(Enum):
     """任务类型枚举"""
-    JIAZI = "jiazi"          # 甲子榜抓取
+    JIAZI = "jiazi"          # 夹子榜抓取
     PAGE = "page"            # 分类页面抓取
     BOOK_DETAIL = "book_detail"  # 书籍详情抓取
 
@@ -570,7 +570,7 @@ def get_task_manager() -> TaskManager:
 # 便捷函数
 def create_jiazi_task() -> str:
     """
-    创建甲子榜抓取任务
+    创建夹子榜抓取任务
     
     Returns:
         任务ID
@@ -596,7 +596,7 @@ def create_page_task(channel: str) -> str:
 
 async def execute_jiazi_task(task_id: str) -> bool:
     """
-    执行甲子榜抓取任务
+    执行夹子榜抓取任务
     
     Args:
         task_id: 任务ID

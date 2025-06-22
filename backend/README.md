@@ -406,7 +406,7 @@ JJClawer3/
 │           ├── __init__.py       # ✅ 爬虫模块导出
 │           ├── base.py           # ✅ 爬虫基础工具（移除重复HTTP实现）
 │           ├── parser.py         # ✅ 数据解析器
-│           ├── jiazi_crawler.py  # ✅ 甲子榜专用爬虫（使用utils/http_client）
+│           ├── jiazi_crawler.py  # ✅ 夹子榜专用爬虫（使用utils/http_client）
 │           └── page_crawler.py   # ✅ 分类页面爬虫（使用utils/http_client）
 ├── data/
 │   ├── urls.json                 # 爬取配置
@@ -469,7 +469,7 @@ JJClawer3/
 - **文件**：`modules/crawler/`（模块化设计）
   - `base.py`：爬虫基础工具（配置管理、数据验证、统计）
   - `parser.py`：数据解析器（清洗、标准化）
-  - `jiazi_crawler.py`：甲子榜专用爬虫（使用utils/http_client）
+  - `jiazi_crawler.py`：夹子榜专用爬虫（使用utils/http_client）
   - `page_crawler.py`：分类页面爬虫（使用utils/http_client）
 - **特性**：单一职责、复用utils工具、易于扩展、模块化管理
 

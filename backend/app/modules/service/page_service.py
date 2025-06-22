@@ -102,7 +102,7 @@ class PageService:
             config = self._load_config()
             pages = []
             
-            # 添加甲子榜
+            # 添加夹子榜
             jiazi_config = config['content']['jiazi']
             pages.append({
                 'page_id': jiazi_config['short_name'],

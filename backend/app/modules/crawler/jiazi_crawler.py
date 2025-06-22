@@ -1,8 +1,8 @@
 """
-甲子榜爬虫模块
+夹子榜爬虫模块
 
-专门负责晋江文学城甲子榜的数据抓取：
-- 甲子榜数据抓取
+专门负责晋江文学城夹子榜的数据抓取：
+- 夹子榜数据抓取
 - URL配置管理
 - 数据验证和处理
 """
@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 class JiaziCrawler:
     """
-    甲子榜爬虫
+    夹子榜爬虫
     
-    专门处理甲子榜数据抓取：
+    专门处理夹子榜数据抓取：
     - 配置管理
     - 数据抓取
     - 结果验证
@@ -31,15 +31,13 @@ class JiaziCrawler:
     
     def __init__(self, http_client: HTTPClient = None):
         """
-        初始化甲子榜爬虫
+        初始化夹子榜爬虫
         
         Args:
             http_client: HTTP客户端实例，如果未提供则创建新实例
         """
         self.http_client = http_client or HTTPClient(
             timeout=30,
-            max_retries=3,
-            retry_delay=1.0,
             rate_limit_delay=1.0
         )
         self.parser = DataParser()
@@ -56,23 +54,23 @@ class JiaziCrawler:
             config_path = os.path.join(os.getcwd(), 'data', 'urls.json')
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                logger.debug("甲子榜URL配置加载成功")
+                logger.debug("夹子榜URL配置加载成功")
                 return config
         except Exception as e:
-            logger.error(f"甲子榜URL配置加载失败: {e}")
+            logger.error(f"夹子榜URL配置加载失败: {e}")
             raise
     
     async def crawl(self) -> Tuple[List[Book], List[BookSnapshot]]:
         """
-        抓取甲子榜数据
+        抓取夹子榜数据
         
         Returns:
             (books, book_snapshots): 书籍信息和快照数据
         """
-        logger.info("开始抓取甲子榜数据")
+        logger.info("开始抓取夹子榜数据")
         
         try:
-            # 获取甲子榜URL
+            # 获取夹子榜URL
             jiazi_config = self.url_config['content']['jiazi']
             url = jiazi_config['url']
             
@@ -84,22 +82,22 @@ class JiaziCrawler:
             
             # 验证结果
             if not books or not snapshots:
-                logger.warning("甲子榜抓取结果为空")
+                logger.warning("夹子榜抓取结果为空")
                 return [], []
             
             if len(books) != len(snapshots):
                 logger.warning(f"数据不一致: 书籍 {len(books)} 本, 快照 {len(snapshots)} 条")
             
-            logger.info(f"甲子榜抓取完成: {len(books)} 本书籍")
+            logger.info(f"夹子榜抓取完成: {len(books)} 本书籍")
             return books, snapshots
             
         except Exception as e:
-            logger.error(f"甲子榜抓取失败: {e}")
+            logger.error(f"夹子榜抓取失败: {e}")
             raise
     
     async def get_config_info(self) -> Dict[str, Any]:
         """
-        获取甲子榜配置信息
+        获取夹子榜配置信息
         
         Returns:
             配置信息字典
@@ -114,10 +112,10 @@ class JiaziCrawler:
                 'url': jiazi_config['url']
             }
         except Exception as e:
-            logger.error(f"获取甲子榜配置失败: {e}")
+            logger.error(f"获取夹子榜配置失败: {e}")
             return {
                 'short_name': 'jiazi',
-                'zh_name': '甲子榜',
+                'zh_name': '夹子榜',
                 'type': 'hourly',
                 'frequency': 'hourly',
                 'url': ''
@@ -127,4 +125,4 @@ class JiaziCrawler:
         """关闭爬虫资源"""
         if self.http_client:
             await self.http_client.close()
-        logger.debug("甲子榜爬虫已关闭")
+        logger.debug("夹子榜爬虫已关闭")
