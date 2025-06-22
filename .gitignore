@@ -176,3 +176,12 @@ cython_debug/
 
 /backend/.idea/
 /frontend/.cursor/
+/backend/.idea/
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/.gitignore
+/.idea/AugmentWebviewStateStore.xml
+/.idea/deployment.xml
+/.idea/JJClawler-full.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
