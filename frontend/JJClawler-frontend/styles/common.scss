@@ -1,0 +1,232 @@
+// 通用容器类 / Common Container Classes
+.container {
+  padding: $spacing-sm;
+}
+
+.container-lg {
+  padding: $spacing-lg;
+}
+
+.page-container {
+  min-height: 100vh;
+  background-color: $background-color;
+  padding: $spacing-sm;
+}
+
+// 卡片类 / Card Classes
+.card {
+  @include card-style;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+}
+
+.card-hover {
+  @include card-style;
+  @include card-hover;
+  padding: $spacing-md;
+  margin-bottom: $spacing-sm;
+}
+
+// 文字类 / Text Classes
+.text-primary {
+  color: $text-primary;
+}
+
+.text-secondary {
+  color: $text-secondary;
+}
+
+.text-placeholder {
+  color: $text-placeholder;
+}
+
+.text-light {
+  color: $text-light;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-ellipsis {
+  @include text-ellipsis;
+}
+
+.text-ellipsis-2 {
+  @include text-ellipsis-multiline(2);
+}
+
+.text-ellipsis-3 {
+  @include text-ellipsis-multiline(3);
+}
+
+// 字体大小类 / Font Size Classes
+.font-xs {
+  font-size: $font-size-xs;
+}
+
+.font-sm {
+  font-size: $font-size-sm;
+}
+
+.font-md {
+  font-size: $font-size-md;
+}
+
+.font-lg {
+  font-size: $font-size-lg;
+}
+
+.font-xl {
+  font-size: $font-size-xl;
+}
+
+.font-xxl {
+  font-size: $font-size-xxl;
+}
+
+// Flex 布局类 / Flex Layout Classes
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  @include flex-center;
+}
+
+.flex-between {
+  @include flex-between;
+}
+
+.flex-around {
+  @include flex-around;
+}
+
+.flex-column {
+  @include flex-column;
+}
+
+.flex-column-center {
+  @include flex-column-center;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+// 间距类 / Spacing Classes
+.m-xs { margin: $spacing-xs; }
+.m-sm { margin: $spacing-sm; }
+.m-md { margin: $spacing-md; }
+.m-lg { margin: $spacing-lg; }
+.m-xl { margin: $spacing-xl; }
+
+.mt-xs { margin-top: $spacing-xs; }
+.mt-sm { margin-top: $spacing-sm; }
+.mt-md { margin-top: $spacing-md; }
+.mt-lg { margin-top: $spacing-lg; }
+.mt-xl { margin-top: $spacing-xl; }
+
+.mb-xs { margin-bottom: $spacing-xs; }
+.mb-sm { margin-bottom: $spacing-sm; }
+.mb-md { margin-bottom: $spacing-md; }
+.mb-lg { margin-bottom: $spacing-lg; }
+.mb-xl { margin-bottom: $spacing-xl; }
+
+.ml-xs { margin-left: $spacing-xs; }
+.ml-sm { margin-left: $spacing-sm; }
+.ml-md { margin-left: $spacing-md; }
+.ml-lg { margin-left: $spacing-lg; }
+.ml-xl { margin-left: $spacing-xl; }
+
+.mr-xs { margin-right: $spacing-xs; }
+.mr-sm { margin-right: $spacing-sm; }
+.mr-md { margin-right: $spacing-md; }
+.mr-lg { margin-right: $spacing-lg; }
+.mr-xl { margin-right: $spacing-xl; }
+
+.p-xs { padding: $spacing-xs; }
+.p-sm { padding: $spacing-sm; }
+.p-md { padding: $spacing-md; }
+.p-lg { padding: $spacing-lg; }
+.p-xl { padding: $spacing-xl; }
+
+.pt-xs { padding-top: $spacing-xs; }
+.pt-sm { padding-top: $spacing-sm; }
+.pt-md { padding-top: $spacing-md; }
+.pt-lg { padding-top: $spacing-lg; }
+.pt-xl { padding-top: $spacing-xl; }
+
+.pb-xs { padding-bottom: $spacing-xs; }
+.pb-sm { padding-bottom: $spacing-sm; }
+.pb-md { padding-bottom: $spacing-md; }
+.pb-lg { padding-bottom: $spacing-lg; }
+.pb-xl { padding-bottom: $spacing-xl; }
+
+.pl-xs { padding-left: $spacing-xs; }
+.pl-sm { padding-left: $spacing-sm; }
+.pl-md { padding-left: $spacing-md; }
+.pl-lg { padding-left: $spacing-lg; }
+.pl-xl { padding-left: $spacing-xl; }
+
+.pr-xs { padding-right: $spacing-xs; }
+.pr-sm { padding-right: $spacing-sm; }
+.pr-md { padding-right: $spacing-md; }
+.pr-lg { padding-right: $spacing-lg; }
+.pr-xl { padding-right: $spacing-xl; }
+
+// 按钮类 / Button Classes
+.btn-primary {
+  @include button-primary;
+}
+
+.btn-secondary {
+  @include button-secondary;
+}
+
+// 输入框类 / Input Classes
+.input {
+  @include input-style;
+  width: 100%;
+}
+
+// 标签类 / Tag Classes
+.tag {
+  @include tag-style(false);
+  display: inline-block;
+  margin-right: $spacing-xs;
+  margin-bottom: $spacing-xs;
+}
+
+.tag-active {
+  @include tag-style(true);
+  display: inline-block;
+  margin-right: $spacing-xs;
+  margin-bottom: $spacing-xs;
+}
+
+// 分割线类 / Divider Classes
+.divider {
+  height: 2rpx;
+  background-color: $border-light;
+  margin: $spacing-md 0;
+}
+
+.divider-thick {
+  height: 4rpx;
+  background-color: $border-medium;
+  margin: $spacing-lg 0;
+}
+
+// 阴影类 / Shadow Classes
+.shadow-light {
+  box-shadow: $shadow-light;
+}
+
+.shadow-medium {
+  box-shadow: $shadow-medium;
+}
+
+.shadow-dark {
+  box-shadow: $shadow-dark;
+} 

@@ -1,0 +1,57 @@
+// 主题色彩 / Theme Colors
+$primary-color: #007aff;
+$secondary-color: #3cc51f;
+$accent-color: #ff6b35;
+$background-color: #f8f8f8;
+$page-background: #f5f5f5;
+$card-background: #ffffff;
+
+// 文字色彩 / Text Colors
+$text-primary: #333333;
+$text-secondary: #666666;
+$text-placeholder: #999999;
+$text-light: #cccccc;
+
+// 边框色彩 / Border Colors
+$border-light: #e0e0e0;
+$border-medium: #d0d0d0;
+$border-dark: #b0b0b0;
+
+// 尺寸变量 / Size Variables
+$border-radius-small: 10rpx;
+$border-radius-medium: 20rpx;
+$border-radius-large: 40rpx;
+
+// 间距变量 / Spacing Variables
+$spacing-xs: 10rpx;
+$spacing-sm: 20rpx;
+$spacing-md: 30rpx;
+$spacing-lg: 40rpx;
+$spacing-xl: 60rpx;
+
+// 字体大小 / Font Sizes
+$font-size-xs: 20rpx;
+$font-size-sm: 24rpx;
+$font-size-md: 28rpx;
+$font-size-lg: 32rpx;
+$font-size-xl: 36rpx;
+$font-size-xxl: 40rpx;
+
+// 阴影 / Shadows
+$shadow-light: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
+$shadow-medium: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+$shadow-dark: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+
+// TabBar 相关 / TabBar Related
+$tabbar-color: #7a7e83;
+$tabbar-selected-color: #3cc51f;
+$tabbar-background: #ffffff;
+
+// 安全区域 / Safe Area
+$safe-area-bottom: env(safe-area-inset-bottom);
+
+// 状态色彩 / Status Colors
+$success-color: #34c759;
+$warning-color: #ff9500;
+$error-color: #ff3b30;
+$info-color: #007aff; 
