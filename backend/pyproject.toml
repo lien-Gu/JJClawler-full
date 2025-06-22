@@ -1,0 +1,66 @@
+[tool.poetry]
+name = "jjclawer3"
+version = "0.1.0"
+description = "晋江文学城爬虫后端项目 - FastAPI + SQLModel实现"
+authors = ["lien <38693632+lien-Gu@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+sqlmodel = "^0.0.22"
+httpx = "^0.28.0"
+apscheduler = "^3.10.4"
+python-dotenv = "^1.0.0"
+pydantic-settings = "^2.6.0"
+pytz = "^2025.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.23.0"
+black = "^24.0.0"
+isort = "^5.13.0"
+ruff = "^0.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["app"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+select = ["E", "W", "F", "I", "N", "B", "A", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
