@@ -20,6 +20,7 @@ from .api import (
     PageConfig, SubPageConfig, RankingConfig, PagesResponse,
     RankingBooksResponse, RankingHistoryResponse,
     BookRankingsResponse, BookTrendsResponse, BookSearchResponse,
+    RankingSearchResponse,
     CrawlJiaziRequest, CrawlRankingRequest, TaskCreateResponse,
     TaskInfo, TasksResponse
 )
@@ -39,6 +40,7 @@ __all__ = [
     "PageConfig", "SubPageConfig", "RankingConfig", "PagesResponse",
     "RankingBooksResponse", "RankingHistoryResponse",
     "BookRankingsResponse", "BookTrendsResponse", "BookSearchResponse",
+    "RankingSearchResponse",
     "CrawlJiaziRequest", "CrawlRankingRequest", "TaskCreateResponse",
     "TaskInfo", "TasksResponse"
 ]

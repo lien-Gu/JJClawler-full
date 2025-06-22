@@ -148,6 +148,14 @@ class BookSearchResponse(BaseModel):
     total: int = Field(description="总数")
 
 
+class RankingSearchResponse(BaseModel):
+    """榜单搜索响应"""
+    rankings: List[dict] = Field(description="榜单列表")
+    total: int = Field(description="总数")
+    query: Optional[str] = Field(default=None, description="搜索关键词")
+    has_next: bool = Field(description="是否有下一页")
+
+
 class CrawlJiaziRequest(BaseModel):
     """夹子爬取请求"""
     force: bool = Field(default=False, description="是否强制爬取")

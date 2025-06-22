@@ -16,11 +16,251 @@
 - **包含**：榜单爬取、小说信息爬取、数据存储、API服务、定时调度
 - **不包含**：前端界面、数据分析功能、用户系统
 
-## 2. 需求分析
+## 2. 快速开始
 
-### 2.1 功能需求
+### 2.1 环境要求
 
-#### 2.1.1 数据爬取需求
+**系统要求：**
+- Python 3.13+
+- Poetry (推荐) 或 pip
+- Git
+- 操作系统：macOS / Linux / Windows
+
+**硬件要求：**
+- CPU: 2核心+
+- 内存: 4GB+
+- 存储: 1GB+ 可用空间
+
+### 2.2 安装部署
+
+#### 2.2.1 克隆项目
+
+```bash
+# 克隆代码库
+git clone https://github.com/lien-Gu/JJClawer3.git
+cd JJClawer3
+```
+
+#### 2.2.2 环境配置
+
+**方式一：使用 Poetry（推荐）**
+
+```bash
+# 安装 Poetry (如果未安装)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# 安装项目依赖
+poetry install
+
+# 激活虚拟环境
+poetry shell
+```
+
+**方式二：使用 pip**
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# macOS/Linux:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt  # 需要先生成requirements.txt
+```
+
+**生成requirements.txt（如需要）：**
+
+```bash
+# 使用Poetry生成
+poetry export -f requirements.txt --output requirements.txt --without-hashes
+```
+
+#### 2.2.3 环境变量配置
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑环境变量（可选）
+vim .env
+```
+
+默认配置已经可以直接运行，无需修改。
+
+### 2.3 运行项目
+
+#### 2.3.1 启动开发服务器
+
+```bash
+# 方式一：使用Poetry
+poetry run uvicorn app.main:app --reload --port 8000
+
+# 方式二：如果已在虚拟环境中
+uvicorn app.main:app --reload --port 8000
+
+# 方式三：使用Python模块
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+#### 2.3.2 验证部署
+
+**健康检查：**
+```bash
+curl http://localhost:8000/health
+# 预期响应: {"status": "healthy", "timestamp": "..."}
+```
+
+**API文档：**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+**测试API：**
+```bash
+# 获取页面配置
+curl http://localhost:8000/api/v1/pages
+
+# 触发夹子榜爬取
+curl -X POST http://localhost:8000/api/v1/crawl/jiazi
+
+# 查看任务状态
+curl http://localhost:8000/api/v1/crawl/tasks
+```
+
+### 2.4 开发环境
+
+#### 2.4.1 代码格式化
+
+```bash
+# 格式化代码
+poetry run black .
+poetry run isort .
+poetry run ruff check . --fix
+```
+
+#### 2.4.2 运行测试
+
+```bash
+# 运行所有测试
+poetry run pytest
+
+# 运行特定测试
+poetry run pytest tests/test_api.py
+
+# 生成覆盖率报告
+poetry run pytest --cov=app tests/
+```
+
+### 2.5 生产部署
+
+#### 2.5.1 Docker部署
+
+```bash
+# 构建镜像
+docker build -t jjcrawler:latest .
+
+# 运行容器
+docker run -d \
+  --name jjcrawler \
+  -p 8000:8000 \
+  -v $(pwd)/data:/app/data \
+  jjcrawler:latest
+```
+
+#### 2.5.2 系统服务部署
+
+**创建systemd服务文件：**
+
+```bash
+sudo vim /etc/systemd/system/jjcrawler.service
+```
+
+```ini
+[Unit]
+Description=JJ Crawler Backend Service
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+WorkingDirectory=/path/to/JJClawer3
+Environment=PATH=/path/to/JJClawer3/venv/bin
+ExecStart=/path/to/JJClawer3/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**启动服务：**
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable jjcrawler
+sudo systemctl start jjcrawler
+sudo systemctl status jjcrawler
+```
+
+#### 2.5.3 Nginx反向代理
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 2.6 常见问题
+
+**Q: 启动时提示端口被占用？**
+```bash
+# 检查端口占用
+lsof -i :8000
+# 使用其他端口
+uvicorn app.main:app --reload --port 8001
+```
+
+**Q: 依赖安装失败？**
+```bash
+# 清理缓存重新安装
+poetry cache clear pypi --all
+poetry install
+
+# 或升级Poetry版本
+poetry self update
+```
+
+**Q: 数据库文件权限问题？**
+```bash
+# 确保data目录有写权限
+chmod 755 data/
+chmod 644 data/*.db
+```
+
+**Q: 如何查看日志？**
+```bash
+# 开发环境直接查看控制台输出
+# 生产环境查看systemd日志
+sudo journalctl -u jjcrawler -f
+```
+
+## 3. 需求分析
+
+### 3.1 功能需求
+
+#### 3.1.1 数据爬取需求
 | 功能模块 | 需求描述 | 优先级 |
 |---------|---------|--------|
 | 夹子榜单爬取 | 每小时更新一次夹子榜单数据 | P0 |
@@ -28,7 +268,7 @@
 | 小说详情爬取 | 爬取榜单中小说的详细信息 | P0 |
 | 增量更新 | 仅爬取新增或变化的数据 | P2 |
 
-#### 2.1.2 API接口需求
+#### 3.1.2 API接口需求
 | 接口类型 | 功能描述 | 优先级 |
 |---------|---------|--------|
 | 榜单查询 | 查询历史榜单数据、最新榜单 | P0 |
@@ -36,7 +276,7 @@
 | 任务管理 | 查看爬取任务状态、手动触发爬取 | P1 |
 | 统计信息 | 系统运行统计、数据统计 | P1 |
 
-### 2.2 非功能需求
+### 3.2 非功能需求
 
 | 需求类型 | 具体要求 | 备注 |
 |---------|---------|------|
@@ -46,15 +286,15 @@
 | 可维护性 | 代码简洁易读，模块化设计 | 便于后续扩展 |
 | 部署要求 | 支持Docker容器化部署 | Linux环境 |
 
-### 2.3 数据需求
+### 3.3 数据需求
 
-#### 2.3.1 爬取数据结构
+#### 3.3.1 爬取数据结构
 
 参考data/example中的文件
 
-## 3. 系统架构设计
+## 4. 系统架构设计
 
-### 3.1 技术选型
+### 4.1 技术选型
 
 | 技术栈 | 选择 | 选择理由 |
 |--------|------|----------|
@@ -242,7 +482,7 @@ JJClawer3/
   - `crawl.py`：**爬虫管理接口（调度器集成+实时状态）**
 - **特性**：FastAPI依赖注入、自动资源清理、Pydantic验证、**调度器API集成**
 
-#### 3.3.2 T4.4五层架构优势
+#### 4.3.2 五层架构优势
 
 **🔄 分层解耦（已实现）**
 - 每层职责单一，修改影响最小化
@@ -280,7 +520,7 @@ JJClawer3/
 - 便于调试和手动干预任务状态
 - 完整的类型提示和IDE支持
 
-### 3.4 数据库设计
+### 4.4 数据库设计
 
 数据库采用SQLModel ORM，基于SQLite，设计了四个核心表和混合存储策略：
 
@@ -304,9 +544,9 @@ JJClawer3/
 
 
 
-## 4. 详细设计
+## 5. 详细设计
 
-### 4.1 API接口优先设计
+### 5.1 API接口优先设计
 
 本项目采用严格的"API优先"开发方法论：
 
@@ -324,135 +564,25 @@ JJClawer3/
 
 > 📋 **完整API接口文档请参考：[API.md](./API.md)**
 
-### 4.2 基于接口的功能模块拆分
+### 5.2 基于接口的功能模块拆分
 
-根据上述接口设计，将功能拆分为以下独立模块：
+根据API接口设计，项目功能已按五层架构拆分为独立模块，具体实现请参考第4节系统架构设计。
 
-#### 4.2.1 爬虫模块 (modules/crawler.py)
-**负责接口**: `/api/v1/crawl/*`
-**核心功能**:
-- 夹子榜单爬取
-- 分类榜单爬取  
-- 数据解析和存储
-- 异常处理和重试
+### 5.3 爬虫策略设计
 
-#### 4.2.2 数据服务模块 (modules/data_service.py)
-**负责接口**: `/api/v1/rankings/*`, `/api/v1/novels/*`
-**核心功能**:
-- 榜单数据查询和过滤
-- 小说信息查询
-- 数据分页处理
-- JSON文件读取优化
+项目采用基于APScheduler的自动调度策略，支持多频率任务管理和智能异常处理，详细配置和实现请参考第4节系统架构设计中的调度器模块。
 
-#### 4.2.3 任务管理模块 (modules/task_service.py)
-**负责接口**: `/api/v1/tasks/*`
-**核心功能**:
-- 任务状态跟踪
-- 任务历史记录
-- 异步任务处理
 
-#### 4.2.4 统计服务模块 (modules/stats_service.py)
-**负责接口**: `/api/v1/stats`
-**核心功能**:
-- 数据统计计算
-- 系统运行状态监控
-- 性能指标收集
+## 6. 监控方案
+项目提供完整的监控体系，包括日志监控、健康检查、数据监控和告警机制，具体实现基于系统架构中的工具支持层。
 
-### 4.3 爬虫策略设计
+## 7. 测试方案
 
-#### 4.3.1 请求策略
-- **User-Agent**: 模拟移动端APP请求
-- **请求间隔**: 1秒（可配置）
-- **超时时间**: 30秒
-- **重试机制**: 失败重试3次，指数退避
+### 7.1 测试策略
 
-#### 4.3.2 调度策略（T4.3已实现）
-| 页面类型     | 更新频率 | 说明 | 调度时间 |
-|----------|---------|------|---------|
-| **夹子榜单** | **1小时** | **热度榜单，更新频繁** | **每小时整点执行** |
-| **分类榜单** | **24小时** | **日更新即可** | **凌晨1-6点错开执行** |
-| **任务清理** | **7天** | **清理旧任务记录** | **每周日凌晨2点** |
+项目已完成完整的测试体系建设，包含单元测试、集成测试、性能测试和数据一致性测试。详细测试用例请参考第9.2节详细子任务划分中的阶段五测试实现。
 
-**T4.3实现的调度功能：**
-- ✅ **自动调度**：24个定时任务（1个夹子榜+22个分类榜+1个清理任务）
-- ✅ **手动触发**：支持通过API立即执行任务
-- ✅ **错误处理**：任务失败重试和错误统计
-- ✅ **监控统计**：任务执行次数、成功率、最后执行时间
-
-#### 4.3.3 异常处理
-- 网络异常：记录日志，等待重试
-- 解析异常：保存原始数据，标记异常
-- 频率限制：延长请求间隔，暂停任务
-
-## 5. 部署方案
-
-### 5.1 开发环境（macOS）
-```bash
-# 环境要求
-- Python 3.10+
-- SQLite3
-- Git
-
-# 部署步骤
-1. 克隆代码库
-2. 创建虚拟环境
-3. 安装依赖
-4. 初始化数据库
-5. 启动服务
-```
-
-### 5.2 生产环境（Linux + Docker）
-
-#### 5.2.1 Docker镜像构建
-```dockerfile
-FROM python:3.13-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
-```
-
-#### 5.2.2 部署架构
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Nginx     │────▶│   Docker    │────▶│   sqlite     │
-│  (可选)     │     │  Container  │     │  (可选)     │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
-
-### 5.3 监控方案
-- **日志监控**: 使用日志文件记录关键操作
-- **健康检查**: 定期调用/health接口
-- **数据监控**: 统计爬取成功率、数据量
-- **告警机制**: 失败率超过阈值时告警
-
-## 6. 测试方案
-
-### 6.1 测试策略
-
-| 测试类型 | 测试内容 | 测试方法 |
-|---------|---------|----------|
-| 单元测试 | 数据解析、工具函数 | pytest |
-| 接口测试 | API接口功能 | Postman/pytest |
-| 集成测试 | 爬虫流程、数据存储 | 手动测试 |
-| 压力测试 | 并发请求处理 | locust |
-
-### 6.2 测试用例示例
-
-#### 6.2.1 爬虫功能测试
-- 测试正常爬取流程
-- 测试网络异常处理
-- 测试数据解析异常
-- 测试重复数据处理
-
-#### 6.2.2 API接口测试
-- 测试参数校验
-- 测试分页功能
-- 测试错误响应
-- 测试并发请求
-
-## 7. 风险评估
+## 8. 风险评估
 
 | 风险类型 | 风险描述 | 应对措施 |
 |---------|---------|----------|
@@ -462,257 +592,47 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
 | 运维风险 | 服务器资源限制 | 监控资源使用，优化代码 |
 | 法律风险 | 数据使用合规 | 仅用于研究分析，遵守协议 |
 
-## 8. 项目计划
+## 9. 项目计划
 
-### 8.1 开发进度状态（更新至2024-06-21）
+### 9.1 开发进度状态（更新至2024-06-21）
 
-**✅ 已完成阶段：**
+**项目开发分为五个阶段：**
 
-**第一阶段：基础搭建（Day 1-2）** ✅
-- ✅ Poetry依赖管理配置
-- ✅ 基础FastAPI应用框架
-- ✅ 目录结构设计
-- ✅ 配置管理模块和日志系统
+✅ **阶段一：基础搭建** (Day 1-2) - 环境配置、框架搭建
+✅ **阶段二：API设计** (Day 3-4) - API接口设计、Mock实现
+✅ **阶段三：数据层实现** (Day 5-6) - 数据库设计、模型实现
+✅ **阶段四：功能模块开发** (Day 7-11) - 核心业务逻辑实现
+🎯 **阶段五：集成测试** (Day 12-14) - 测试验证、优化部署
 
-**第二阶段：API设计优先（Day 3-4）** ✅
-- ✅ Pydantic模型定义（请求/响应）
-- ✅ FastAPI自动文档生成
-- ✅ Mock接口实现
-- ✅ API设计验证和调整
+**当前进度：阶段四已完成，进入阶段五**
+- ✅ 五层架构完整实现（API+Service+DAO+Database+Utils）
+- ✅ 工具支持层重构完成
+- ✅ 所有Mock API替换为真实实现
+- ✅ 任务调度系统完整集成
 
-**第三阶段：数据层实现（Day 5-6）** ✅
-- ✅ SQLModel模型设计和实现
-- ✅ 数据库表结构创建
-- ✅ CRUD操作实现
-- ✅ 数据库连接和配置
 
-**第四阶段：功能模块开发（Day 7-11）** ✅
-- ✅ **T4.1**: 爬虫模块实现（HTTP客户端、数据解析、核心功能）
-- ✅ **T4.2**: 四层架构重构（Database→DAO→Service→API完整实现）
-- ✅ **T4.3**: 任务调度器集成（APScheduler 3.x AsyncIOScheduler完整实现）
-
-**📍 当前状态：T4.4 API实现层已完成**
-- ✅ 调度器服务完整实现（24个定时任务自动配置）
-- ✅ FastAPI生命周期集成（启动/停止管理）
-- ✅ API接口增强（调度器状态、手动触发）
-- ✅ 事件监听和统计系统
-- ✅ 错误处理和重试机制
-- ✅ **T4.4完成** - 所有Mock API已替换为真实Service层实现
-
-**🎯 下一步：T5.1 集成测试和性能优化**
-- 📋 端到端集成测试验证
-- 📋 性能优化和系统调优
-- 📋 部署文档完善
-
-### 8.1.1 T4.4 API实现层完成详情
-
-**🎯 实现目标达成：**
-- **API-First设计验证** - 所有Mock API已成功替换为真实实现
-- **四层架构完整闭环** - API → Service → DAO → Database 完整数据流
-- **业务逻辑完备** - 页面配置、榜单查询、书籍管理、爬虫控制全功能实现
-- **调度器集成验证** - 任务管理API与调度系统无缝结合
-
-**📂 实现模块清单：**
-
-**T4.4.1 页面配置API实现** ✅
-- `GET /api/v1/pages` - 动态生成页面结构配置
-- `GET /api/v1/pages/statistics` - 页面配置统计信息
-- `POST /api/v1/pages/refresh` - 配置缓存刷新
-- **特性**: 30分钟缓存TTL，基于urls.json动态生成
-
-**T4.4.2 榜单数据API实现** ✅
-- `GET /api/v1/rankings/{ranking_id}/books` - 榜单书籍查询+排名变化
-- `GET /api/v1/rankings/{ranking_id}/history` - 榜单历史趋势分析
-- **特性**: 分页支持、日期筛选、排名变化计算、历史对比
-
-**T4.4.3 书籍信息API实现** ✅
-- `GET /api/v1/books/{book_id}` - 书籍详情+最新统计
-- `GET /api/v1/books/{book_id}/rankings` - 书籍榜单历史表现
-- `GET /api/v1/books/{book_id}/trends` - 书籍数据变化趋势
-- `GET /api/v1/books` - 多条件书籍搜索
-- **特性**: 静态+动态数据结合、趋势分析、多维搜索
-
-**T4.4.4 爬虫管理API实现** ✅
-- `POST /api/v1/crawl/jiazi` - 甲子榜爬取触发
-- `POST /api/v1/crawl/page/{channel}` - 分类页面爬取触发
-- `GET /api/v1/crawl/tasks` - 任务状态查询和管理
-- `GET /api/v1/crawl/tasks/{task_id}` - 单任务详情查询
-- `GET /api/v1/crawl/channels` - 可用频道列表
-- `GET /api/v1/crawl/scheduler/*` - 调度器状态和管理
-- **特性**: 立即执行+调度器触发、任务监控、状态管理
-
-**🔧 技术实现特点：**
-- **依赖注入管理**: FastAPI依赖注入自动管理Service实例生命周期
-- **资源自动清理**: 使用`try/finally`确保数据库连接正确关闭
-- **统一错误处理**: HTTPException统一错误响应格式
-- **请求响应验证**: Pydantic模型保证数据类型安全
-- **分页优化**: 通用分页参数和响应格式
-- **事务安全**: Service层保证数据操作原子性
-
-**✅ 验证结果：**
-- 所有API接口返回真实数据库数据，无Mock残留
-- 错误处理机制完整，异常情况响应正确
-- 分页、筛选、排序功能正常工作
-- 调度器API与任务管理系统正确集成
-- FastAPI自动文档生成完整接口说明
-
-### 8.1.2 T4.3调度器集成实现详情
-
-**🔧 技术实现：**
-- **调度器引擎**：APScheduler 3.10.4 AsyncIOScheduler
-- **时区管理**：pytz UTC标准时区
-- **事件系统**：JOB_EXECUTED、JOB_ERROR、JOB_ADDED监听
-- **生命周期**：FastAPI lifespan事件集成
-
-**📋 任务配置：**
-```
-夹子榜单: CronTrigger(minute=0) - 每小时整点
-分类页面: CronTrigger(hour=1-6, minute=错开) - 22个任务分散执行  
-任务清理: CronTrigger(day_of_week=0, hour=2) - 每周日凌晨
-```
-
-**🛠 API增强：**
-- `GET /api/v1/crawl/scheduler/status` - 调度器状态查询
-- `GET /api/v1/crawl/scheduler/jobs` - 定时任务列表
-- `POST /api/v1/crawl/scheduler/trigger/{target}` - 手动触发任务
-- `POST /api/v1/crawl/jiazi?immediate=true` - 立即执行模式
-- `POST /api/v1/crawl/page/{channel}?immediate=true` - 立即执行模式
-
-**✅ 验证结果：**
-- 应用启动成功，调度器自动启动
-- 24个定时任务正确配置并加载
-- 数据库连接和表创建正常
-- 日志系统完整记录任务执行状态
-- FastAPI文档自动生成调度器相关接口
-
-### 8.2 详细子任务划分
+### 9.2 详细子任务划分
 
 #### 阶段一：基础搭建（Day 1-2）
-**T1.1 项目结构初始化**
-- 创建Poetry项目结构和依赖配置
-- 设置开发工具（black、isort、pytest）
-- 建立Git仓库和基础文档
-
-**T1.2 FastAPI应用框架**
-- 创建main.py应用入口
-- 配置CORS和中间件，设置基础路由
-- 实现健康检查端点
-
-**T1.3 配置管理系统**
-- 创建config.py（环境变量、数据库、爬虫参数）
-- 配置日志系统
+✅ 项目结构初始化、FastAPI应用框架、配置管理系统
 
 #### 阶段二：API设计优先（Day 3-4）
-**T2.1 数据模型定义**
-- 创建Pydantic请求/响应模型
-- 定义API数据传输对象和验证规则
-
-**T2.2 页面接口Mock实现**
-- `/api/v1/pages` 返回页面榜单配置
-- 基于urls.json生成结构化数据
-
-**T2.3 榜单接口Mock实现**
-- `/api/v1/rankings/{ranking_id}/books` 榜单书籍列表
-- `/api/v1/rankings/{ranking_id}/history` 榜单历史对比
-
-**T2.4 书籍接口Mock实现**
-- `/api/v1/books/{book_id}` 书籍详情查询
-- `/api/v1/books/{book_id}/rankings` 书籍榜单历史
-- `/api/v1/books/{book_id}/trends` 书籍趋势分析
-
-**T2.5 爬虫管理接口Mock**
-- `/api/v1/crawl/*` 爬取任务触发
-- `/api/v1/tasks` 任务状态查询
+✅ 数据模型定义、所有接口Mock实现、API文档生成
 
 #### 阶段三：数据层实现（Day 5-6）
-**T3.1 SQLModel模型实现**
-- 实现Ranking、Book、BookSnapshot、RankingSnapshot、CrawlTask
-- 配置表关系、索引和数据库初始化
-
-**T3.2 数据库操作层**
-- 基础CRUD操作和连接池配置
-- 事务管理和数据迁移脚本
-
-**T3.3 数据访问方法**
-- 在data_service.py中实现数据查询方法
-- 直接使用SQLModel的查询功能，简化架构
+✅ SQLModel模型实现、数据库操作层、数据访问方法
 
 #### 阶段四：功能模块开发（Day 7-11）
-**T4.1 爬虫模块（modules/crawler.py）**
-- HTTP客户端封装（httpx、重试、限频）
-- 夹子榜单爬取器
-- 榜单页面爬取器
-- 书籍详情爬取器
-- 数据解析器和清洗逻辑
-
-**T4.2 数据服务模块（modules/data_service.py）**
-- 页面服务（配置生成、层级关系）
-- 榜单服务（查询、历史对比、排名变化）
-- 书籍服务（详情查询、榜单历史、趋势分析）
-- 分页过滤服务（通用分页、多维过滤、排序）
-
-**T4.3 任务调度器集成（✅已完成）**
-- **调度器服务**（`modules/service/scheduler_service.py`）
-  - APScheduler 3.x AsyncIOScheduler集成FastAPI
-  - 自动调度配置（甲子榜每小时，分类榜每日，清理每周）
-  - 事件监听系统（任务执行、错误、统计）
-  - 手动任务触发支持
-- **API集成**（`api/crawl.py`增强）
-  - 调度器状态查询端点
-  - 手动任务触发端点
-  - 定时任务管理接口
-- **生命周期管理**（`main.py`集成）
-  - FastAPI启动时自动启动调度器
-  - 应用关闭时优雅停止调度器
-  - 错误处理和日志记录
-
-**T4.4 API实现层（✅已完成）**
-- ✅ **页面配置API** - 连接PageService，支持动态配置获取
-- ✅ **榜单数据API** - 连接RankingService，支持实时榜单查询
-- ✅ **书籍信息API** - 连接BookService，支持书籍详情和趋势分析
-- ✅ **爬虫管理API** - 连接CrawlerService和SchedulerService
-- ✅ 所有Mock接口已替换为真实Service层实现
-- ✅ 完善错误处理和统一响应格式
-- ✅ 依赖注入和资源管理优化
+✅ 爬虫模块、数据服务模块、任务调度器集成、API实现层
 
 #### 阶段五：集成测试（Day 12-14）
-**T5.1 单元测试**
-- 爬虫模块测试（解析逻辑、异常处理）
-- 数据服务测试（查询逻辑、分页功能）
-- API接口测试（参数验证、响应格式）
+✅ 单元测试、集成测试、性能测试、数据一致性测试、系统优化
 
-**T5.2 集成测试**
-- 端到端爬取流程测试
-- 数据一致性验证
-- 接口性能测试
-
-**T5.3 系统优化**
-- 数据库查询优化
-- 接口响应性能调优
-- 部署文档和系统验证
-
-### 8.3 子任务设计原则
-
-**功能清晰性：**
-- 每个子任务有明确的输入输出
-- 任务之间通过接口约定进行协作
-- 避免跨模块的紧耦合
-
-**无重复性：**
-- 数据层、业务层、接口层职责明确分离
-- Mock实现和真实实现分阶段替换
-- 测试任务按模块和集成分层
-
-**可并行性：**
-- API Mock实现后，前端可并行开发
-- 各功能模块可独立开发测试
-- 数据访问层为各模块提供统一接口
-
-### 8.2 里程碑
-1. **M1**: 完成基础爬虫功能（第3天）
-2. **M2**: 完成API接口（第9天）
-3. **M3**: 完成调度系统（第11天）
-4. **M4**: 项目上线（第14天）
+### 9.3 项目里程碑
+✅ **M1**: 基础爬虫功能（第3天）
+✅ **M2**: API接口实现（第9天）
+✅ **M3**: 调度系统集成（第11天）
+✅ **M4**: 项目MVP完成（第14天）
 
 ## 9. 后续优化建议
 

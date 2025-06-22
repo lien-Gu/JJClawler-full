@@ -1,0 +1,1153 @@
+openapi: 3.0.0
+info:
+  title: JJ Crawler API Documentation
+  description: |
+    本文档详细介绍晋江文学城爬虫后端系统的所有API接口，已完成T4.4 API实现层的开发，所有接口均已连接到真实的Service层实现。
+    
+    **API基础信息**
+    - **基础URL**: `http://localhost:8000/api/v1`
+    - **数据格式**: JSON
+    - **认证方式**: 无（开发阶段）
+    - **API版本**: v1
+    - **实现状态**: ✅ T4.4完成 - 所有Mock API已替换为真实实现
+  version: 1.2.0 # 根据您的文档，我使用了最新版本
+servers:
+  - url: http://localhost:8000/api/v1
+    description: JJ Crawler API v1
+tags:
+  - name: Page Configuration
+    description: 页面配置接口
+  - name: Ranking Data
+    description: 榜单数据接口
+  - name: Book Information
+    description: 书籍信息接口
+  - name: Crawler Management
+    description: 爬虫管理接口
+  - name: System Status
+    description: 系统状态接口
+paths:
+  /pages:
+    get:
+      summary: 获取页面配置
+      operationId: getPagesConfig
+      tags:
+        - Page Configuration
+      description: 获取所有页面配置信息，用于前端导航和页面布局生成
+      responses:
+        "200":
+          description: 成功获取页面配置
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: 榜单页面
+                        path:
+                          type: string
+                          example: /rankings
+                        sub_pages:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                example: 夹子
+                              path:
+                                type: string
+                                example: /rankings/jiazi
+                              rankings:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    ranking_id:
+                                      type: string
+                                      example: jiazi
+                                    name:
+                                      type: string
+                                      example: 夹子
+                                    update_frequency:
+                                      type: string
+                                      example: hourly
+                  total_pages:
+                    type: integer
+                    example: 3
+                  total_rankings:
+                    type: integer
+                    example: 8
+  /pages/statistics:
+    get:
+      summary: 获取页面统计信息
+      operationId: getPagesStatistics
+      tags:
+        - Page Configuration
+      description: 获取页面配置统计信息
+      responses:
+        "200":
+          description: 成功获取页面统计信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_pages:
+                    type: integer
+                    example: 15
+                  root_pages:
+                    type: integer
+                    example: 3
+                  sub_pages:
+                    type: integer
+                    example: 12
+                  total_rankings:
+                    type: integer
+                    example: 8
+                  config_path:
+                    type: string
+                    example: data/urls.json
+                  cache_valid:
+                    type: boolean
+                    example: true
+                  last_updated:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00
+  /pages/refresh:
+    post:
+      summary: 刷新页面配置缓存
+      operationId: refreshPagesConfig
+      tags:
+        - Page Configuration
+      description: 强制刷新页面配置缓存
+      responses:
+        "200":
+          description: 页面配置缓存已刷新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 页面配置缓存已刷新
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00
+  /rankings/{ranking_id}/books:
+    get:
+      summary: 获取榜单书籍列表
+      operationId: getRankingBooks
+      tags:
+        - Ranking Data
+      description: 获取指定榜单的书籍排名信息，支持历史查询和排名变化对比
+      parameters:
+        - in: path
+          name: ranking_id
+          schema:
+            type: string # 您的文档中是int，但示例和实际使用中更可能是string，如"jiazi"
+          required: true
+          description: 榜单ID
+          example: jiazi
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+          required: false
+          description: 指定日期，格式：YYYY-MM-DD
+          example: 2024-01-01
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+          required: false
+          description: 每页数量，范围：1-100
+          example: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          required: false
+          description: 偏移量，用于分页
+          example: 20
+      responses:
+        "200":
+          description: 成功获取榜单书籍列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ranking:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "1234567"
+                      name:
+                        type: string
+                        example: 夹子榜
+                  snapshot_time:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00Z
+                  books:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        book_id:
+                          type: string
+                          example: "123456"
+                        title:
+                          type: string
+                          example: 书籍标题
+                        author:
+                          type: string
+                          example: 作者名称
+                        position:
+                          type: integer
+                          example: 1
+                        total_clicks:
+                          type: integer
+                          example: 1000000
+                        total_favorites:
+                          type: integer
+                          example: 50000
+                        comment_count:
+                          type: integer
+                          example: 1500
+                        chapter_count:
+                          type: integer
+                          example: 120
+                        position_change:
+                          type: string
+                          example: "+2"
+                        novel_class:
+                          type: string
+                          example: 言情
+                        tags:
+                          type: string
+                          example: 现代,都市
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+  /rankings/{ranking_id}/history:
+    get:
+      summary: 获取榜单历史数据
+      operationId: getRankingHistory
+      tags:
+        - Ranking Data
+      description: 获取榜单的历史快照数据，用于趋势分析
+      parameters:
+        - in: path
+          name: ranking_id
+          schema:
+            type: string
+          required: true
+          description: 榜单ID
+          example: jiazi
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 7
+            minimum: 1
+            maximum: 30
+          required: false
+          description: 查询天数，范围：1-30
+          example: 7
+      responses:
+        "200":
+          description: 成功获取榜单历史数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ranking_id:
+                    type: string
+                    example: jiazi
+                  snapshots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        snapshot_time:
+                          type: string
+                          format: date-time
+                          example: 2024-01-01T12:00:00Z
+                        total_books:
+                          type: integer
+                          example: 50
+                        avg_clicks:
+                          type: integer
+                          example: 50000
+                        avg_favorites:
+                          type: integer
+                          example: 2500
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                        example: 2023-12-25
+                      end_date:
+                        type: string
+                        format: date
+                        example: 2024-01-01
+                      days:
+                        type: integer
+                        example: 7
+  /rankings/search:
+    get:
+      summary: 搜索榜单
+      operationId: searchRankings
+      tags:
+        - Ranking Data
+      description: 根据榜单名称进行模糊搜索，返回匹配的榜单列表
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+          required: false
+          description: 榜单名称搜索关键词（支持模糊匹配）
+          example: 甲子
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          required: false
+          description: 每页数量
+          example: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          required: false
+          description: 偏移量
+          example: 0
+      responses:
+        "200":
+          description: 成功搜索到榜单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rankings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ranking_id:
+                          type: string
+                          example: jiazi
+                        name:
+                          type: string
+                          example: 甲子榜
+                        update_frequency:
+                          type: string
+                          example: hourly
+                        page_name:
+                          type: string
+                          example: 甲子榜页面
+                  total:
+                    type: integer
+                    example: 1
+                  query:
+                    type: string
+                    nullable: true
+                    example: 甲子
+                  has_next:
+                    type: boolean
+                    example: false
+  /books:
+    get:
+      summary: 搜索书籍
+      operationId: searchBooks
+      tags:
+        - Book Information
+      description: 根据条件搜索书籍
+      parameters:
+        - in: query
+          name: keyword
+          schema:
+            type: string
+          required: false
+          description: 搜索关键词（书名、作者）
+          example: 我的书名
+        - in: query
+          name: novel_class
+          schema:
+            type: string
+          required: false
+          description: 小说分类
+          example: 言情
+        - in: query
+          name: author
+          schema:
+            type: string
+          required: false
+          description: 作者名称
+          example: 作者A
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          required: false
+          description: 每页数量
+          example: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          required: false
+          description: 偏移量
+          example: 0
+      responses:
+        "200":
+          description: 成功搜索到书籍
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        book_id:
+                          type: string
+                          example: "123456"
+                        title:
+                          type: string
+                          example: 书籍标题
+                        author_name:
+                          type: string
+                          example: 作者名称
+                        novel_class:
+                          type: string
+                          example: 言情
+                        tags:
+                          type: string
+                          example: 现代,都市
+                        latest_stats:
+                          type: object
+                          properties:
+                            total_clicks:
+                              type: integer
+                              example: 1000000
+                            total_favorites:
+                              type: integer
+                              example: 50000
+                  pagination:
+                    $ref: '#/components/schemas/PaginationInfo'
+  /books/{book_id}:
+    get:
+      summary: 获取书籍详细信息
+      operationId: getBookDetail
+      tags:
+        - Book Information
+      description: 获取指定书籍的完整信息，包括基本信息和最新统计数据
+      parameters:
+        - in: path
+          name: book_id
+          schema:
+            type: string
+          required: true
+          description: 书籍ID
+          example: "123456"
+      responses:
+        "200":
+          description: 成功获取书籍详细信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book_id:
+                    type: string
+                    example: "123456"
+                  title:
+                    type: string
+                    example: 书籍标题
+                  author_id:
+                    type: string
+                    example: "789"
+                  author_name:
+                    type: string
+                    example: 作者名称
+                  novel_class:
+                    type: string
+                    example: 言情
+                  tags:
+                    type: string
+                    example: 现代,都市
+                  first_seen:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00Z
+                  last_updated:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00Z
+                  latest_stats:
+                    type: object
+                    properties:
+                      total_clicks:
+                        type: integer
+                        example: 1000000
+                      total_favorites:
+                        type: integer
+                        example: 50000
+                      comment_count:
+                        type: integer
+                        example: 1500
+                      chapter_count:
+                        type: integer
+                        example: 120
+                      snapshot_time:
+                        type: string
+                        format: date-time
+                        example: 2024-01-01T12:00:00Z
+  /books/{book_id}/rankings:
+    get:
+      summary: 获取书籍榜单历史
+      operationId: getBookRankingsHistory
+      tags:
+        - Book Information
+      description: 获取书籍在各榜单中的出现历史和排名表现
+      parameters:
+        - in: path
+          name: book_id
+          schema:
+            type: string
+          required: true
+          description: 书籍ID
+          example: "123456"
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 30
+          required: false
+          description: 查询天数
+          example: 30
+      responses:
+        "200":
+          description: 成功获取书籍榜单历史
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book:
+                    type: object
+                    properties:
+                      book_id:
+                        type: string
+                        example: "123456"
+                      title:
+                        type: string
+                        example: 书籍标题
+                      author_name:
+                        type: string
+                        example: 作者名称
+                  current_rankings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ranking_id:
+                          type: string
+                          example: jiazi
+                        ranking_name:
+                          type: string
+                          example: 甲子榜
+                        position:
+                          type: integer
+                          example: 5
+                        snapshot_time:
+                          type: string
+                          format: date-time
+                          example: 2024-01-01T12:00:00Z
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ranking_id:
+                          type: string
+                          example: jiazi
+                        position:
+                          type: integer
+                          example: 3
+                        snapshot_time:
+                          type: string
+                          format: date-time
+                          example: 2023-12-31T12:00:00Z
+  /books/{book_id}/trends:
+    get:
+      summary: 获取书籍趋势数据
+      operationId: getBookTrends
+      tags:
+        - Book Information
+      description: 获取书籍点击量、收藏量等统计数据的变化趋势
+      parameters:
+        - in: path
+          name: book_id
+          schema:
+            type: string
+          required: true
+          description: 书籍ID
+          example: "123456"
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 30
+          required: false
+          description: 查询天数
+          example: 30
+        - in: query
+          name: metrics
+          schema:
+            type: string
+            default: all
+            enum:
+              - clicks
+              - favorites
+              - comments
+              - chapters
+              - all
+          required: false
+          description: 指标类型：clicks,favorites,comments,chapters,all
+          example: all
+      responses:
+        "200":
+          description: 成功获取书籍趋势数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book_id:
+                    type: string
+                    example: "123456"
+                  trends:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookTrendData'
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                        example: 2023-12-02
+                      end_date:
+                        type: string
+                        format: date
+                        example: 2024-01-01
+                      days:
+                        type: integer
+                        example: 30
+                  summary:
+                    type: object
+                    properties:
+                      clicks_growth:
+                        type: string
+                        example: "+5.2%"
+                      favorites_growth:
+                        type: string
+                        example: "+3.8%"
+                      peak_date:
+                        type: string
+                        format: date
+                        example: 2023-12-25
+  /crawl/jiazi:
+    post:
+      summary: 触发甲子榜爬取
+      operationId: triggerJiaziCrawl
+      tags:
+        - Crawler Management
+      description: 手动触发甲子榜数据爬取任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                immediate:
+                  type: boolean
+                  example: true
+                metadata:
+                  type: object
+                  properties:
+                    trigger_source:
+                      type: string
+                      example: manual
+                    description:
+                      type: string
+                      example: 手动触发的甲子榜爬取
+      responses:
+        "200":
+          description: 成功创建爬取任务
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    example: jiazi_20240101_120000_abc123
+                  message:
+                    type: string
+                    example: 甲子榜爬取任务已创建
+                  estimated_duration:
+                    type: string
+                    example: 2-3分钟
+                  status:
+                    type: string
+                    example: pending
+  /crawl/page/{channel}:
+    post:
+      summary: 触发分类页面爬取
+      operationId: triggerChannelCrawl
+      tags:
+        - Crawler Management
+      description: 触发指定分类页面的爬取任务
+      parameters:
+        - in: path
+          name: channel
+          schema:
+            type: string
+          required: true
+          description: 频道标识，如 "yq", "ca"
+          example: yq
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                immediate:
+                  type: boolean
+                  example: true
+                metadata:
+                  type: object
+                  properties:
+                    trigger_source:
+                      type: string
+                      example: manual
+      responses:
+        "200":
+          description: 成功创建分类页面爬取任务
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    example: page_yq_20240101_120000_def456
+                  message:
+                    type: string
+                    example: 分类页面爬取任务已创建
+                  channel:
+                    type: string
+                    example: yq
+                  estimated_duration:
+                    type: string
+                    example: 1-2分钟
+  /crawl/tasks:
+    get:
+      summary: 获取任务状态
+      operationId: getCrawlTasksStatus
+      tags:
+        - Crawler Management
+      description: 获取所有爬取任务的状态信息
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            default: all
+            enum:
+              - pending
+              - running
+              - completed
+              - failed
+              - all
+          required: false
+          description: 任务状态：pending,running,completed,failed,all
+          example: running
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          required: false
+          description: 返回数量限制
+          example: 20
+      responses:
+        "200":
+          description: 成功获取任务状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        task_id:
+                          type: string
+                          example: jiazi_20240101_120000_abc123
+                        task_type:
+                          type: string
+                          example: jiazi
+                        status:
+                          type: string
+                          example: running
+                        progress:
+                          type: integer
+                          example: 75
+                        items_crawled:
+                          type: integer
+                          example: 38
+                        total_items:
+                          type: integer
+                          example: 50
+                        created_at:
+                          type: string
+                          format: date-time
+                          example: 2024-01-01T12:00:00Z
+                        started_at:
+                          type: string
+                          format: date-time
+                          example: 2024-01-01T12:00:30Z
+                  recent_completed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        task_id:
+                          type: string
+                          example: jiazi_20240101_110000_xyz789
+                        task_type:
+                          type: string
+                          example: jiazi
+                        status:
+                          type: string
+                          example: completed
+                        items_crawled:
+                          type: integer
+                          example: 50
+                        completed_at:
+                          type: string
+                          format: date-time
+                          example: 2024-01-01T11:05:00Z
+                        duration:
+                          type: string
+                          example: 4分32秒
+                  statistics:
+                    type: object
+                    properties:
+                      total_running:
+                        type: integer
+                        example: 1
+                      total_completed_today:
+                        type: integer
+                        example: 5
+                      total_failed_today:
+                        type: integer
+                        example: 0
+                      success_rate:
+                        type: string
+                        example: 100%
+  /crawl/tasks/{task_id}:
+    get:
+      summary: 获取单个任务详情
+      operationId: getCrawlTaskDetail
+      tags:
+        - Crawler Management
+      description: 获取指定任务的详细信息
+      parameters:
+        - in: path
+          name: task_id
+          schema:
+            type: string
+          required: true
+          description: 任务ID
+          example: jiazi_20240101_120000_abc123
+      responses:
+        "200":
+          description: 成功获取任务详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    example: jiazi_20240101_120000_abc123
+                  task_type:
+                    type: string
+                    example: jiazi
+                  status:
+                    type: string
+                    example: completed
+                  progress:
+                    type: integer
+                    example: 100
+                  items_crawled:
+                    type: integer
+                    example: 50
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00Z
+                  started_at:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:30Z
+                  completed_at:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:05:02Z
+                  duration:
+                    type: string
+                    example: 4分32秒
+                  metadata:
+                    type: object
+                    properties:
+                      trigger_source:
+                        type: string
+                        example: scheduled
+                      books_new:
+                        type: integer
+                        example: 3
+                      books_updated:
+                        type: integer
+                        example: 47
+                      snapshots_created:
+                        type: integer
+                        example: 50
+                  error_message:
+                    type: string
+                    nullable: true
+                    example: null
+  /health:
+    get:
+      summary: 健康检查
+      operationId: healthCheck
+      tags:
+        - System Status
+      description: 系统健康状态检查
+      responses:
+        "200":
+          description: 系统健康
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T12:00:00Z
+                  version:
+                    type: string
+                    example: 1.0.0
+                  uptime:
+                    type: string
+                    example: 2天3小时15分钟
+                  database:
+                    type: string
+                    example: connected
+                  cache:
+                    type: string
+                    example: active
+  /stats:
+    get:
+      summary: 系统统计
+      operationId: getSystemStats
+      tags:
+        - System Status
+      description: 获取系统运行统计信息
+      responses:
+        "200":
+          description: 成功获取系统统计信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: object
+                    properties:
+                      total_count:
+                        type: integer
+                        example: 12450
+                      new_today:
+                        type: integer
+                        example: 25
+                      updated_today:
+                        type: integer
+                        example: 380
+                  rankings:
+                    type: object
+                    properties:
+                      total_count:
+                        type: integer
+                        example: 8
+                      active_count:
+                        type: integer
+                        example: 8
+                      last_update:
+                        type: string
+                        format: date-time
+                        example: 2024-01-01T12:00:00Z
+                  snapshots:
+                    type: object
+                    properties:
+                      total_count:
+                        type: integer
+                        example: 450000
+                      created_today:
+                        type: integer
+                        example: 400
+                      storage_size:
+                        type: string
+                        example: 120MB
+                  tasks:
+                    type: object
+                    properties:
+                      completed_today:
+                        type: integer
+                        example: 24
+                      failed_today:
+                        type: integer
+                        example: 0
+                      success_rate:
+                        type: string
+                        example: 100%
+                      avg_duration:
+                        type: string
+                        example: 3分45秒
+                  system:
+                    type: object
+                    properties:
+                      cpu_usage:
+                        type: string
+                        example: 12%
+                      memory_usage:
+                        type: string
+                        example: 340MB
+                      disk_usage:
+                        type: string
+                        example: 2.5GB
+components:
+  schemas:
+    PaginationInfo:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: 总数量
+          example: 100
+        limit:
+          type: integer
+          description: 每页数量
+          example: 20
+        offset:
+          type: integer
+          description: 偏移量
+          example: 0
+        has_next:
+          type: boolean
+          description: 是否有下一页
+          example: true
+    BookTrendData:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: 2024-01-01
+        total_clicks:
+          type: integer
+          nullable: true
+          example: 1000000
+        total_favorites:
+          type: integer
+          nullable: true
+          example: 50000
+        comment_count:
+          type: integer
+          nullable: true
+          example: 1500
+        chapter_count:
+          type: integer
+          nullable: true
+          example: 120
+    # Common Error Model
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: 错误码
+              example: RESOURCE_NOT_FOUND
+            message:
+              type: string
+              description: 错误信息
+              example: 指定的书籍不存在
+            details:
+              type: string
+              nullable: true
+              description: 错误详情
+              example: 书籍ID '123456' 在数据库中未找到
+            timestamp:
+              type: string
+              format: date-time
+              example: 2024-01-01T12:00:00Z
+            request_id:
+              type: string
+              nullable: true
+              example: req_abc123def456
