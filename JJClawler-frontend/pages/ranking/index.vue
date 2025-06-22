@@ -51,7 +51,7 @@
     <!-- 第三层级：内容显示 -->
     <view class="content-section">
       <!-- 夹子：显示书籍列表 -->
-      <view v-if="selectedSite && selectedSite.id === 'jj' && level === 3" class="books-section">
+      <view v-if="selectedSite && selectedSite.id === 'jj' && level >= 2" class="books-section">
         <BookList 
           :books="books"
           :title="currentRankingTitle"
@@ -201,7 +201,6 @@ export default {
     selectSite(site, saveHistory = true) {
       this.selectedSite = site
       this.selectedChannel = null
-      this.level = 2
       
       console.log('选择分站:', site)
       
@@ -211,16 +210,18 @@ export default {
       }
       
       if (site.type === 'special' && site.id === 'jj') {
-        // 夹子：直接显示书籍列表
-        this.level = 3
+        // 夹子：直接在第一层级下方显示书籍列表
+        this.level = 2
         this.currentRankingTitle = '夹子榜单'
         this.loadJiaziBooks()
       } else if (site.type === 'complex') {
         // 复杂分站：显示分站榜单 + 频道选择
+        this.level = 2
         this.currentChannels = getChannelsBySiteId(site.id)
         this.loadSiteRankings(site)
       } else {
         // 简单分站：直接显示榜单
+        this.level = 2
         this.loadSiteRankings(site)
       }
     },

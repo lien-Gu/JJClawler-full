@@ -103,19 +103,20 @@ const _sfc_main = {
     selectSite(site, saveHistory = true) {
       this.selectedSite = site;
       this.selectedChannel = null;
-      this.level = 2;
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:206", "选择分站:", site);
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:205", "选择分站:", site);
       if (saveHistory) {
         this.saveCurrentSelection();
       }
       if (site.type === "special" && site.id === "jj") {
-        this.level = 3;
+        this.level = 2;
         this.currentRankingTitle = "夹子榜单";
         this.loadJiaziBooks();
       } else if (site.type === "complex") {
+        this.level = 2;
         this.currentChannels = data_url.getChannelsBySiteId(site.id);
         this.loadSiteRankings(site);
       } else {
+        this.level = 2;
         this.loadSiteRankings(site);
       }
     },
@@ -125,7 +126,7 @@ const _sfc_main = {
     selectChannel(channel, saveHistory = true) {
       this.selectedChannel = channel;
       this.level = 3;
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:234", "选择频道:", channel);
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:235", "选择频道:", channel);
       if (saveHistory) {
         this.saveCurrentSelection();
       }
@@ -185,7 +186,7 @@ const _sfc_main = {
      * 搜索输入
      */
     onSearchInput(e) {
-      common_vendor.index.__f__("log", "at pages/ranking/index.vue:305", "搜索:", e.detail.value);
+      common_vendor.index.__f__("log", "at pages/ranking/index.vue:306", "搜索:", e.detail.value);
     },
     /**
      * 跳转到榜单详情
@@ -244,8 +245,8 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       };
     })
   } : {}, {
-    f: $data.selectedSite && $data.selectedSite.id === "jj" && $data.level === 3
-  }, $data.selectedSite && $data.selectedSite.id === "jj" && $data.level === 3 ? {
+    f: $data.selectedSite && $data.selectedSite.id === "jj" && $data.level >= 2
+  }, $data.selectedSite && $data.selectedSite.id === "jj" && $data.level >= 2 ? {
     g: common_vendor.o($options.handleBookTap),
     h: common_vendor.p({
       books: $data.books,

@@ -23,17 +23,14 @@
         <scroll-view class="reports-scroll" scroll-x show-scrollbar="false">
           <view class="reports-container">
             <view class="report-card" @tap="goToRankingStats">
-              <view class="report-icon">📊</view>
               <text class="report-title">榜单统计</text>
               <text class="report-desc">查看榜单数据</text>
             </view>
             <view class="report-card" @tap="goToBookStats">
-              <view class="report-icon">📚</view>
               <text class="report-title">书籍统计</text>
               <text class="report-desc">查看书籍数据</text>
             </view>
             <view class="report-card" @tap="goToChannelStats">
-              <view class="report-icon">📺</view>
               <text class="report-title">频道统计</text>
               <text class="report-desc">查看频道数据</text>
             </view>
@@ -270,11 +267,6 @@ export default {
 					flex-direction: column;
 					justify-content: space-between;
 					box-shadow: 0 8rpx 24rpx rgba(100, 163, 71, 0.2);
-					
-					.report-icon {
-						font-size: 40rpx;
-						line-height: 1;
-					}
 					
 					.report-title {
 						font-family: 'Inter', sans-serif;

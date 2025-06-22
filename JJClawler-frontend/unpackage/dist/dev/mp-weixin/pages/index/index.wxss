@@ -574,10 +574,6 @@
   justify-content: space-between;
   box-shadow: 0 8rpx 24rpx rgba(100, 163, 71, 0.2);
 }
-.content-container .reports-section .reports-scroll .reports-container .report-card .report-icon.data-v-1cf27b2a {
-  font-size: 40rpx;
-  line-height: 1;
-}
 .content-container .reports-section .reports-scroll .reports-container .report-card .report-title.data-v-1cf27b2a {
   font-family: "Inter", sans-serif;
   font-weight: 600;

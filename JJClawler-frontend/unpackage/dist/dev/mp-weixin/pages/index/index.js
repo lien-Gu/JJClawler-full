@@ -8,7 +8,7 @@ const _sfc_main = {
     };
   },
   onLoad() {
-    common_vendor.index.__f__("log", "at pages/index/index.vue:63", "首页加载完成");
+    common_vendor.index.__f__("log", "at pages/index/index.vue:60", "首页加载完成");
   },
   // 下拉刷新
   onPullDownRefresh() {
@@ -54,7 +54,7 @@ const _sfc_main = {
     openBackendUrl(path, title) {
       const baseUrl = this.getApiBaseUrl();
       const fullUrl = baseUrl + path;
-      common_vendor.index.__f__("log", "at pages/index/index.vue:118", `准备打开${title}页面:`, fullUrl);
+      common_vendor.index.__f__("log", "at pages/index/index.vue:115", `准备打开${title}页面:`, fullUrl);
       common_vendor.index.navigateTo({
         url: `/pages/webview/index?url=${encodeURIComponent(fullUrl)}&title=${encodeURIComponent(title)}`
       });
