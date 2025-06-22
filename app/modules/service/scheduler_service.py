@@ -15,7 +15,6 @@
 """
 
 import asyncio
-import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Callable
 from contextlib import asynccontextmanager
@@ -30,8 +29,9 @@ from pytz import utc
 from app.modules.service.crawler_service import CrawlerService
 from app.modules.service.task_service import get_task_manager, TaskType
 from app.modules.service.page_service import get_page_service
+from app.utils.log_utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SchedulerService:

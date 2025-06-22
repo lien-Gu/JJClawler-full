@@ -159,11 +159,13 @@ class RankingSearchResponse(BaseModel):
 class CrawlJiaziRequest(BaseModel):
     """夹子爬取请求"""
     force: bool = Field(default=False, description="是否强制爬取")
+    immediate: bool = Field(default=True, description="是否立即执行")
 
 
 class CrawlRankingRequest(BaseModel):
     """榜单爬取请求"""
     force: bool = Field(default=False, description="是否强制爬取")
+    immediate: bool = Field(default=True, description="是否立即执行")
 
 
 class TaskCreateResponse(BaseModel):

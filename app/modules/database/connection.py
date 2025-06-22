@@ -3,12 +3,12 @@
 
 提供SQLite数据库的连接、会话管理和表创建
 """
-import logging
 from typing import Generator, Optional
 from sqlmodel import SQLModel, create_engine, Session, select
 from app.config import get_settings
+from app.utils.log_utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 全局数据库引擎
 _engine: Optional["Engine"] = None

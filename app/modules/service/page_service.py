@@ -14,15 +14,16 @@
 4. 易于扩展：支持新增页面类型
 """
 
-import logging
 import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
+from app.config import get_settings
 
 from app.utils.file_utils import read_json_file
+from app.utils.log_utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PageService:
@@ -36,13 +37,18 @@ class PageService:
     - 缓存管理
     """
     
-    def __init__(self, config_path: str = "data/urls.json"):
+    def __init__(self, config_path: str = None):
         """
         初始化页面服务
         
         Args:
             config_path: 配置文件路径
         """
+        # 如果没有指定路径，从settings读取
+        if config_path is None:
+            settings = get_settings()
+            config_path = settings.URLS_CONFIG_FILE
+            
         self.config_path = Path(config_path)
         self._config_cache = None
         self._cache_timestamp = None

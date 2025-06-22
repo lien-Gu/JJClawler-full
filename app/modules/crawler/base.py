@@ -9,13 +9,13 @@
 注意：HTTP客户端功能已迁移至 app.utils.http_client.HTTPClient
 """
 
-import logging
 from typing import Dict, Optional, Any
-from pathlib import Path
 
-from app.utils.file_utils import read_json_file, get_project_root
+from app.utils.file_utils import read_json_file
+from app.utils.log_utils import get_logger
+from app.config import get_settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_crawler_config() -> Dict[str, Any]:
@@ -25,8 +25,8 @@ def get_crawler_config() -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: 爬虫配置字典
     """
-    config_path = get_project_root() / "data" / "urls.json"
-    config = read_json_file(config_path, default={})
+    settings = get_settings()
+    config = read_json_file(settings.URLS_CONFIG_FILE, default={})
     
     if not config:
         logger.warning("爬虫配置文件为空或不存在")

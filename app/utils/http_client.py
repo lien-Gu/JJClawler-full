@@ -4,26 +4,30 @@ HTTP客户端工具
 提供统一的HTTP请求封装，包括重试机制、错误处理和请求限流
 """
 import asyncio
-import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import httpx
 from httpx import Response, RequestError, HTTPStatusError
+from app.utils.log_utils import get_logger
+from app.config import get_settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
 class RetryConfig:
     """重试配置"""
-    max_retries: int = 3
+    max_retries: Optional[int] = None
     base_delay: float = 1.0  # 基础延迟（秒）
     max_delay: float = 60.0  # 最大延迟（秒）
     backoff_factor: float = 2.0  # 退避因子
     retry_status_codes: List[int] = None  # 需要重试的状态码
     
     def __post_init__(self):
+        if self.max_retries is None:
+            settings = get_settings()
+            self.max_retries = settings.MAX_RETRIES
         if self.retry_status_codes is None:
             self.retry_status_codes = [429, 502, 503, 504]
 
@@ -41,8 +45,8 @@ class HTTPClient:
     
     def __init__(
         self,
-        timeout: float = 30.0,
-        rate_limit_delay: float = 1.0,
+        timeout: Optional[float] = None,
+        rate_limit_delay: Optional[float] = None,
         retry_config: Optional[RetryConfig] = None,
         headers: Optional[Dict[str, str]] = None
     ):
@@ -55,8 +59,9 @@ class HTTPClient:
             retry_config: 重试配置
             headers: 默认请求头
         """
-        self.timeout = timeout
-        self.rate_limit_delay = rate_limit_delay
+        settings = get_settings()
+        self.timeout = timeout if timeout is not None else settings.REQUEST_TIMEOUT
+        self.rate_limit_delay = rate_limit_delay if rate_limit_delay is not None else settings.CRAWL_DELAY
         self.retry_config = retry_config or RetryConfig()
         
         # 默认请求头

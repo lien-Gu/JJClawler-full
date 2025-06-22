@@ -15,7 +15,6 @@
 """
 
 import asyncio
-import logging
 import os
 import threading
 from datetime import datetime, timedelta
@@ -27,9 +26,11 @@ from uuid import uuid4
 
 from app.utils.file_utils import read_json_file, write_json_file, ensure_directory
 from app.utils.time_utils import to_iso_string, parse_iso_datetime
+from app.utils.log_utils import get_logger
+from app.config import get_settings
 
 # 配置日志
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TaskStatus(Enum):
@@ -78,13 +79,18 @@ class TaskFileManager:
     - 历史记录归档
     """
     
-    def __init__(self, base_dir: str = "data/tasks"):
+    def __init__(self, base_dir: str = None):
         """
         初始化任务文件管理器
         
         Args:
             base_dir: 任务文件存储目录
         """
+        # 如果没有指定路径，从settings读取
+        if base_dir is None:
+            settings = get_settings()
+            base_dir = f"{settings.DATA_DIR}/tasks"
+            
         self.base_dir = Path(base_dir)
         self.tasks_file = self.base_dir / "tasks.json"
         self.history_dir = self.base_dir / "history"
@@ -349,7 +355,7 @@ class TaskManager:
     - 统计信息
     """
     
-    def __init__(self, base_dir: str = "data/tasks"):
+    def __init__(self, base_dir: str = None):
         """
         初始化任务管理器
         
@@ -515,6 +521,33 @@ class TaskManager:
             days: 保留天数
         """
         self.file_manager.cleanup_old_tasks(days)
+    
+    def complete_task(self, task_id: str, items_crawled: int = 0, metadata: Dict[str, Any] = None) -> bool:
+        """
+        完成任务
+        
+        Args:
+            task_id: 任务ID
+            items_crawled: 抓取的条目数
+            metadata: 额外的元数据
+            
+        Returns:
+            操作是否成功
+        """
+        return self.file_manager.complete_task(task_id, items_crawled, metadata)
+    
+    def fail_task(self, task_id: str, error_message: str) -> bool:
+        """
+        标记任务失败
+        
+        Args:
+            task_id: 任务ID
+            error_message: 错误信息
+            
+        Returns:
+            操作是否成功
+        """
+        return self.file_manager.fail_task(task_id, error_message)
 
 
 # 全局任务管理器实例
