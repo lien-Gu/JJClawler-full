@@ -2,7 +2,7 @@
   "api": {
     "baseURL": "http://localhost:8000/api/v1",
     "timeout": 10000,
-    "environment": "development"
+    "environment": "dev"
   },
   "environments": {
     "dev": {
