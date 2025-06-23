@@ -1,0 +1,334 @@
+{
+  "stats": {
+    "overview": {
+      "total_books": 15683,
+      "total_rankings": 47,
+      "total_authors": 8924,
+      "recent_updates": 234,
+      "hot_rankings": 12,
+      "active_users": 45231,
+      "last_updated": "2024-06-23T14:30:00Z"
+    }
+  },
+  "rankings": {
+    "list": [
+      {
+        "id": "jiazi",
+        "name": "夹子榜",
+        "channel": "jiazi",
+        "description": "最受欢迎的作品榜单",
+        "book_count": 100,
+        "update_frequency": "每小时",
+        "last_updated": "2024-06-23T14:00:00Z"
+      },
+      {
+        "id": "yanqing_weekly",
+        "name": "言情周榜",
+        "channel": "yanqing",
+        "description": "言情类作品周排行",
+        "book_count": 50,
+        "update_frequency": "每天",
+        "last_updated": "2024-06-23T10:00:00Z"
+      },
+      {
+        "id": "chunai_monthly",
+        "name": "纯爱月榜",
+        "channel": "chunai",
+        "description": "纯爱类作品月排行",
+        "book_count": 30,
+        "update_frequency": "每天",
+        "last_updated": "2024-06-23T08:00:00Z"
+      }
+    ],
+    "hot": [
+      {
+        "id": "jiazi",
+        "name": "夹子榜",
+        "activity_score": 98.5,
+        "recent_changes": 23,
+        "total_books": 100
+      },
+      {
+        "id": "yanqing_weekly",
+        "name": "言情周榜",
+        "activity_score": 87.2,
+        "recent_changes": 15,
+        "total_books": 50
+      },
+      {
+        "id": "chunai_monthly",
+        "name": "纯爱月榜",
+        "activity_score": 75.8,
+        "recent_changes": 8,
+        "total_books": 30
+      }
+    ]
+  },
+  "books": {
+    "jiazi_list": [
+      {
+        "id": "book_001",
+        "title": "穿越之农门娇女",
+        "author": "花开半夏",
+        "author_id": "author_001",
+        "rank": 1,
+        "category": "言情",
+        "tags": ["穿越", "古代", "农门", "甜宠"],
+        "total_clicks": 1254832,
+        "total_favorites": 98765,
+        "comment_count": 5432,
+        "chapter_count": 156,
+        "last_updated": "2024-06-23T13:45:00Z",
+        "status": "连载中",
+        "rank_change": 0
+      },
+      {
+        "id": "book_002",
+        "title": "重生校园之学霸女神",
+        "author": "青春无敌",
+        "author_id": "author_002",
+        "rank": 2,
+        "category": "现代言情",
+        "tags": ["重生", "校园", "学霸", "青春"],
+        "total_clicks": 987654,
+        "total_favorites": 76543,
+        "comment_count": 4321,
+        "chapter_count": 123,
+        "last_updated": "2024-06-23T12:30:00Z",
+        "status": "连载中",
+        "rank_change": 1
+      },
+      {
+        "id": "book_003",
+        "title": "仙侠之绝世剑仙",
+        "author": "剑指苍穹",
+        "author_id": "author_003",
+        "rank": 3,
+        "category": "仙侠",
+        "tags": ["修仙", "剑道", "热血", "升级"],
+        "total_clicks": 876543,
+        "total_favorites": 65432,
+        "comment_count": 3210,
+        "chapter_count": 200,
+        "last_updated": "2024-06-23T11:15:00Z",
+        "status": "连载中",
+        "rank_change": -1
+      }
+    ],
+    "detail": {
+      "book_001": {
+        "id": "book_001",
+        "title": "穿越之农门娇女",
+        "author": "花开半夏",
+        "author_id": "author_001",
+        "category": "言情",
+        "tags": ["穿越", "古代", "农门", "甜宠"],
+        "description": "现代医学博士陈小雅意外穿越到古代农家，成为被退婚的小农女。凭借现代知识和医术，她要在这个时代闯出一片天地...",
+        "total_clicks": 1254832,
+        "total_favorites": 98765,
+        "comment_count": 5432,
+        "chapter_count": 156,
+        "word_count": 456789,
+        "first_published": "2024-01-15T10:00:00Z",
+        "last_updated": "2024-06-23T13:45:00Z",
+        "status": "连载中",
+        "cover_url": "",
+        "ranking_history": [
+          {
+            "ranking_id": "jiazi",
+            "ranking_name": "夹子榜",
+            "position": 1,
+            "date": "2024-06-23"
+          },
+          {
+            "ranking_id": "yanqing_weekly",
+            "ranking_name": "言情周榜",
+            "position": 3,
+            "date": "2024-06-22"
+          }
+        ],
+        "trends": {
+          "clicks": [
+            { "date": "2024-06-17", "value": 1200000 },
+            { "date": "2024-06-18", "value": 1215000 },
+            { "date": "2024-06-19", "value": 1225000 },
+            { "date": "2024-06-20", "value": 1235000 },
+            { "date": "2024-06-21", "value": 1242000 },
+            { "date": "2024-06-22", "value": 1250000 },
+            { "date": "2024-06-23", "value": 1254832 }
+          ],
+          "favorites": [
+            { "date": "2024-06-17", "value": 95000 },
+            { "date": "2024-06-18", "value": 96200 },
+            { "date": "2024-06-19", "value": 96800 },
+            { "date": "2024-06-20", "value": 97500 },
+            { "date": "2024-06-21", "value": 98100 },
+            { "date": "2024-06-22", "value": 98400 },
+            { "date": "2024-06-23", "value": 98765 }
+          ]
+        }
+      }
+    }
+  },
+  "pages": {
+    "sites": [
+      {
+        "id": "jiazi",
+        "name": "夹子",
+        "channels": [
+          {
+            "id": "jiazi",
+            "name": "夹子榜",
+            "url": "/jiazi",
+            "description": "最受欢迎的作品"
+          }
+        ]
+      },
+      {
+        "id": "yanqing",
+        "name": "言情",
+        "channels": [
+          {
+            "id": "guyan",
+            "name": "古言",
+            "url": "/yanqing/guyan",
+            "description": "古代言情作品"
+          },
+          {
+            "id": "xianyan",
+            "name": "现言",
+            "url": "/yanqing/xianyan",
+            "description": "现代言情作品"
+          },
+          {
+            "id": "huanyan",
+            "name": "幻言",
+            "url": "/yanqing/huanyan",
+            "description": "幻想言情作品"
+          }
+        ]
+      },
+      {
+        "id": "chunai",
+        "name": "纯爱",
+        "channels": [
+          {
+            "id": "chunai_xiandai",
+            "name": "现代纯爱",
+            "url": "/chunai/xiandai",
+            "description": "现代纯爱作品"
+          },
+          {
+            "id": "chunai_gudai",
+            "name": "古代纯爱",
+            "url": "/chunai/gudai",
+            "description": "古代纯爱作品"
+          }
+        ]
+      }
+    ],
+    "statistics": {
+      "total_sites": 8,
+      "total_channels": 24,
+      "total_rankings": 47,
+      "active_rankings": 35,
+      "last_updated": "2024-06-23T14:30:00Z"
+    }
+  },
+  "user": {
+    "info": {
+      "id": "user_test_001",
+      "nickname": "测试用户",
+      "avatar": "",
+      "isLogin": false
+    },
+    "stats": {
+      "followRankings": 5,
+      "followBooks": 12,
+      "readHistory": 45
+    },
+    "follows": {
+      "rankings": [
+        {
+          "id": "jiazi",
+          "name": "夹子榜",
+          "followed_at": "2024-06-20T10:00:00Z"
+        },
+        {
+          "id": "yanqing_weekly",
+          "name": "言情周榜",
+          "followed_at": "2024-06-19T15:30:00Z"
+        }
+      ],
+      "books": [
+        {
+          "id": "book_001",
+          "title": "穿越之农门娇女",
+          "author": "花开半夏",
+          "followed_at": "2024-06-21T09:15:00Z"
+        },
+        {
+          "id": "book_002",
+          "title": "重生校园之学霸女神",
+          "author": "青春无敌",
+          "followed_at": "2024-06-20T14:20:00Z"
+        }
+      ]
+    }
+  },
+  "crawl": {
+    "tasks": [
+      {
+        "task_id": "jiazi_20240623_140000_abc123",
+        "task_type": "jiazi",
+        "status": "completed",
+        "created_at": "2024-06-23T14:00:00Z",
+        "started_at": "2024-06-23T14:00:05Z",
+        "completed_at": "2024-06-23T14:02:30Z",
+        "progress": 100,
+        "items_crawled": 100,
+        "metadata": {
+          "trigger_source": "scheduled",
+          "books_new": 5,
+          "books_updated": 95
+        }
+      },
+      {
+        "task_id": "page_20240623_080000_def456",
+        "task_type": "page",
+        "status": "completed",
+        "created_at": "2024-06-23T08:00:00Z",
+        "started_at": "2024-06-23T08:00:10Z",
+        "completed_at": "2024-06-23T08:05:45Z",
+        "progress": 100,
+        "items_crawled": 50,
+        "metadata": {
+          "trigger_source": "scheduled",
+          "channel": "yanqing",
+          "books_new": 3,
+          "books_updated": 47
+        }
+      }
+    ],
+    "status": {
+      "is_running": true,
+      "active_jobs": 8,
+      "statistics": {
+        "total_executed": 156,
+        "total_failed": 2
+      }
+    },
+    "jobs": [
+      {
+        "id": "jiazi_hourly",
+        "next_run_time": "2024-06-23T15:00:00Z",
+        "func_name": "_execute_jiazi_crawl"
+      },
+      {
+        "id": "page_daily_yanqing",
+        "next_run_time": "2024-06-24T01:00:00Z",
+        "func_name": "_execute_page_crawl"
+      }
+    ]
+  }
+}

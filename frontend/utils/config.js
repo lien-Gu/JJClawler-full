@@ -45,10 +45,42 @@ class ConfigManager {
       this.currentEnvironment = environment
       this.config.api.environment = environment
       console.log(`环境已切换到: ${environment}`)
+      
+      // 显示数据源提示
+      this._showDataSourceTip(environment)
+      
+      // 通知其他模块环境已改变
+      this._notifyEnvironmentChange(environment)
       return true
     }
     console.error(`无效的环境: ${environment}`)
     return false
+  }
+
+  /**
+   * 显示数据源提示
+   * @param {string} environment 环境名称
+   */
+  _showDataSourceTip(environment) {
+    const tips = {
+      'dev': '使用本地后端API数据',
+      'test': '使用预制假数据',
+      'prod': '使用服务器API数据'
+    }
+    
+    if (this.isDebugMode()) {
+      console.log(`数据源: ${tips[environment] || environment}`)
+    }
+  }
+
+  /**
+   * 通知环境变化
+   * @param {string} environment 新环境
+   */
+  _notifyEnvironmentChange(environment) {
+    // 可以在这里添加环境变化的回调处理
+    // 比如清理缓存、重新加载数据等
+    console.log(`环境变化通知: ${environment}`)
   }
 
   /**

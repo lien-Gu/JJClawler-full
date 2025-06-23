@@ -73,10 +73,11 @@
     <view class="help-section">
       <view class="section-title">使用说明</view>
       <view class="help-content">
-        <text>• 开发环境: 本地开发时使用，通常为 localhost:8000</text>
-        <text>• 测试环境: 内部测试使用的服务器地址</text>
-        <text>• 生产环境: 正式环境的服务器地址</text>
+        <text>• dev环境: 本地开发使用真实后端API，通常为 localhost:8000</text>
+        <text>• test环境: 使用预制假数据，无需后端服务，便于前端调试</text>
+        <text>• pro环境: 生产环境使用服务器API</text>
         <text>• 自定义配置: 可以输入任意的服务器地址进行连接</text>
+        <text>• test环境下连接测试将始终显示成功</text>
         <text>• 修改配置后建议测试连接以确保服务正常</text>
       </view>
     </view>
@@ -194,7 +195,21 @@ export default {
       }
 
       try {
-        // 测试健康检查接口
+        // test环境总是显示连接成功（使用假数据）
+        if (configManager.getCurrentEnvironment() === 'test') {
+          this.connectionStatus = {
+            text: '连接正常(假数据)',
+            class: 'status-success'
+          }
+          
+          uni.showToast({
+            title: '测试环境-假数据模式',
+            icon: 'success'
+          })
+          return
+        }
+
+        // 其他环境测试真实连接
         const response = await request.get('/health', {}, { showLoading: false, showError: false })
         
         this.connectionStatus = {
