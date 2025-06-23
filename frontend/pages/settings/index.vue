@@ -136,6 +136,18 @@
           </view>
         </view>
         
+        <!-- API配置 -->
+        <view class="app-item" @tap="openAPIConfig">
+          <view class="item-info">
+            <text class="item-icon">🔧</text>
+            <text class="item-title">API配置</text>
+          </view>
+          <view class="item-extra">
+            <text class="extra-text">服务器设置</text>
+            <text class="arrow-icon">›</text>
+          </view>
+        </view>
+
         <!-- 版本信息 -->
         <view class="app-item">
           <view class="item-info">
@@ -650,6 +662,15 @@ export default {
       })
     },
     
+    /**
+     * 打开API配置页面
+     */
+    openAPIConfig() {
+      uni.navigateTo({
+        url: '/pages/settings/api-config'
+      })
+    },
+
     /**
      * 格式化缓存大小
      */

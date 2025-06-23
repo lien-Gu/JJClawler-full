@@ -12,7 +12,11 @@ from app.modules.models import (
     RankingBooksResponse, 
     RankingHistoryResponse, 
     RankingConfig,
-    RankingSearchResponse
+    RankingSearchResponse,
+    RankingsListResponse,
+    HotRankingsResponse,
+    RankingListItem,
+    HotRankingItem
 )
 
 router = APIRouter(prefix="/rankings", tags=["榜单数据"])
@@ -21,6 +25,137 @@ router = APIRouter(prefix="/rankings", tags=["榜单数据"])
 def get_ranking_service() -> RankingService:
     """获取Ranking服务实例"""
     return RankingService()
+
+
+@router.get("", response_model=RankingsListResponse)
+async def get_rankings_list(
+    limit: int = Query(20, ge=1, le=100, description="每页数量"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    ranking_service: RankingService = Depends(get_ranking_service)
+):
+    """
+    获取榜单列表
+    
+    返回系统中所有榜单的基本信息，支持分页
+    """
+    try:
+        # 获取所有榜单信息
+        all_rankings = ranking_service.get_all_rankings()
+        
+        # 计算分页
+        total = len(all_rankings)
+        start_idx = offset
+        end_idx = offset + limit
+        paged_rankings = all_rankings[start_idx:end_idx]
+        
+        # 转换为RankingListItem格式
+        ranking_items = []
+        for ranking_info in paged_rankings:
+            # 获取该榜单的书籍数量 (简化实现，实际应该从快照中统计)
+            total_books = 0
+            last_updated = None
+            try:
+                _, books, snapshot_time = ranking_service.get_ranking_books(ranking_info.ranking_id, limit=1)
+                # For general list, we just estimate - in a real implementation this would come from DB stats
+                total_books = len(books) * 50 if books else 0
+                last_updated = snapshot_time
+            except:
+                pass
+            
+            ranking_item = RankingListItem(
+                ranking_id=ranking_info.ranking_id,
+                name=ranking_info.name,
+                update_frequency=ranking_info.frequency.value,
+                total_books=total_books,
+                last_updated=last_updated,
+                parent_id=ranking_info.parent_id
+            )
+            ranking_items.append(ranking_item)
+        
+        return RankingsListResponse(
+            rankings=ranking_items,
+            total=total,
+            page=offset // limit + 1,
+            limit=limit,
+            has_next=end_idx < total
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取榜单列表失败: {str(e)}")
+    finally:
+        ranking_service.close()
+
+
+@router.get("/hot", response_model=HotRankingsResponse)
+async def get_hot_rankings(
+    limit: int = Query(10, ge=1, le=50, description="返回数量"),
+    ranking_service: RankingService = Depends(get_ranking_service)
+):
+    """
+    获取热门榜单
+    
+    根据最近活跃度返回热门榜单列表，
+    活跃度基于最近的快照数量和更新频率计算
+    """
+    try:
+        # 获取所有榜单信息
+        all_rankings = ranking_service.get_all_rankings()
+        
+        # 计算每个榜单的热度并排序
+        hot_rankings = []
+        for ranking_info in all_rankings:
+            # 获取榜单基本信息和最近活跃度
+            total_books = 0
+            last_updated = None
+            recent_activity = 0
+            
+            try:
+                # 获取榜单最新快照信息
+                _, books, snapshot_time = ranking_service.get_ranking_books(ranking_info.ranking_id, limit=1)
+                # For hot rankings, estimate total books from sample
+                total_books = len(books) * 50 if books else 0
+                last_updated = snapshot_time
+                
+                # 获取最近7天的趋势数据来计算活跃度
+                trend_data = ranking_service.get_ranking_trend_data(ranking_info.ranking_id, days=7)
+                recent_activity = sum(item.get("snapshot_count", 0) for item in trend_data)
+                
+                # 如果没有趋势数据，根据榜单类型给予基础分数
+                if recent_activity == 0:
+                    if ranking_info.frequency.value == "daily":
+                        recent_activity = 7  # 每日榜单基础分数
+                    elif ranking_info.frequency.value == "hourly":
+                        recent_activity = 24  # 小时榜单基础分数
+                    else:
+                        recent_activity = 1
+                        
+            except Exception as e:
+                # 如果获取失败，给予最低分数
+                recent_activity = 0
+            
+            hot_ranking = HotRankingItem(
+                ranking_id=ranking_info.ranking_id,
+                name=ranking_info.name,
+                update_frequency=ranking_info.frequency.value,
+                recent_activity=recent_activity,
+                total_books=total_books,
+                last_updated=last_updated
+            )
+            hot_rankings.append(hot_ranking)
+        
+        # 按活跃度降序排序，取前N个
+        hot_rankings.sort(key=lambda x: x.recent_activity, reverse=True)
+        top_hot_rankings = hot_rankings[:limit]
+        
+        return HotRankingsResponse(
+            rankings=top_hot_rankings,
+            total=len(top_hot_rankings)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取热门榜单失败: {str(e)}")
+    finally:
+        ranking_service.close()
 
 
 @router.get("/search", response_model=RankingSearchResponse)

@@ -22,7 +22,10 @@ from .api import (
     BookRankingsResponse, BookTrendsResponse, BookSearchResponse,
     RankingSearchResponse,
     CrawlJiaziRequest, CrawlRankingRequest, TaskCreateResponse,
-    TaskInfo, TasksResponse
+    TaskInfo, TasksResponse,
+    # 新增统计和热门榜单模型
+    OverviewStats, OverviewResponse, HotRankingItem, HotRankingsResponse,
+    RankingListItem, RankingsListResponse
 )
 
 __all__ = [
@@ -42,5 +45,8 @@ __all__ = [
     "BookRankingsResponse", "BookTrendsResponse", "BookSearchResponse",
     "RankingSearchResponse",
     "CrawlJiaziRequest", "CrawlRankingRequest", "TaskCreateResponse",
-    "TaskInfo", "TasksResponse"
+    "TaskInfo", "TasksResponse",
+    # 新增统计和热门榜单模型
+    "OverviewStats", "OverviewResponse", "HotRankingItem", "HotRankingsResponse",
+    "RankingListItem", "RankingsListResponse"
 ]

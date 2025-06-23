@@ -5,7 +5,82 @@ Accept: application/json
 
 ###
 
-GET http://127.0.0.1:8000/hello/User
+GET http://127.0.0.1:8000/health
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/stats
+Accept: application/json
+
+###
+
+# ==================== NEW API ENDPOINTS ====================
+
+# 首页概览统计数据
+GET http://127.0.0.1:8000/api/v1/stats/overview
+Accept: application/json
+
+###
+
+# 榜单列表 (分页)
+GET http://127.0.0.1:8000/api/v1/rankings?limit=10&offset=0
+Accept: application/json
+
+###
+
+# 热门榜单
+GET http://127.0.0.1:8000/api/v1/rankings/hot?limit=5
+Accept: application/json
+
+###
+
+# ==================== EXISTING API ENDPOINTS ====================
+
+# 页面配置
+GET http://127.0.0.1:8000/api/v1/pages
+Accept: application/json
+
+###
+
+# 榜单搜索
+GET http://127.0.0.1:8000/api/v1/rankings/search?name=榜&limit=10
+Accept: application/json
+
+###
+
+# 获取特定榜单的书籍
+GET http://127.0.0.1:8000/api/v1/rankings/example_ranking_id/books?limit=10
+Accept: application/json
+
+###
+
+# 获取榜单历史
+GET http://127.0.0.1:8000/api/v1/rankings/example_ranking_id/history?days=7
+Accept: application/json
+
+###
+
+# 书籍搜索
+GET http://127.0.0.1:8000/api/v1/books/search?title=测试&limit=10
+Accept: application/json
+
+###
+
+# 获取书籍详情
+GET http://127.0.0.1:8000/api/v1/books/example_book_id
+Accept: application/json
+
+###
+
+# 获取书籍榜单历史
+GET http://127.0.0.1:8000/api/v1/books/example_book_id/rankings?days=30
+Accept: application/json
+
+###
+
+# 获取书籍趋势数据
+GET http://127.0.0.1:8000/api/v1/books/example_book_id/trends?days=7
 Accept: application/json
 
 ###

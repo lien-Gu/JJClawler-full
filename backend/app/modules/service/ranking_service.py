@@ -77,7 +77,7 @@ class RankingService:
         snapshot_time: Optional[datetime] = None,
         limit: int = 50,
         offset: int = 0
-    ) -> Tuple[Optional[RankingInfo], List[BookInRanking], Optional[datetime], int]:
+    ) -> Tuple[Optional[RankingInfo], List[BookInRanking], Optional[datetime]]:
         """获取榜单书籍列表"""
         # 获取榜单信息
         ranking_info = self.get_ranking_info(ranking_id)

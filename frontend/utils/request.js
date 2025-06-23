@@ -3,9 +3,11 @@
  * @description 封装 uni.request，提供统一的请求配置、错误处理、拦截器等功能
  */
 
-// 基础配置
-const BASE_URL = 'https://api.jjclawler.com' // 替换为实际的API地址
-const TIMEOUT = 10000 // 请求超时时间
+import configManager from './config.js'
+
+// 基础配置（从配置文件动态获取）
+let BASE_URL = configManager.getAPIBaseURL()
+let TIMEOUT = configManager.getAPITimeout()
 
 /**
  * HTTP状态码映射
@@ -338,6 +340,7 @@ export function upload(url, filePath, formData = {}, options = {}) {
  */
 export function setBaseURL(baseUrl) {
   BASE_URL = baseUrl
+  configManager.updateConfig({ api: { baseURL: baseUrl } })
 }
 
 /**
@@ -346,6 +349,28 @@ export function setBaseURL(baseUrl) {
  */
 export function setTimeout(timeout) {
   TIMEOUT = timeout
+  configManager.updateConfig({ api: { timeout } })
+}
+
+/**
+ * 刷新配置（重新加载配置文件中的设置）
+ */
+export function refreshConfig() {
+  BASE_URL = configManager.getAPIBaseURL()
+  TIMEOUT = configManager.getAPITimeout()
+  console.log('请求配置已刷新:', { BASE_URL, TIMEOUT })
+}
+
+/**
+ * 获取当前配置
+ * @returns {Object} 当前配置
+ */
+export function getCurrentConfig() {
+  return {
+    BASE_URL,
+    TIMEOUT,
+    environment: configManager.getCurrentEnvironment()
+  }
 }
 
 // 默认导出
@@ -357,5 +382,7 @@ export default {
   upload,
   request,
   setBaseURL,
-  setTimeout
+  setTimeout,
+  refreshConfig,
+  getCurrentConfig
 } 

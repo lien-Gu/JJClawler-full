@@ -1,0 +1,26 @@
+{
+  "api": {
+    "baseURL": "http://localhost:8000/api/v1",
+    "timeout": 10000,
+    "environment": "development"
+  },
+  "environments": {
+    "development": {
+      "baseURL": "http://localhost:8000/api/v1",
+      "description": "本地开发环境"
+    },
+    "test": {
+      "baseURL": "http://test.jjclawler.com/api/v1",
+      "description": "测试环境"
+    },
+    "production": {
+      "baseURL": "https://api.jjclawler.com/api/v1",
+      "description": "生产环境"
+    }
+  },
+  "app": {
+    "name": "JJClawler",
+    "version": "1.0.0",
+    "debug": true
+  }
+}
