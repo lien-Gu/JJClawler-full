@@ -258,3 +258,13 @@ def trigger_manual_crawl(target: str) -> str:
     """手动触发爬取"""
     scheduler_service = get_scheduler_service()
     return scheduler_service.trigger_manual_crawl(target)
+
+
+def get_scheduler_stats() -> Dict[str, Any]:
+    """获取调度器统计信息"""
+    scheduler_service = get_scheduler_service()
+    return {
+        "status": scheduler_service.get_status(),
+        "jobs": scheduler_service.get_scheduled_jobs(),
+        "task_summary": get_task_manager().get_task_summary()
+    }

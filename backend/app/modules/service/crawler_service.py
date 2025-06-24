@@ -15,7 +15,6 @@
 4. 数据完整性：重复数据检测和更新策略
 """
 
-import logging
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 from contextlib import asynccontextmanager
@@ -24,9 +23,11 @@ from app.modules.crawler import JiaziCrawler, PageCrawler
 from app.modules.service import BookService, RankingService
 from app.modules.models import Book, BookSnapshot, Ranking, RankingSnapshot
 from app.modules.database import get_session_sync
+from app.utils.log_utils import get_logger
+from app.utils.transform_utils import format_crawl_result
+from app.utils.db_utils import transaction_context
 
-# 配置日志
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CrawlerService:
@@ -148,13 +149,13 @@ class CrawlerService:
         """
         if not books or not book_snapshots:
             logger.warning("没有数据需要保存")
-            return {
-                "books_new": 0,
-                "books_updated": 0,
-                "snapshots_created": 0,
-                "ranking_updated": False,
-                "errors": ["没有数据"]
-            }
+            return format_crawl_result(
+                books_new=0,
+                books_updated=0,
+                snapshots_created=0,
+                ranking_updated=False,
+                errors=["没有数据"]
+            )
         
         try:
             # 使用事务保存数据
@@ -182,25 +183,25 @@ class CrawlerService:
                           f"{books_result['updated']} 更新书籍, "
                           f"{snapshots_result} 快照记录")
                 
-                return {
-                    "books_new": books_result['new'],
-                    "books_updated": books_result['updated'],
-                    "snapshots_created": snapshots_result,
-                    "ranking_snapshots_created": len(ranking_snapshots),
-                    "ranking_updated": True,
-                    "ranking_id": ranking.ranking_id,
-                    "errors": []
-                }
+                return format_crawl_result(
+                    books_new=books_result['new'],
+                    books_updated=books_result['updated'],
+                    snapshots_created=snapshots_result,
+                    ranking_snapshots=len(ranking_snapshots),
+                    ranking_updated=True,
+                    ranking_id=ranking.ranking_id,
+                    errors=[]
+                )
                 
         except Exception as e:
             logger.error(f"数据保存失败: {e}")
-            return {
-                "books_new": 0,
-                "books_updated": 0,
-                "snapshots_created": 0,
-                "ranking_updated": False,
-                "errors": [str(e)]
-            }
+            return format_crawl_result(
+                books_new=0,
+                books_updated=0,
+                snapshots_created=0,
+                ranking_updated=False,
+                errors=[str(e)]
+            )
     
     def _ensure_ranking_exists(self, session, ranking_name: str, ranking_type: str, channel: Optional[str]) -> Ranking:
         """

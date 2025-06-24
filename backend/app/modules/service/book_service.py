@@ -3,16 +3,18 @@ Book业务服务
 
 封装Book相关的业务逻辑
 """
-import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
+
 from app.modules.dao import BookDAO, RankingDAO
 from app.modules.models import (
     BookDetail, BookInRanking, BookRankingHistory, 
     BookTrendData, Book, BookSnapshot
 )
+from app.utils.log_utils import get_logger
+from app.utils.transform_utils import book_to_detail
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BookService:
@@ -53,23 +55,8 @@ class BookService:
         # 获取最新快照数据
         latest_snapshot = self.book_dao.get_latest_snapshot(book_id)
         
-        # 构建BookDetail对象
-        book_detail = BookDetail(
-            id=book.id,
-            book_id=book.book_id,
-            title=book.title,
-            author_id=book.author_id,
-            author_name=book.author_name,
-            novel_class=book.novel_class,
-            tags=book.tags,
-            first_seen=book.first_seen,
-            last_updated=book.last_updated,
-            latest_clicks=latest_snapshot.total_clicks if latest_snapshot else None,
-            latest_favorites=latest_snapshot.total_favorites if latest_snapshot else None,
-            latest_comments=latest_snapshot.comment_count if latest_snapshot else None,
-            latest_chapters=latest_snapshot.chapter_count if latest_snapshot else None
-        )
-        return book_detail
+        # 使用统一的转换函数
+        return book_to_detail(book, latest_snapshot)
     
     def search_books(
         self, 
@@ -96,21 +83,7 @@ class BookService:
         book_details = []
         for book in books:
             latest_snapshot = self.book_dao.get_latest_snapshot(book.book_id)
-            book_detail = BookDetail(
-                id=book.id,
-                book_id=book.book_id,
-                title=book.title,
-                author_id=book.author_id,
-                author_name=book.author_name,
-                novel_class=book.novel_class,
-                tags=book.tags,
-                first_seen=book.first_seen,
-                last_updated=book.last_updated,
-                latest_clicks=latest_snapshot.total_clicks if latest_snapshot else None,
-                latest_favorites=latest_snapshot.total_favorites if latest_snapshot else None,
-                latest_comments=latest_snapshot.comment_count if latest_snapshot else None,
-                latest_chapters=latest_snapshot.chapter_count if latest_snapshot else None
-            )
+            book_detail = book_to_detail(book, latest_snapshot)
             book_details.append(book_detail)
         
         return book_details, total
@@ -193,21 +166,7 @@ class BookService:
         book_details = []
         for book in books:
             latest_snapshot = self.book_dao.get_latest_snapshot(book.book_id)
-            book_detail = BookDetail(
-                id=book.id,
-                book_id=book.book_id,
-                title=book.title,
-                author_id=book.author_id,
-                author_name=book.author_name,
-                novel_class=book.novel_class,
-                tags=book.tags,
-                first_seen=book.first_seen,
-                last_updated=book.last_updated,
-                latest_clicks=latest_snapshot.total_clicks if latest_snapshot else None,
-                latest_favorites=latest_snapshot.total_favorites if latest_snapshot else None,
-                latest_comments=latest_snapshot.comment_count if latest_snapshot else None,
-                latest_chapters=latest_snapshot.chapter_count if latest_snapshot else None
-            )
+            book_detail = book_to_detail(book, latest_snapshot)
             book_details.append(book_detail)
         
         return book_details
