@@ -1,396 +1,335 @@
 <template>
-	<view class="home-page">
-		<!-- 顶部欢迎区域 -->
-		<view class="welcome-section">
-			<view class="welcome-content">
-				<text class="welcome-title">晋江数据中心</text>
-				<text class="welcome-subtitle">实时掌握最新榜单动态</text>
-			</view>
-			<view class="refresh-btn" @tap="refreshData">
-				<text class="refresh-text">刷新</text>
-			</view>
-		</view>
-		
-		<!-- 核心统计数据 -->
-		<view class="stats-section">
-			<text class="section-title">数据概览</text>
-			<view class="stats-grid">
-				<StatsCard 
-					v-for="stat in coreStats" 
-					:key="stat.key"
-					:title="stat.title"
-					:value="stat.value"
-					:trend="stat.trend"
-					:icon="stat.icon"
-					:color="stat.color"
-				/>
-			</view>
-		</view>
-		
-		<!-- 分站数据统计 -->
-		<view class="sites-section">
-			<view class="section-header">
-				<text class="section-title">分站统计</text>
-				<text class="section-more" @tap="goToRanking">查看更多</text>
-			</view>
-			<view class="sites-grid">
-				<view 
-					class="site-card" 
-					v-for="site in siteStats" 
-					:key="site.key"
-					@tap="goToSite(site)"
-				>
-					<view class="site-info">
-						<text class="site-name">{{ site.name }}</text>
-						<text class="site-count">{{ site.rankingCount }}个榜单</text>
-					</view>
-				</view>
-			</view>
-		</view>
-		
-		<!-- 热门榜单 -->
-		<view class="hot-rankings-section">
-			<view class="section-header">
-				<text class="section-title">热门榜单</text>
-				<text class="section-more" @tap="goToRanking">查看全部</text>
-			</view>
-			<scroll-view class="rankings-scroll" scroll-x>
-				<view class="rankings-list">
-					<view 
-						class="ranking-item" 
-						v-for="ranking in hotRankings" 
-						:key="ranking.id"
-						@tap="goToRankingDetail(ranking)"
-					>
-						<text class="ranking-name">{{ ranking.name }}</text>
-						<text class="ranking-desc">{{ ranking.bookCount }}本书籍</text>
-						<text class="ranking-update">{{ formatTime(ranking.updateTime) }}</text>
-					</view>
-				</view>
-			</scroll-view>
-		</view>
-	</view>
+  <view class="index-page">
+    <!-- 主要内容区域 -->
+    <view class="content-container">
+      <!-- 问候语 -->
+      <view class="greeting-section">
+        <text class="greeting-text">嗨~</text>
+      </view>
+      
+      <!-- 统计报告卡片 -->
+      <view class="summary-card" @tap="goToStatisticsDetail">
+        <view class="summary-content">
+          <text class="summary-title">统计报告</text>
+          <view class="summary-stats">
+            <text class="stats-text">总书籍: {{ overviewStats.total_books || 0 }}</text>
+            <text class="stats-text">总榜单: {{ overviewStats.total_rankings || 0 }}</text>
+          </view>
+          <view class="summary-button" @tap.stop="refreshData">
+            <text class="button-text">刷新数据</text>
+          </view>
+        </view>
+      </view>
+      
+      <!-- 分项统计 -->
+      <view class="reports-section">
+        <text class="section-title">分项</text>
+        <scroll-view class="reports-scroll" scroll-x show-scrollbar="false">
+          <view class="reports-container">
+            <view class="report-card" @tap="goToRankingStats">
+              <text class="report-title">榜单统计</text>
+              <text class="report-desc">查看榜单数据</text>
+            </view>
+            <view class="report-card" @tap="goToBookStats">
+              <text class="report-title">书籍统计</text>
+              <text class="report-desc">查看书籍数据</text>
+            </view>
+            <view class="report-card" @tap="goToChannelStats">
+              <text class="report-title">频道统计</text>
+              <text class="report-desc">查看频道数据</text>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 热门榜单 -->
+      <view class="hot-rankings-section">
+        <text class="section-title">热门榜单</text>
+        <view class="rankings-list">
+          <view 
+            class="ranking-item" 
+            v-for="ranking in hotRankings" 
+            :key="ranking.id"
+            @tap="goToRankingDetail(ranking)"
+          >
+            <text class="ranking-name">{{ ranking.name }}</text>
+            <text class="ranking-count">{{ ranking.total_books || 0 }}本</text>
+          </view>
+        </view>
+        <view class="view-more" @tap="goToRanking">
+          <text class="more-text">查看更多</text>
+        </view>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script>
-import StatsCard from '@/components/StatsCard.vue'
 import dataManager from '@/utils/data-manager.js'
 
 export default {
-	name: 'HomePage',
-	components: {
-		StatsCard
-	},
+	name: 'IndexPage',
 	
 	data() {
 		return {
-			coreStats: [
-				{
-					key: 'totalBooks',
-					title: '总书籍数',
-					value: 0,
-					trend: 0,
-					icon: '📚',
-					color: '#007AFF'
-				},
-				{
-					key: 'totalRankings',
-					title: '总榜单数',
-					value: 0,
-					trend: 0,
-					icon: '📊',
-					color: '#34C759'
-				},
-				{
-					key: 'todayUpdates',
-					title: '今日更新',
-					value: 0,
-					trend: 0,
-					icon: '🔄',
-					color: '#FF9500'
-				}
-			],
-			siteStats: [],
-			hotRankings: []
+      overviewStats: {},
+      hotRankings: []
 		}
 	},
 	
 	onLoad() {
 		this.loadData()
 	},
+
+  onShow() {
+    // 每次显示页面时检查数据
+    this.loadData()
+  },
 	
 	methods: {
-		async loadData() {
-			try {
-				const [statsRes, rankingsRes] = await Promise.all([
-					dataManager.getOverviewStats(),
-					dataManager.getHotRankings({ limit: 6 })
-				])
-				
-				if (statsRes) {
-					this.updateCoreStats(statsRes)
-				}
-				
-				if (rankingsRes) {
-					this.hotRankings = rankingsRes.map(ranking => ({
-						id: ranking.id,
-						name: ranking.name,
-						bookCount: ranking.total_books || ranking.book_count || 0,
-						updateTime: ranking.last_updated || new Date().toISOString()
-					}))
-				}
-				
-				this.siteStats = [
-					{ key: 'jiazi', name: '夹子', rankingCount: 1 },
-					{ key: 'yanqing', name: '言情', rankingCount: 12 },
-					{ key: 'chunai', name: '纯爱', rankingCount: 8 },
-					{ key: 'yanshen', name: '衍生', rankingCount: 6 }
-				]
-				
-			} catch (error) {
-				console.error('数据加载失败:', error)
-			}
+    async loadData() {
+      try {
+        const [statsRes, rankingsRes] = await Promise.all([
+          dataManager.getOverviewStats(),
+          dataManager.getHotRankings({ limit: 4 })
+        ])
+        
+        if (statsRes) {
+          this.overviewStats = statsRes
+        }
+        
+        if (rankingsRes && Array.isArray(rankingsRes)) {
+          this.hotRankings = rankingsRes
+        }
+      } catch (error) {
+        console.error('数据加载失败:', error)
+      }
+    },
+
+    async refreshData() {
+      try {
+        await this.loadData()
+        uni.showToast({
+          title: '刷新成功',
+          icon: 'success',
+          duration: 1500
+        })
+      } catch (error) {
+        uni.showToast({
+          title: '刷新失败',
+          icon: 'none',
+          duration: 2000
+        })
+      }
+    },
+		
+		goToStatisticsDetail() {
+			// 可以跳转到统计详情页面
+			console.log('跳转到统计详情')
 		},
 		
-		updateCoreStats(data) {
-			if (!data) return
-			
-			this.coreStats.forEach(stat => {
-				switch(stat.key) {
-					case 'totalBooks':
-						stat.value = data.total_books || 0
-						break
-					case 'totalRankings':
-						stat.value = data.total_rankings || 0
-						break
-					case 'todayUpdates':
-						stat.value = data.recent_updates || 0
-						break
-				}
-			})
-		},
-		
-		async refreshData() {
-			try {
-				await this.loadData()
-				uni.showToast({
-					title: '刷新成功',
-					icon: 'success',
-					duration: 1500
-				})
-			} catch (error) {
-				uni.showToast({
-					title: '刷新失败',
-					icon: 'none',
-					duration: 2000
-				})
-			}
-		},
-		
-		formatTime(time) {
-			if (!time) return '未知'
-			
-			const now = new Date()
-			const updateTime = new Date(time)
-			const diff = now - updateTime
-			
-			const minutes = Math.floor(diff / (1000 * 60))
-			const hours = Math.floor(diff / (1000 * 60 * 60))
-			
-			if (minutes < 60) {
-				return `${minutes}分钟前`
-			} else if (hours < 24) {
-				return `${hours}小时前`
-			} else {
-				return updateTime.toLocaleDateString()
-			}
-		},
-		
-		goToRanking() {
+		goToRankingStats() {
 			uni.switchTab({
 				url: '/pages/ranking/index'
 			})
 		},
 		
-		goToSite(site) {
-			uni.switchTab({
-				url: `/pages/ranking/index?site=${site.key}`
-			})
+		goToBookStats() {
+			// 可以跳转到书籍统计页面
+			console.log('跳转到书籍统计')
 		},
 		
-		goToRankingDetail(ranking) {
-			uni.navigateTo({
-				url: `/pages/ranking/detail?id=${ranking.id}`
-			})
-		}
+		goToChannelStats() {
+			// 可以跳转到频道统计页面
+			console.log('跳转到频道统计')
+		},
+
+    goToRankingDetail(ranking) {
+      uni.navigateTo({
+        url: `/pages/ranking/detail?id=${ranking.id}`
+      })
+    },
+
+    goToRanking() {
+      uni.switchTab({
+        url: '/pages/ranking/index'
+      })
+    }
 	}
 }
 </script>
 
 <style lang="scss" scoped>
-.home-page {
-	min-height: 100vh;
-	background-color: $page-background;
-	padding-bottom: $safe-area-bottom;
+.index-page {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f4f0eb 0%, #e8e1d7 100%);
+  padding-bottom: $safe-area-bottom;
 }
 
-.welcome-section {
-	@include flex-between;
-	align-items: center;
-	padding: $spacing-lg;
-	background: linear-gradient(135deg, $primary-color, $secondary-color);
-	color: white;
-	
-	.welcome-content {
-		flex: 1;
-		
-		.welcome-title {
-			display: block;
-			font-size: $font-size-xl;
-			font-weight: bold;
-			margin-bottom: $spacing-xs;
-		}
-		
-		.welcome-subtitle {
-			font-size: $font-size-sm;
-			opacity: 0.9;
-		}
-	}
-	
-	.refresh-btn {
-		@include flex-center;
-		padding: $spacing-xs $spacing-md;
-		background-color: rgba(255, 255, 255, 0.2);
-		border-radius: $border-radius-medium;
-		
-		.refresh-text {
-			color: white;
-			font-size: $font-size-sm;
-		}
-		
-		&:active {
-			opacity: 0.7;
-		}
-	}
+.content-container {
+  padding: 32rpx;
 }
 
-.stats-section {
-	padding: $spacing-lg;
-	
-	.stats-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: $spacing-md;
-		margin-top: $spacing-md;
-	}
+.greeting-section {
+  margin-bottom: 48rpx;
+  padding-top: 24rpx;
+  
+  .greeting-text {
+    font-size: 64rpx;
+    font-weight: 700;
+    color: #2c2c2c;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
 }
 
-.sites-section {
-	padding: 0 $spacing-lg $spacing-lg;
-	
-	.sites-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: $spacing-sm;
-		margin-top: $spacing-md;
-	}
-	
-	.site-card {
-		@include card-style;
-		@include flex-between;
-		align-items: center;
-		padding: $spacing-md;
-		transition: all 0.3s ease;
-		
-		&:active {
-			transform: scale(0.98);
-		}
-	}
-	
-	.site-info {
-		flex: 1;
-		
-		.site-name {
-			display: block;
-			font-size: $font-size-md;
-			font-weight: bold;
-			color: $text-primary;
-			margin-bottom: 4rpx;
-		}
-		
-		.site-count {
-			font-size: $font-size-xs;
-			color: $text-secondary;
-		}
-	}
+.summary-card {
+  background-color: #c3c3c3;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 48rpx;
+  
+  .summary-content {
+    .summary-title {
+      display: block;
+      font-size: 36rpx;
+      font-weight: 600;
+      color: #2c2c2c;
+      margin-bottom: 16rpx;
+    }
+
+    .summary-stats {
+      display: flex;
+      gap: 24rpx;
+      margin-bottom: 24rpx;
+      
+      .stats-text {
+        font-size: 28rpx;
+        color: #666666;
+      }
+    }
+    
+    .summary-button {
+      background-color: #64a347;
+      border-radius: 16rpx;
+      padding: 16rpx 32rpx;
+      align-self: flex-start;
+      
+      .button-text {
+        font-size: 28rpx;
+        font-weight: 500;
+        color: #ffffff;
+      }
+      
+      &:active {
+        opacity: 0.8;
+      }
+    }
+  }
+  
+  &:active {
+    opacity: 0.95;
+  }
+}
+
+.reports-section {
+  margin-bottom: 48rpx;
+  
+  .section-title {
+    display: block;
+    font-size: 36rpx;
+    font-weight: 600;
+    color: #2c2c2c;
+    margin-bottom: 24rpx;
+  }
+  
+  .reports-scroll {
+    white-space: nowrap;
+  }
+  
+  .reports-container {
+    display: flex;
+    gap: 16rpx;
+    
+    .report-card {
+      flex-shrink: 0;
+      width: 240rpx;
+      background-color: #c3c3c3;
+      border-radius: 16rpx;
+      padding: 24rpx;
+      
+      .report-title {
+        display: block;
+        font-size: 32rpx;
+        font-weight: 500;
+        color: #2c2c2c;
+        margin-bottom: 8rpx;
+      }
+      
+      .report-desc {
+        font-size: 24rpx;
+        color: #666666;
+        line-height: 1.4;
+      }
+      
+      &:active {
+        opacity: 0.8;
+      }
+    }
+  }
 }
 
 .hot-rankings-section {
-	padding: 0 $spacing-lg $spacing-lg;
-	
-	.rankings-scroll {
-		margin-top: $spacing-md;
-		white-space: nowrap;
-	}
-	
-	.rankings-list {
-		@include flex-center;
-		gap: $spacing-sm;
-		padding-bottom: $spacing-xs;
-	}
-	
-	.ranking-item {
-		@include card-style;
-		position: relative;
-		padding: $spacing-md;
-		min-width: 200rpx;
-		transition: all 0.3s ease;
-		
-		&:active {
-			transform: scale(0.98);
-		}
-		
-		.ranking-name {
-			display: block;
-			font-size: $font-size-md;
-			font-weight: bold;
-			color: $text-primary;
-			margin-bottom: $spacing-xs;
-			@include text-ellipsis;
-		}
-		
-		.ranking-desc {
-			display: block;
-			font-size: $font-size-sm;
-			color: $text-secondary;
-			margin-bottom: 4rpx;
-		}
-		
-		.ranking-update {
-			font-size: $font-size-xs;
-			color: $text-placeholder;
-		}
-	}
-}
+  .section-title {
+    display: block;
+    font-size: 36rpx;
+    font-weight: 600;
+    color: #2c2c2c;
+    margin-bottom: 24rpx;
+  }
 
-.section-title {
-	font-size: $font-size-lg;
-	font-weight: bold;
-	color: $text-primary;
-}
+  .rankings-list {
+    margin-bottom: 24rpx;
 
-.section-header {
-	@include flex-between;
-	align-items: center;
-	margin-bottom: $spacing-md;
-	
-	.section-more {
-		font-size: $font-size-sm;
-		color: $primary-color;
-		
-		&:active {
-			opacity: 0.7;
-		}
-	}
+    .ranking-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #c3c3c3;
+      border-radius: 16rpx;
+      padding: 24rpx;
+      margin-bottom: 12rpx;
+
+      .ranking-name {
+        font-size: 32rpx;
+        font-weight: 500;
+        color: #2c2c2c;
+      }
+
+      .ranking-count {
+        font-size: 24rpx;
+        color: #666666;
+      }
+
+      &:active {
+        opacity: 0.8;
+      }
+    }
+  }
+
+  .view-more {
+    display: flex;
+    justify-content: center;
+    padding: 16rpx;
+
+    .more-text {
+      font-size: 28rpx;
+      color: #64a347;
+      font-weight: 500;
+    }
+
+    &:active {
+      opacity: 0.7;
+    }
+  }
 }
 </style>

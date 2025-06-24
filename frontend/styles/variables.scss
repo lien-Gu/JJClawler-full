@@ -1,14 +1,15 @@
 // 主题色彩 / Theme Colors
-$primary-color: #007aff;
-$secondary-color: #3cc51f;
+$primary-color: #64a347;
+$primary-light: #7bb354;
+$secondary-color: #c3c3c3;
 $accent-color: #ff6b35;
-$background-color: #f8f8f8;
+$background-color: #f4f0eb;
 $page-background: #f5f5f5;
 $card-background: #ffffff;
 
 // 文字色彩 / Text Colors
-$text-primary: #333333;
-$text-secondary: #666666;
+$text-primary: #454444;
+$text-secondary: rgba(69, 68, 68, 0.7);
 $text-placeholder: #999999;
 $text-light: #cccccc;
 
@@ -22,12 +23,19 @@ $border-radius-small: 10rpx;
 $border-radius-medium: 20rpx;
 $border-radius-large: 40rpx;
 
+// 圆角系统（简化命名）
+$radius-sm: 8rpx;    // 4px
+$radius-md: 16rpx;   // 8px
+$radius-lg: 20rpx;   // 10px
+$radius-xl: 24rpx;   // 12px
+
 // 间距变量 / Spacing Variables
-$spacing-xs: 10rpx;
-$spacing-sm: 20rpx;
-$spacing-md: 30rpx;
-$spacing-lg: 40rpx;
-$spacing-xl: 60rpx;
+$spacing-xs: 8rpx;
+$spacing-sm: 16rpx;
+$spacing-md: 32rpx;
+$spacing-lg: 48rpx;
+$spacing-xl: 64rpx;
+$spacing-xxl: 96rpx;
 
 // 字体大小 / Font Sizes
 $font-size-xs: 20rpx;
@@ -41,6 +49,10 @@ $font-size-xxl: 40rpx;
 $shadow-light: 0 2rpx 10rpx rgba(0, 0, 0, 0.05);
 $shadow-medium: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
 $shadow-dark: 0 4rpx 20rpx rgba(0, 0, 0, 0.15);
+$shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+$shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
+$shadow-primary: 0 8rpx 24rpx rgba(100, 163, 71, 0.2);
 
 // TabBar 相关 / TabBar Related
 $tabbar-color: #7a7e83;
@@ -48,10 +60,33 @@ $tabbar-selected-color: #3cc51f;
 $tabbar-background: #ffffff;
 
 // 安全区域 / Safe Area
+$safe-area-top: env(safe-area-inset-top);
 $safe-area-bottom: env(safe-area-inset-bottom);
+$safe-area-left: env(safe-area-inset-left);
+$safe-area-right: env(safe-area-inset-right);
 
 // 状态色彩 / Status Colors
 $success-color: #34c759;
 $warning-color: #ff9500;
 $error-color: #ff3b30;
-$info-color: #007aff; 
+$info-color: #007aff;
+
+// 颜色系统
+$white: #ffffff;
+$black: #000000;
+
+// 字体系统
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// 行高系统
+$line-height-tight: 1.2;
+$line-height-normal: 1.4;
+$line-height-relaxed: 1.6;
+
+// 过渡动画
+$transition-fast: 0.15s ease;
+$transition-normal: 0.2s ease;
+$transition-slow: 0.3s ease; 

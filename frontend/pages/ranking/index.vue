@@ -1,609 +1,568 @@
 <template>
-  <view class="ranking-container">
+  <view class="ranking-page">
     <!-- 搜索栏 -->
     <view class="search-section">
-      <input 
-        class="search-input" 
-        placeholder="搜索榜单或书籍"
-        v-model="searchKeyword"
-        @input="onSearch"
-      />
+      <view class="search-container">
+        <view class="search-icon">🔍</view>
+        <input 
+          class="search-input" 
+          type="text" 
+          placeholder="搜索"
+          v-model="searchKeyword"
+          @input="onSearchInput"
+        />
+      </view>
     </view>
-
-
-
-    <!-- 第一层级: 分站选择 - 始终显示 -->
-    <view class="level-container">
-      <scroll-view class="site-scroll" scroll-x="true">
-        <view class="site-tabs">
+    
+    <!-- 第一层级：分站选择 -->
+    <view class="sites-section">
+      <scroll-view class="sites-scroll" scroll-x>
+        <view class="sites-container">
           <view 
-            class="site-tab"
-            :class="{ active: selectedSite === site.id }"
+            class="site-tag"
+            :class="{ active: selectedSite && selectedSite.id === site.id }"
             v-for="site in sites" 
             :key="site.id"
             @tap="selectSite(site)"
           >
-            {{ site.name }}
+            <text class="site-text">{{ site.name }}</text>
           </view>
         </view>
       </scroll-view>
     </view>
-
-    <!-- 第二层级: 频道选择 - 当选中分站有子频道时显示 -->
-    <view class="level-container" v-if="showChannelLevel">
-      <scroll-view class="channel-scroll" scroll-x="true">
-        <view class="channel-tabs">
+    
+    <!-- 第二层级：频道选择（仅复杂分站显示） -->
+    <view v-if="selectedSite && selectedSite.type === 'complex'" class="channels-section">
+      <scroll-view class="channels-scroll" scroll-x>
+        <view class="channels-container">
           <view 
-            class="channel-tab"
-            :class="{ active: selectedChannel === channel.id }"
-            v-for="channel in currentSite.channels" 
+            class="channel-tag"
+            :class="{ active: selectedChannel && selectedChannel.id === channel.id }"
+            v-for="channel in currentChannels" 
             :key="channel.id"
             @tap="selectChannel(channel)"
           >
-            {{ channel.name }}
+            <text class="channel-text">{{ channel.name }}</text>
           </view>
         </view>
       </scroll-view>
     </view>
-
-    <!-- 第三层级: 内容展示区域 -->
-    <view class="content-container" v-if="showContentLevel">
-      
-      <!-- 夹子榜单：显示书籍列表 -->
-      <view v-if="currentSite.type === 'special'" class="book-list-container">
-        <view class="jiazi-header">
-          <text class="jiazi-title">{{ currentSite.name }}</text>
-          <text class="jiazi-count">共{{ bookList.length }}本</text>
-        </view>
-        <scroll-view class="book-list" scroll-y="true">
-          <view 
-            class="book-item"
-            v-for="(book, index) in bookList" 
-            :key="book.id"
-          >
-            <view class="book-rank">{{ index + 1 }}</view>
-            <view class="book-info">
-              <view class="book-title">{{ book.title }}</view>
-              <view class="book-stats">
-                <text class="stat-item">
-                  收藏: {{ book.collections }}
-                  <text class="change-indicator" :class="book.collectionChange > 0 ? 'up' : 'down'">
-                    {{ book.collectionChange > 0 ? '↑' : '↓' }}{{ Math.abs(book.collectionChange) }}
-                  </text>
-                </text>
-                <text class="stat-item">
-                  排名变化: 
-                  <text class="change-indicator" :class="book.rankChange > 0 ? 'down' : 'up'">
-                    {{ book.rankChange > 0 ? '↓' : '↑' }}{{ Math.abs(book.rankChange) }}
-                  </text>
-                </text>
-              </view>
-            </view>
-          </view>
-        </scroll-view>
+    
+    <!-- 第三层级：内容显示 -->
+    <view class="content-section">
+      <!-- 夹子：显示书籍列表 -->
+      <view v-if="selectedSite && selectedSite.id === 'jj' && level >= 2" class="books-section">
+        <BookList 
+          :books="books"
+          :title="currentRankingTitle"
+          :show-count="true"
+          :show-rank="true"
+          :show-actions="false"
+          @book-tap="handleBookTap"
+        />
       </view>
-
-      <!-- 普通榜单：显示榜单列表 -->
-      <view v-else class="ranking-list-container">
-        <scroll-view class="ranking-list" scroll-y="true">
+      
+      <!-- 其他分站：显示榜单列表 -->
+      <view v-else-if="selectedSite && level >= 2" class="rankings-section">
+        <view class="rankings-list">
           <view 
-            class="ranking-card"
-            v-for="ranking in rankingList" 
+            class="ranking-item" 
+            v-for="ranking in currentRankings" 
             :key="ranking.id"
             @tap="goToRankingDetail(ranking)"
           >
-            <view class="ranking-title">{{ ranking.name }}</view>
-            <view class="ranking-desc">{{ ranking.desc }}</view>
-            <view class="ranking-stats">
-              <text class="stat-item">{{ ranking.bookCount }} 本书籍</text>
-              <text class="stat-item">{{ ranking.updateTime }}</text>
-            </view>
+            <text class="ranking-name">{{ ranking.name }}</text>
           </view>
-        </scroll-view>
+        </view>
       </view>
-      
     </view>
   </view>
 </template>
 
 <script>
-import { getSitesList } from '@/data/url.js'
-import dataManager from '@/utils/data-manager.js'
+import { getSitesList, getSiteById, getChannelsBySiteId } from '@/data/url.js'
+import BookList from '@/components/BookList.vue'
 
+/**
+ * 榜单页面
+ * @description 多层级导航展示榜单和书籍信息，按照Figma设计样式
+ */
 export default {
+  name: 'RankingPage',
+  
+  components: {
+    BookList
+  },
+  
   data() {
     return {
       searchKeyword: '',
-      selectedSite: '',
-      selectedChannel: '',
-      currentSite: {},
-      currentChannel: {},
       sites: [],
-      rankingList: [],
-      bookList: [] // 夹子榜单的书籍列表
+      selectedSite: null,
+      selectedChannel: null,
+      currentChannels: [],
+      currentRankings: [],
+      books: [],
+      level: 1, // 1: 分站选择, 2: 频道选择, 3: 内容显示
+      currentRankingTitle: ''
     }
   },
   
-  computed: {
-    // 是否显示频道选择层级
-    showChannelLevel() {
-      return this.selectedSite && 
-             this.currentSite.type === 'complex' && 
-             this.currentSite.channels && 
-             this.currentSite.channels.length > 0
-    },
+  onLoad(options) {
+    this.initData()
     
-    // 是否显示内容层级
-    showContentLevel() {
-      if (!this.selectedSite) return false
-      
-      // 夹子：选中即显示书籍列表
-      if (this.currentSite.type === 'special') {
-        return true
+    // 处理外部传入的参数
+    if (options.site) {
+      const site = getSiteById(options.site)
+      if (site) {
+        this.selectSite(site)
       }
-      
-      // 简单榜单：选中即显示榜单列表
-      if (this.currentSite.type === 'simple') {
-        return true
-      }
-      
-      // 复杂榜单：选中分站即显示分站榜单，选中频道则显示频道榜单
-      if (this.currentSite.type === 'complex') {
-        return true
-      }
-      
-      return false
+    } else {
+      // 没有外部参数时，尝试恢复历史选择
+      this.restoreLastSelection()
     }
-  },
-  
-  onLoad() {
-    this.loadSites()
   },
   
   methods: {
     /**
-     * 加载分站数据
+     * 初始化数据
      */
-    loadSites() {
+    initData() {
       try {
-        // 从本地数据文件加载
         this.sites = getSitesList()
-        console.log('分站数据加载成功:', this.sites)
+        console.log('加载分站列表:', this.sites)
       } catch (error) {
         console.error('加载分站数据失败:', error)
+        // 提供备用数据
+        this.sites = [
+          { id: 'jj', name: '夹子', type: 'special' },
+          { id: 'shu', name: '书城', type: 'simple' },
+          { id: 'yan', name: '言情', type: 'complex' }
+        ]
       }
     },
     
     /**
+     * 恢复上次选择的tab
+     */
+    restoreLastSelection() {
+      try {
+        const lastSelection = uni.getStorageSync('ranking_last_selection')
+        if (lastSelection && lastSelection.siteId) {
+          console.log('恢复历史选择:', lastSelection)
+          const site = getSiteById(lastSelection.siteId)
+          if (site) {
+            this.selectSite(site, false) // 不保存历史，避免重复保存
+            
+            // 如果有频道选择历史，也恢复
+            if (lastSelection.channelId && site.type === 'complex') {
+              const channels = getChannelsBySiteId(site.id)
+              const channel = channels.find(ch => ch.id === lastSelection.channelId)
+              if (channel) {
+                setTimeout(() => {
+                  this.selectChannel(channel, false)
+                }, 100)
+              }
+            }
+            return
+          }
+        }
+      } catch (error) {
+        console.error('恢复历史选择失败:', error)
+      }
+      
+      // 没有历史信息或恢复失败，默认选中夹子
+      const jiaziSite = this.sites.find(site => site.id === 'jj')
+      if (jiaziSite) {
+        this.selectSite(jiaziSite)
+      }
+    },
+
+    /**
+     * 保存当前选择到历史
+     */
+    saveCurrentSelection() {
+      try {
+        const selection = {
+          siteId: this.selectedSite?.id,
+          channelId: this.selectedChannel?.id,
+          timestamp: Date.now()
+        }
+        uni.setStorageSync('ranking_last_selection', selection)
+        console.log('保存选择历史:', selection)
+      } catch (error) {
+        console.error('保存选择历史失败:', error)
+      }
+    },
+
+    /**
      * 选择分站
      */
-    selectSite(site) {
-      this.selectedSite = site.id
-      this.currentSite = site
+    selectSite(site, saveHistory = true) {
+      this.selectedSite = site
+      this.selectedChannel = null
       
-      // 清空频道选择
-      this.selectedChannel = ''
-      this.currentChannel = {}
+      console.log('选择分站:', site)
       
-      // 根据分站类型加载对应内容
-      if (site.type === 'special') {
-        // 夹子：加载书籍列表
-        this.loadBookList(site.id)
+      // 保存选择历史
+      if (saveHistory) {
+        this.saveCurrentSelection()
+      }
+      
+      if (site.type === 'special' && site.id === 'jj') {
+        // 夹子：直接在第一层级下方显示书籍列表
+        this.level = 2
+        this.currentRankingTitle = '夹子榜单'
+        this.loadJiaziBooks()
+      } else if (site.type === 'complex') {
+        // 复杂分站：显示分站榜单 + 频道选择
+        this.level = 2
+        this.currentChannels = getChannelsBySiteId(site.id)
+        this.loadSiteRankings(site)
       } else {
-        // 简单榜单和复杂榜单：都加载分站的榜单列表
-        this.loadRankings(site.id)
+        // 简单分站：直接显示榜单
+        this.level = 2
+        this.loadSiteRankings(site)
       }
     },
     
     /**
      * 选择频道
      */
-    selectChannel(channel) {
-      this.selectedChannel = channel.id
-      this.currentChannel = channel
+    selectChannel(channel, saveHistory = true) {
+      this.selectedChannel = channel
+      this.level = 3
+      console.log('选择频道:', channel)
       
-      // 加载频道对应的榜单
-      this.loadRankings(this.selectedSite, channel.id)
-    },
-    
-
-    
-    /**
-     * 加载榜单数据
-     */
-    async loadRankings(siteId, channelId = '') {
-      try {
-        console.log('加载榜单数据:', siteId, channelId)
-        
-        // 使用数据管理器获取榜单数据
-        const rankingsData = await dataManager.getRankingsList({
-          site: siteId,
-          channel: channelId
-        })
-        
-        if (rankingsData && Array.isArray(rankingsData)) {
-          this.rankingList = rankingsData.map(ranking => ({
-            id: ranking.id,
-            name: ranking.name,
-            desc: ranking.description || `${ranking.name}榜单`,
-            bookCount: ranking.book_count || 0,
-            updateTime: this.formatUpdateTime(ranking.last_updated)
-          }))
-        } else {
-          // 如果没有数据，使用生成的测试数据作为后备
-          this.rankingList = this.generateTestRankings(siteId, channelId)
-        }
-        
-        // 在调试模式下显示数据源信息
-        if (dataManager.getEnvironmentInfo().debug) {
-          console.log('榜单数据源:', dataManager.getEnvironmentInfo().environment)
-          console.log('榜单数据:', this.rankingList)
-        }
-        
-      } catch (error) {
-        console.error('加载榜单数据失败:', error)
-        // 出错时使用测试数据
-        this.rankingList = this.generateTestRankings(siteId, channelId)
+      // 保存选择历史
+      if (saveHistory) {
+        this.saveCurrentSelection()
       }
+      
+      this.loadChannelRankings(this.selectedSite, channel)
     },
     
     /**
-     * 生成测试榜单数据
+     * 加载分站榜单
      */
-    generateTestRankings(siteId, channelId = '') {
-      const baseRankings = {
-        // 书城榜单
-        index: [
-          { id: 'index_1', name: '书城热门榜', desc: '书城最受欢迎的作品', bookCount: 100, updateTime: '1小时前更新' },
-          { id: 'index_2', name: '书城新书榜', desc: '书城最新发布的作品', bookCount: 80, updateTime: '2小时前更新' },
-          { id: 'index_3', name: '书城完结榜', desc: '书城已完结的优质作品', bookCount: 60, updateTime: '3小时前更新' }
+    loadSiteRankings(site) {
+      // 模拟分站榜单数据
+      const siteRankings = {
+        jj: [
+          { id: 'jj_main', name: '夹子总榜', type: 'books' },
+          { id: 'jj_rising', name: '夹子新星榜', type: 'books' },
+          { id: 'jj_hot', name: '夹子热门榜', type: 'books' }
         ],
-        
-        // 言情分站榜单
-        yq: [
-          { id: 'yq_1', name: '言情总榜', desc: '言情分站综合排行', bookCount: 200, updateTime: '30分钟前更新' },
-          { id: 'yq_2', name: '言情月榜', desc: '本月最受欢迎的言情作品', bookCount: 150, updateTime: '1小时前更新' },
-          { id: 'yq_3', name: '言情新作榜', desc: '最新发布的言情作品', bookCount: 120, updateTime: '2小时前更新' },
-          { id: 'yq_4', name: '言情完结榜', desc: '已完结的优质言情作品', bookCount: 90, updateTime: '4小时前更新' }
+        shu: [
+          { id: 'shu_hot', name: '热门榜' },
+          { id: 'shu_new', name: '新书榜' },
+          { id: 'shu_finish', name: '完结榜' }
         ],
-        
-        // 纯爱分站榜单
-        ca: [
-          { id: 'ca_1', name: '纯爱总榜', desc: '纯爱分站综合排行', bookCount: 180, updateTime: '45分钟前更新' },
-          { id: 'ca_2', name: '纯爱热门榜', desc: '最受欢迎的纯爱作品', bookCount: 140, updateTime: '1小时前更新' },
-          { id: 'ca_3', name: '纯爱新书榜', desc: '最新发布的纯爱作品', bookCount: 110, updateTime: '2小时前更新' },
-          { id: 'ca_4', name: '纯爱收藏榜', desc: '收藏量最高的纯爱作品', bookCount: 85, updateTime: '3小时前更新' }
+        yan: [
+          { id: 'yan_monthly', name: '月榜' },
+          { id: 'yan_weekly', name: '周榜' },
+          { id: 'yan_daily', name: '日榜' }
         ],
-        
-        // 衍生分站榜单
-        ys: [
-          { id: 'ys_1', name: '衍生总榜', desc: '衍生分站综合排行', bookCount: 160, updateTime: '20分钟前更新' },
-          { id: 'ys_2', name: '衍生热门榜', desc: '最受欢迎的衍生作品', bookCount: 130, updateTime: '1小时前更新' },
-          { id: 'ys_3', name: '衍生新作榜', desc: '最新发布的衍生作品', bookCount: 100, updateTime: '2小时前更新' }
-        ],
-        
-        // 无CP+分站榜单
-        nocp_plus: [
-          { id: 'nocp_1', name: '无CP+总榜', desc: '无CP+分站综合排行', bookCount: 140, updateTime: '35分钟前更新' },
-          { id: 'nocp_2', name: '无CP+热门榜', desc: '最受欢迎的无CP+作品', bookCount: 110, updateTime: '1小时前更新' },
-          { id: 'nocp_3', name: '无CP+新书榜', desc: '最新发布的无CP+作品', bookCount: 90, updateTime: '3小时前更新' }
-        ],
-        
-        // 百合分站榜单
-        bh: [
-          { id: 'bh_1', name: '百合热门榜', desc: '最受欢迎的百合作品', bookCount: 80, updateTime: '1小时前更新' },
-          { id: 'bh_2', name: '百合新书榜', desc: '最新发布的百合作品', bookCount: 60, updateTime: '2小时前更新' },
-          { id: 'bh_3', name: '百合完结榜', desc: '已完结的优质百合作品', bookCount: 45, updateTime: '4小时前更新' }
+        chun: [
+          { id: 'chun_popular', name: '人气榜' },
+          { id: 'chun_recommend', name: '推荐榜' }
         ]
       }
       
-      // 如果有选中频道，生成频道特定榜单
-      if (channelId) {
-        const channelName = this.currentChannel.name || '频道'
-        return [
-          { id: `${channelId}_1`, name: `${channelName}热门榜`, desc: `${channelName}最受欢迎的作品`, bookCount: 80, updateTime: '30分钟前更新' },
-          { id: `${channelId}_2`, name: `${channelName}新书榜`, desc: `${channelName}最新发布的作品`, bookCount: 60, updateTime: '1小时前更新' },
-          { id: `${channelId}_3`, name: `${channelName}完结榜`, desc: `${channelName}已完结的优质作品`, bookCount: 40, updateTime: '2小时前更新' }
-        ]
-      }
-      
-      // 返回分站榜单，如果没有对应分站则返回默认榜单
-      return baseRankings[siteId] || [
-        { id: 'default_1', name: '热门榜单', desc: '当前最受欢迎的作品', bookCount: 50, updateTime: '2小时前更新' },
-        { id: 'default_2', name: '新书榜单', desc: '最新发布的优质作品', bookCount: 30, updateTime: '1小时前更新' },
-        { id: 'default_3', name: '完结榜单', desc: '已完结的优质作品', bookCount: 25, updateTime: '6小时前更新' }
+      this.currentRankings = siteRankings[site.id] || [
+        { id: `${site.id}_default`, name: '默认榜单' }
+      ]
+    },
+    
+    /**
+     * 加载频道榜单
+     */
+    loadChannelRankings(site, channel) {
+      // 模拟频道榜单数据
+      this.currentRankings = [
+        { id: `${site.id}_${channel.id}_hot`, name: `${channel.name}热门榜` },
+        { id: `${site.id}_${channel.id}_new`, name: `${channel.name}新作榜` }
       ]
     },
     
     /**
      * 加载夹子书籍列表
      */
-    async loadBookList(siteId) {
-      try {
-        // 这里应该调用API获取夹子书籍数据
-        // const response = await this.$http.get('/api/jiazi/books')
-        // this.bookList = response.data
-        
-        console.log('加载夹子书籍数据:', siteId)
-        
-        // 临时模拟数据
-        this.bookList = [
-          {
-            id: '1',
-            title: '重生之商业帝国',
-            collections: 15680,
-            collectionChange: 245,  // 正数表示增加
-            rankChange: -2  // 负数表示排名上升，正数表示排名下降
-          },
-          {
-            id: '2',
-            title: '穿越古代当皇后',
-            collections: 12450,
-            collectionChange: -89,
-            rankChange: 1
-          },
-          {
-            id: '3',
-            title: '现代都市修仙录',
-            collections: 11230,
-            collectionChange: 156,
-            rankChange: 0
-          },
-          {
-            id: '4',
-            title: '娱乐圈的那些事',
-            collections: 9870,
-            collectionChange: 78,
-            rankChange: -1
-          },
-          {
-            id: '5',
-            title: '末世重生女配逆袭',
-            collections: 8950,
-            collectionChange: -23,
-            rankChange: 3
-          }
-        ]
-      } catch (error) {
-        console.error('加载夹子书籍数据失败:', error)
-      }
+    loadJiaziBooks() {
+      // 模拟夹子书籍数据
+      this.books = Array.from({ length: 50 }, (_, index) => ({
+        id: `book_${index + 1}`,
+        title: `重生之农女${index + 1}`,
+        collections: 193 + Math.floor(Math.random() * 1000),
+        collectionChange: Math.floor(Math.random() * 100) - 50,
+        rankChange: Math.floor(Math.random() * 10) - 5
+      }))
     },
     
     /**
-     * 搜索功能
+     * 搜索输入
      */
-    onSearch() {
-      // 实现搜索逻辑
-      console.log('搜索关键词:', this.searchKeyword)
+    onSearchInput(e) {
+      console.log('搜索:', e.detail.value)
+      // 这里可以实现搜索逻辑
     },
     
     /**
      * 跳转到榜单详情
      */
     goToRankingDetail(ranking) {
+      // 如果是夹子榜单，直接在当前页面显示书籍列表
+      if (ranking.type === 'books') {
+        this.level = 3
+        this.currentRankingTitle = ranking.name
+        this.loadJiaziBooks()
+        return
+      }
+      
+      // 其他榜单跳转到详情页
       uni.navigateTo({
-        url: `/pages/ranking/detail?id=${ranking.id}`
+        url: `/pages/ranking/detail?id=${ranking.id}&name=${encodeURIComponent(ranking.name)}`
       })
     },
     
     /**
-     * 跳转到夹子榜单详情
+     * 处理书籍点击（BookList组件事件）
      */
-    goToJiaziDetail() {
-      uni.navigateTo({
-        url: `/pages/ranking/detail?id=jiazi&type=special`
-      })
+    handleBookTap({ book, index }) {
+      this.goToBookDetail(book)
     },
 
     /**
-     * 格式化更新时间
+     * 跳转到书籍详情
      */
-    formatUpdateTime(timeStr) {
-      if (!timeStr) return '未知时间'
-      
-      try {
-        const updateTime = new Date(timeStr)
-        const now = new Date()
-        const diff = now - updateTime
-        
-        const minutes = Math.floor(diff / (1000 * 60))
-        const hours = Math.floor(diff / (1000 * 60 * 60))
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-        
-        if (minutes < 60) {
-          return `${minutes}分钟前更新`
-        } else if (hours < 24) {
-          return `${hours}小时前更新`
-        } else if (days < 7) {
-          return `${days}天前更新`
-        } else {
-          return updateTime.toLocaleDateString() + '更新'
-        }
-      } catch (error) {
-        return '未知时间'
-      }
+    goToBookDetail(book) {
+      uni.navigateTo({
+        url: `/pages/book/detail?id=${book.id}`
+      })
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.ranking-container {
-  padding: 20rpx;
+.ranking-page {
+  min-height: 100vh;
+  background-color: #f4f0eb;
+  padding-bottom: $safe-area-bottom;
 }
 
 .search-section {
-  margin-bottom: 30rpx;
-}
-
-.search-input {
-  width: 100%;
-  height: 80rpx;
-  padding: 0 30rpx;
-  border: 2rpx solid #e0e0e0;
-  border-radius: 40rpx;
-  background-color: #f8f8f8;
-  font-size: 28rpx;
-}
-
-
-.level-container {
-  margin-bottom: 30rpx;
-}
-
-.site-scroll, .channel-scroll {
-  white-space: nowrap;
-}
-
-.site-tabs, .channel-tabs {
-  display: flex;
-  padding: 10rpx 0;
-}
-
-.site-tab, .channel-tab {
-  flex-shrink: 0;
-  padding: 20rpx 40rpx;
-  margin-right: 20rpx;
-  background-color: #f0f0f0;
-  border-radius: 50rpx;
-  font-size: 28rpx;
-  color: #333;
-  transition: all 0.3s ease;
+  padding: 32rpx;
   
-  &.active {
-    background-color: #007aff;
-    color: white;
-    font-weight: bold;
+  .search-container {
+    display: flex;
+    align-items: center;
+    background-color: #ffffff;
+    border-radius: 48rpx;
+    padding: 0 32rpx;
+    height: 96rpx;
+    
+    .search-icon {
+      font-size: 32rpx;
+      color: #999999;
+      margin-right: 16rpx;
+    }
+    
+    .search-input {
+      flex: 1;
+      font-size: 32rpx;
+      color: #333333;
+      
+      &::placeholder {
+        color: #999999;
+      }
+    }
   }
 }
 
-.ranking-list {
-  height: 1000rpx;
-}
-
-.ranking-card {
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  background-color: white;
-  border-radius: 20rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
-}
-
-.ranking-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10rpx;
-}
-
-.ranking-desc {
-  font-size: 26rpx;
-  color: #666;
-  margin-bottom: 15rpx;
-}
-
-.ranking-stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 24rpx;
-  color: #999;
-}
-
-/* 夹子书籍列表样式 */
-.book-list-container {
-  margin-top: 20rpx;
-}
-
-.jiazi-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20rpx 0;
-  margin-bottom: 20rpx;
-  border-bottom: 2rpx solid #f0f0f0;
-}
-
-.jiazi-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
-}
-
-.jiazi-count {
-  font-size: 24rpx;
-  color: #999;
-}
-
-.book-list {
-  height: 800rpx;
-}
-
-.book-item {
-  display: flex;
-  align-items: center;
-  padding: 25rpx 20rpx;
-  margin-bottom: 15rpx;
-  background-color: white;
-  border-radius: 15rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1);
-}
-
-.book-rank {
-  width: 60rpx;
-  height: 60rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #007aff;
-  color: white;
-  border-radius: 50%;
-  font-size: 24rpx;
-  font-weight: bold;
-  margin-right: 20rpx;
-}
-
-.book-info {
-  flex: 1;
-}
-
-.book-title {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10rpx;
-  line-height: 1.4;
-}
-
-.book-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-}
-
-.stat-item {
-  font-size: 24rpx;
-  color: #666;
-}
-
-.change-indicator {
-  margin-left: 10rpx;
-  font-weight: bold;
+.sites-section {
+  padding: 0 32rpx 32rpx;
   
-  &.up {
-    color: #ff4d4f; /* 红色表示上升/增加 */
+  .sites-scroll {
+    white-space: nowrap;
   }
   
-  &.down {
-    color: #52c41a; /* 绿色表示下降/减少 */
+  .sites-container {
+    display: flex;
+    gap: 16rpx;
+    
+    .site-tag {
+      flex-shrink: 0;
+      background-color: #c3c3c3;
+      border-radius: 32rpx;
+      padding: 16rpx 32rpx;
+      
+      .site-text {
+        font-size: 28rpx;
+        color: #333333;
+        white-space: nowrap;
+      }
+      
+      &.active {
+        background-color: #64a347;
+        
+        .site-text {
+          color: #ffffff;
+          font-weight: 600;
+        }
+      }
+    }
   }
 }
 
-/* 内容容器样式 */
-.content-container {
-  margin-top: 20rpx;
+.channels-section {
+  padding: 0 32rpx 32rpx;
+  
+  .channels-scroll {
+    white-space: nowrap;
+  }
+  
+  .channels-container {
+    display: flex;
+    gap: 16rpx;
+    
+    .channel-tag {
+      flex-shrink: 0;
+      background-color: #e0e0e0;
+      border-radius: 24rpx;
+      padding: 12rpx 24rpx;
+      
+      .channel-text {
+        font-size: 24rpx;
+        color: #666666;
+        white-space: nowrap;
+      }
+      
+      &.active {
+        background-color: #64a347;
+        
+        .channel-text {
+          color: #ffffff;
+          font-weight: 500;
+        }
+      }
+    }
+  }
 }
 
-.ranking-list-container {
-  margin-top: 20rpx;
+.content-section {
+  padding: 0 32rpx;
+}
+
+.books-section {
+  .books-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32rpx;
+    
+    .books-title {
+      font-size: 36rpx;
+      font-weight: 600;
+      color: #333333;
+    }
+    
+    .books-count {
+      font-size: 28rpx;
+      color: #666666;
+    }
+  }
+  
+  .books-list {
+    .book-item {
+      display: flex;
+      align-items: center;
+      background-color: #c3c3c3;
+      border-radius: 16rpx;
+      padding: 24rpx;
+      margin-bottom: 16rpx;
+      
+      .book-rank {
+        width: 48rpx;
+        height: 48rpx;
+        background-color: #999999;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24rpx;
+        font-weight: 600;
+        color: #ffffff;
+        margin-right: 24rpx;
+      }
+      
+      .book-info {
+        flex: 1;
+        
+        .book-title {
+          display: block;
+          font-size: 32rpx;
+          font-weight: 500;
+          color: #333333;
+          margin-bottom: 8rpx;
+        }
+        
+        .book-stats {
+          display: flex;
+          align-items: center;
+          gap: 24rpx;
+          
+          .book-collections {
+            font-size: 24rpx;
+            color: #666666;
+          }
+          
+          .book-changes {
+            display: flex;
+            gap: 16rpx;
+            
+            .collection-change,
+            .rank-change {
+              font-size: 24rpx;
+              font-weight: 500;
+              
+              &.positive {
+                color: #34c759;
+              }
+              
+              &.negative {
+                color: #ff3b30;
+              }
+            }
+          }
+        }
+      }
+      
+      &:active {
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+.rankings-section {
+  .rankings-list {
+    .ranking-item {
+      background-color: #c3c3c3;
+      border-radius: 16rpx;
+      padding: 32rpx;
+      margin-bottom: 16rpx;
+      
+      .ranking-name {
+        font-size: 32rpx;
+        font-weight: 500;
+        color: #333333;
+      }
+      
+      &:active {
+        opacity: 0.8;
+      }
+    }
+  }
 }
 </style> 
