@@ -1,0 +1,175 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 项目配置规则 (Project Configuration Guide)
+
+## 技术栈概述 (Tech Stack Overview)
+
+### 后端技术栈 (Backend Stack)
+- **框架**: FastAPI 0.115.0+
+- **Python版本**: 3.10+ 
+- **数据模型**: SQLModel 0.0.22+ (基于Pydantic和SQLAlchemy)
+- **HTTP客户端**: httpx 0.28.0+ (异步HTTP请求)
+- **任务调度**: APScheduler 3.10.4+ (定时任务和爬虫调度)
+- **配置管理**: python-dotenv + pydantic-settings
+- **时区处理**: pytz 2025.2+
+
+### 前端技术栈 (Frontend Stack)  
+- **框架**: uni-app (跨平台小程序框架)
+- **核心技术**: Vue.js 组合式API
+- **构建工具**: HBuilderX/uni-cli
+- **样式预处理**: SCSS
+- **状态管理**: 基于组合式API的响应式数据
+- **HTTP请求**: uni.request封装
+
+## 项目结构规范 (Project Structure)
+
+### 后端结构
+```
+backend/
+├── app/                          # 应用核心代码
+│   ├── api/                      # API路由模块
+│   ├── modules/                  # 业务模块
+│   │   ├── crawler/             # 爬虫模块
+│   │   ├── dao/                 # 数据访问层
+│   │   ├── database/            # 数据库连接
+│   │   ├── models/              # 数据模型
+│   │   └── service/             # 业务服务层
+│   ├── utils/                   # 工具函数
+│   ├── config.py                # 配置文件
+│   └── main.py                  # 应用入口
+├── tests/                       # 测试代码
+└── pyproject.toml              # 依赖管理
+```
+
+### 前端结构
+```
+frontend/
+├── components/                  # 公共组件
+├── pages/                      # 页面目录
+│   ├── index/                  # 首页
+│   ├── book/                   # 书籍详情页
+│   ├── ranking/                # 排行榜页面
+│   ├── follow/                 # 关注页面
+│   └── settings/               # 设置页面
+├── utils/                      # 工具函数
+├── styles/                     # 样式文件
+├── static/                     # 静态资源
+├── App.vue                     # 应用根组件
+├── main.js                     # 应用入口
+├── pages.json                  # 页面配置
+└── manifest.json              # 应用配置
+```
+
+## 开发环境要求 (Development Environment)
+
+### 后端环境
+- Python 3.10或更高版本
+- Poetry包管理器 (推荐) 或 pip
+- 支持异步操作的Python环境
+- 数据库使用sqlite+sqmodel
+
+### 前端环境
+- HBuilderX 或 uni-cli
+- Node.js 16+ (如使用uni-cli)
+- 微信开发者工具 (小程序开发)
+
+## 功能边界 (Feature Boundaries)
+
+### 后端职责
+- **数据爬取**: 晋江文学城书籍、排行榜、页面数据爬取
+- **数据存储**: 爬取数据的结构化存储和管理
+- **任务调度**: 定时爬取任务的调度和管理
+- **API服务**: 为前端提供RESTful API接口
+- **数据分析**: 书籍统计、排行分析等数据处理
+
+### 前端职责  
+- **用户界面**: 提供直观的用户交互界面
+- **数据展示**: 书籍列表、排行榜、统计数据的可视化展示
+- **用户操作**: 搜索、筛选、收藏等用户操作功能
+- **配置管理**: API地址配置、用户偏好设置
+- **离线缓存**: 数据的本地缓存和离线访问
+
+## 接口通信规范 (API Communication Standards)
+
+### 基础规范
+- **协议**: HTTP/HTTPS
+- **数据格式**: JSON
+- **字符编码**: UTF-8
+- **内容类型**: application/json
+
+### 请求规范
+```typescript
+// 统一请求头
+{
+  "Content-Type": "application/json",
+  "Accept": "application/json"
+}
+```
+
+### 响应格式
+```json
+{
+  "code": 200,
+  "message": "成功",
+  "data": {},
+  "timestamp": "2024-12-21T10:30:00Z"
+}
+```
+
+### 错误处理
+```json
+// 客户端错误 (4xx)
+{
+  "code": 400,
+  "message": "请求参数错误",
+  "error": "详细错误信息",
+  "timestamp": "2024-12-21T10:30:00Z"
+}
+
+// 服务器错误 (5xx)  
+{
+  "code": 500,
+  "message": "服务器内部错误",
+  "error": "Internal Server Error",
+  "timestamp": "2024-12-21T10:30:00Z"
+}
+```
+
+## 开发约定 (Development Conventions)
+
+### 代码风格
+- **后端**: 遵循PEP 8规范，使用Black格式化工具
+- **前端**: 遵循Vue.js官方风格指南，使用ESLint和Prettier
+
+### 命名规范
+- **接口路径**: 小写字母，用连字符分隔 (kebab-case)
+- **Python变量**: 小写字母，用下划线分隔 (snake_case)
+- **Vue组件**: 大驼峰命名 (PascalCase)
+- **JavaScript变量**: 小驼峰命名 (camelCase)
+
+### 核心文件引用
+- 后端配置: [backend/app/config.py](mdc:backend/app/config.py)
+- 后端入口: [backend/app/main.py](mdc:backend/app/main.py)
+- 依赖配置: [backend/pyproject.toml](mdc:backend/pyproject.toml)
+- 前端入口: [frontend/main.js](mdc:frontend/main.js)
+- 前端配置: [frontend/manifest.json](mdc:frontend/manifest.json)
+- 页面配置: [frontend/pages.json](mdc:frontend/pages.json)
+- API文档: [openAPI.json](mdc:openAPI.json)
+
+## 部署要求 (Deployment Requirements)
+
+### 后端部署
+- **运行环境**: Python 3.10+ 运行时
+- **进程管理**: uvicorn ASGI服务器
+- **端口配置**: 默认8000端口
+- **环境变量**: 通过.env文件管理敏感配置
+
+### 前端部署
+- **构建输出**: 微信小程序包或H5页面
+- **CDN支持**: 静态资源CDN加速
+- **接口配置**: 生产环境API地址配置
+
+
