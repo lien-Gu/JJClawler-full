@@ -92,12 +92,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # 配置CORS
+    # 配置CORS - 允许前端访问
+    import os
+    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+    if cors_origins == ["*"] or settings.DEBUG:
+        allowed_origins = ["*"]
+    else:
+        allowed_origins = cors_origins
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.DEBUG else [],
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
     
@@ -163,7 +170,7 @@ def setup_routes(app: FastAPI):
             }
     
     # 注册API v1路由
-    from app.api import pages, rankings, books, crawl, stats
+    from app.api import pages, rankings, books, crawl, stats, users
     
     settings = get_settings()
     app.include_router(pages.router, prefix=settings.API_V1_STR)
@@ -171,6 +178,7 @@ def setup_routes(app: FastAPI):
     app.include_router(books.router, prefix=settings.API_V1_STR)
     app.include_router(crawl.router, prefix=settings.API_V1_STR)
     app.include_router(stats.router, prefix=settings.API_V1_STR)
+    app.include_router(users.router, prefix=settings.API_V1_STR)
 
 
 # 创建应用实例

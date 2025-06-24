@@ -37,23 +37,27 @@
 			}
 		},
 		{
-			"path": "pages/settings/api-config",
+			"path": "pages/webview/index",
 			"style": {
-				"navigationBarTitleText": "API配置"
+				"navigationBarTitleText": "加载中...",
+				"navigationStyle": "custom"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "JJClawler",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		"navigationBarBackgroundColor": "#f4f0eb",
+		"backgroundColor": "#f4f0eb"
 	},
 	"tabBar": {
-		"color": "#7A7E83",
-		"selectedColor": "#3CC51F",
+		"color": "#000000",
+		"selectedColor": "#000000",
 		"borderStyle": "white",
-		"backgroundColor": "#ffffff",
+		"backgroundColor": "rgba(255, 255, 255, 0.5)",
+		"height": "98px",
+		"fontSize": "14px",
+		"iconWidth": "24px",
 		"list": [
 			{
 				"pagePath": "pages/index/index",

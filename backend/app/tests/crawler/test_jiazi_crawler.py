@@ -8,6 +8,7 @@ import asyncio
 import json
 import tempfile
 import os
+from unittest.mock import Mock, patch, AsyncMock, mock_open
 from app.modules.crawler.jiazi_crawler import JiaziCrawler
 from app.modules.models import Book, BookSnapshot
 
@@ -98,7 +99,10 @@ class TestJiaziCrawling:
         
         # 设置返回数据
         mock_raw_data = {"code": "200", "data": {"list": []}}
-        mock_http_client.get.return_value = mock_raw_data
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = mock_raw_data
+        mock_http_client.get.return_value = mock_response
         
         mock_books = [
             Book(book_id="1", title="测试书籍1", author_id="1", author_name="作者1"),
@@ -136,7 +140,10 @@ class TestJiaziCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             
             crawler = JiaziCrawler(http_client=mock_http_client)
             crawler.parser = mock_parser
@@ -156,7 +163,10 @@ class TestJiaziCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             
             # 书籍和快照数量不一致
             mock_books = [Book(book_id="1", title="测试书籍", author_id="1", author_name="作者")]
@@ -198,7 +208,10 @@ class TestJiaziCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             mock_parser.parse_jiazi_data.side_effect = Exception("解析失败")
             
             crawler = JiaziCrawler(http_client=mock_http_client)
@@ -346,7 +359,10 @@ class TestIntegrationScenarios:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = mock_response_data
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = mock_response_data
+            mock_http_client.get.return_value = mock_response
             
             # 模拟解析结果
             test_book = Book(
@@ -406,7 +422,10 @@ class TestIntegrationScenarios:
             
             # 重置mock副作用，模拟第二次成功
             mock_http_client.get.side_effect = None
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             crawler.parser.parse_jiazi_data.return_value = ([], [])
             
             # 第二次爬取应该成功

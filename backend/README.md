@@ -100,7 +100,7 @@ vim .env
 poetry run uvicorn app.main:app --reload --port 8000
 
 # 关闭
-pkill -f unicorn
+pkill -f uvicorn
 
 # 方式二：如果已在虚拟环境中
 uvicorn app.main:app --reload --port 8000

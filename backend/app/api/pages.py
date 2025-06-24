@@ -4,6 +4,7 @@
 提供动态页面结构配置信息的API端点
 使用PageService从配置文件获取页面信息
 """
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from app.modules.models import PagesResponse, PageConfig, SubPageConfig, RankingConfig
 from app.modules.service.page_service import get_page_service
@@ -116,9 +117,34 @@ async def get_page_statistics():
     """
     try:
         page_service = get_page_service()
-        return page_service.get_page_statistics()
+        stats = page_service.get_page_statistics()
+        
+        # 添加fake标识用于前端识别
+        stats["meta"] = {
+            "fake": False,
+            "message": "Real page statistics from configuration",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return stats
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取页面统计失败: {str(e)}")
+        # 如果获取失败，返回假数据
+        from datetime import datetime
+        return {
+            "total_pages": 7,
+            "root_pages": 3,
+            "sub_pages": 4,
+            "total_rankings": 23,
+            "config_path": "data/urls.json",
+            "cache_valid": True,
+            "last_updated": datetime.now().isoformat(),
+            "meta": {
+                "fake": True,
+                "message": "Fake page statistics for development",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e)
+            }
+        }
 
 
 @router.post("/refresh")
