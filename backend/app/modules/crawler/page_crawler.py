@@ -10,6 +10,7 @@
 import json
 import logging
 import os
+from datetime import datetime
 from typing import List, Tuple, Dict, Any
 
 from app.utils.http_client import HTTPClient
@@ -79,10 +80,31 @@ class PageCrawler:
                 raise ValueError(f"无法构建频道URL: {channel}")
             
             # 发送请求
-            raw_data = await self.http_client.get(url)
+            response = await self.http_client.get(url)
+            
+            # 检查响应状态
+            response.raise_for_status()
+            
+            # 提取JSON数据
+            raw_data = response.json()
             
             # 解析数据
-            books, snapshots = self.parser.parse_page_data(raw_data)
+            try:
+                books, snapshots = self.parser.parse_page_data(raw_data)
+            except Exception as parse_error:
+                # 解析失败，但爬取成功，抛出特定异常
+                from app.utils.failure_storage import get_failure_storage
+                task_id = f"page_{channel}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                get_failure_storage().store_parse_failure(
+                    task_id=task_id,
+                    task_type="page",
+                    error_message=f"分类页面数据解析失败: {str(parse_error)}",
+                    raw_data=raw_data,
+                    url=url,
+                    channel=channel
+                )
+                logger.error(f"分类页面数据解析失败，原始数据已保存: {parse_error}")
+                raise parse_error
             
             # 验证结果
             if not books or not snapshots:

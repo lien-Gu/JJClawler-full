@@ -199,14 +199,20 @@ class DataParser:
             value = item.get(field_name)
             if value is not None:
                 try:
-                    # 处理字符串格式的数字（如 "1.2万" -> 12000）
+                    # 处理字符串格式的数字
                     if isinstance(value, str):
-                        value = value.replace(',', '').replace('万', '0000').replace('千', '000')
-                        # 处理小数点形式的万（如 "1.2万" -> "12000"）
-                        if '.' in value and value.endswith('0000'):
-                            parts = value[:-4].split('.')
-                            if len(parts) == 2:
-                                value = parts[0] + parts[1] + '000'
+                        # 去除逗号
+                        value = value.replace(',', '')
+                        
+                        # 处理"万"单位
+                        if '万' in value:
+                            base_num = float(value.replace('万', ''))
+                            return int(base_num * 10000)
+                        
+                        # 处理"千"单位  
+                        if '千' in value:
+                            base_num = float(value.replace('千', ''))
+                            return int(base_num * 1000)
                     
                     return int(float(value))
                 except (ValueError, TypeError):

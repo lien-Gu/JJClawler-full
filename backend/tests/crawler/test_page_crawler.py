@@ -131,9 +131,12 @@ class TestPageCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            # 设置返回数据
+            # 设置返回数据  
             mock_raw_data = {"code": "200", "data": {"list": []}}
-            mock_http_client.get.return_value = mock_raw_data
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = mock_raw_data
+            mock_http_client.get.return_value = mock_response
             
             mock_books = [
                 Book(book_id="1", title="言情小说1", author_id="1", author_name="作者1"),
@@ -174,7 +177,10 @@ class TestPageCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             
             crawler = PageCrawler(http_client=mock_http_client)
             crawler.parser = mock_parser
@@ -211,7 +217,10 @@ class TestPageCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             
             # 书籍和快照数量不一致
             mock_books = [
@@ -262,7 +271,10 @@ class TestPageCrawling:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = {"code": "200", "data": {"list": []}}
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+            mock_http_client.get.return_value = mock_response
             mock_parser.parse_page_data.side_effect = Exception("解析失败")
             
             crawler = PageCrawler(http_client=mock_http_client)
@@ -504,7 +516,10 @@ class TestIntegrationScenarios:
             mock_http_client = AsyncMock()
             mock_parser = Mock()
             
-            mock_http_client.get.return_value = mock_response_data
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.return_value = mock_response_data
+            mock_http_client.get.return_value = mock_response
             
             # 模拟解析结果
             test_book = Book(
@@ -572,11 +587,17 @@ class TestIntegrationScenarios:
             
             # 设置不同频道返回不同数据
             def mock_get_side_effect(url):
+                mock_response = Mock()
+                mock_response.raise_for_status.return_value = None
+                
                 if "yq" in url:
-                    return {"code": "200", "data": {"list": [{"novelId": "yq1"}]}}
+                    mock_response.json.return_value = {"code": "200", "data": {"list": [{"novelId": "yq1"}]}}
                 elif "cy" in url:
-                    return {"code": "200", "data": {"list": [{"novelId": "cy1"}]}}
-                return {"code": "200", "data": {"list": []}}
+                    mock_response.json.return_value = {"code": "200", "data": {"list": [{"novelId": "cy1"}]}}
+                else:
+                    mock_response.json.return_value = {"code": "200", "data": {"list": []}}
+                
+                return mock_response
             
             mock_http_client.get.side_effect = mock_get_side_effect
             

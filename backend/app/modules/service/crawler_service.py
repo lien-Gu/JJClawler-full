@@ -26,6 +26,7 @@ from app.modules.database import get_session_sync
 from app.utils.log_utils import get_logger
 from app.utils.transform_utils import format_crawl_result
 from app.utils.db_utils import transaction_context
+from app.utils.failure_storage import get_failure_storage
 
 logger = get_logger(__name__)
 
@@ -47,6 +48,7 @@ class CrawlerService:
         self.page_crawler = None
         self.book_service = BookService()
         self.ranking_service = RankingService()
+        self.failure_storage = get_failure_storage()
     
     @asynccontextmanager
     async def _get_jiazi_crawler(self):
@@ -68,14 +70,20 @@ class CrawlerService:
             await self.page_crawler.close()
             self.page_crawler = None
     
-    async def crawl_and_save_jiazi(self) -> Dict[str, Any]:
+    async def crawl_and_save_jiazi(self, task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         抓取并保存夹子榜数据
+        
+        Args:
+            task_id: 任务ID，用于失败存储
         
         Returns:
             采集结果统计
         """
         logger.info("开始夹子榜数据采集任务")
+        
+        if not task_id:
+            task_id = f"jiazi_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         try:
             # 抓取数据
@@ -86,27 +94,50 @@ class CrawlerService:
             result = await self._save_crawled_data(
                 books, book_snapshots, 
                 ranking_name="夹子榜", 
-                ranking_type="jiazi"
+                ranking_type="jiazi",
+                task_id=task_id
             )
             
             logger.info(f"夹子榜数据采集完成: {result}")
             return result
             
         except Exception as e:
-            logger.error(f"夹子榜数据采集失败: {e}")
+            # 存储失败记录
+            error_msg = str(e)
+            logger.error(f"夹子榜数据采集失败: {error_msg}")
+            
+            # 获取jiazi配置信息来获取URL
+            url = None
+            try:
+                async with self._get_jiazi_crawler() as crawler:
+                    config_info = await crawler.get_config_info()
+                    url = config_info.get('url')
+            except:
+                pass
+            
+            self.failure_storage.store_task_failure(
+                task_id=task_id,
+                task_type="jiazi",
+                error_message=error_msg,
+                url=url
+            )
             raise
     
-    async def crawl_and_save_page(self, channel: str) -> Dict[str, Any]:
+    async def crawl_and_save_page(self, channel: str, task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         抓取并保存分类页面数据
         
         Args:
             channel: 分类频道标识
+            task_id: 任务ID，用于失败存储
             
         Returns:
             采集结果统计
         """
         logger.info(f"开始分类页面数据采集任务: {channel}")
+        
+        if not task_id:
+            task_id = f"page_{channel}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         try:
             # 抓取数据
@@ -118,14 +149,28 @@ class CrawlerService:
                 books, book_snapshots,
                 ranking_name=f"分类页面-{channel}",
                 ranking_type="page",
-                channel=channel
+                channel=channel,
+                task_id=task_id
             )
             
             logger.info(f"分类页面数据采集完成 ({channel}): {result}")
             return result
             
         except Exception as e:
-            logger.error(f"分类页面数据采集失败 ({channel}): {e}")
+            # 存储失败记录
+            error_msg = str(e)
+            logger.error(f"分类页面数据采集失败 ({channel}): {error_msg}")
+            
+            # 构建URL（估算）
+            url = f"https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={channel}&version=20"
+            
+            self.failure_storage.store_task_failure(
+                task_id=task_id,
+                task_type="page",
+                error_message=error_msg,
+                url=url,
+                channel=channel
+            )
             raise
     
     async def _save_crawled_data(self, 
@@ -133,7 +178,8 @@ class CrawlerService:
                                book_snapshots: List[BookSnapshot],
                                ranking_name: str,
                                ranking_type: str,
-                               channel: Optional[str] = None) -> Dict[str, Any]:
+                               channel: Optional[str] = None,
+                               task_id: Optional[str] = None) -> Dict[str, Any]:
         """
         保存抓取的数据到数据库
         
