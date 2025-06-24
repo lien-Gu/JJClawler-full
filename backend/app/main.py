@@ -92,12 +92,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # 配置CORS
+    # 配置CORS - 允许前端访问
+    import os
+    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+    if cors_origins == ["*"] or settings.DEBUG:
+        allowed_origins = ["*"]
+    else:
+        allowed_origins = cors_origins
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.DEBUG else [],
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
     
