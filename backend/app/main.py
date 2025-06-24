@@ -163,13 +163,14 @@ def setup_routes(app: FastAPI):
             }
     
     # 注册API v1路由
-    from app.api import pages, rankings, books, crawl
+    from app.api import pages, rankings, books, crawl, stats
     
     settings = get_settings()
     app.include_router(pages.router, prefix=settings.API_V1_STR)
     app.include_router(rankings.router, prefix=settings.API_V1_STR)
     app.include_router(books.router, prefix=settings.API_V1_STR)
     app.include_router(crawl.router, prefix=settings.API_V1_STR)
+    app.include_router(stats.router, prefix=settings.API_V1_STR)
 
 
 # 创建应用实例

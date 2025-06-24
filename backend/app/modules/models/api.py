@@ -196,6 +196,57 @@ class TasksResponse(BaseModel):
     total_completed: int = Field(description="已完成任务总数")
 
 
+# ==================== 新增统计和热门榜单API模型 ====================
+class OverviewStats(BaseModel):
+    """首页概览统计"""
+    total_books: int = Field(description="书籍总数")
+    total_rankings: int = Field(description="榜单总数")
+    recent_snapshots: int = Field(description="最近24小时快照数")
+    active_rankings: int = Field(description="活跃榜单数")
+    last_updated: datetime = Field(description="最后更新时间")
+
+
+class HotRankingItem(BaseModel):
+    """热门榜单项"""
+    ranking_id: str = Field(description="榜单ID")
+    name: str = Field(description="榜单名称")
+    update_frequency: str = Field(description="更新频率")
+    recent_activity: int = Field(description="最近活跃度")
+    total_books: int = Field(description="榜单书籍总数")
+    last_updated: Optional[datetime] = Field(default=None, description="最后更新时间")
+
+
+class RankingListItem(BaseModel):
+    """榜单列表项"""
+    ranking_id: str = Field(description="榜单ID")
+    name: str = Field(description="榜单名称")
+    update_frequency: str = Field(description="更新频率")
+    total_books: int = Field(description="榜单书籍总数")
+    last_updated: Optional[datetime] = Field(default=None, description="最后更新时间")
+    parent_id: Optional[str] = Field(default=None, description="父级榜单ID")
+
+
+class OverviewResponse(BaseModel):
+    """首页概览响应"""
+    stats: OverviewStats = Field(description="统计数据")
+    status: str = Field(default="ok", description="状态")
+
+
+class HotRankingsResponse(BaseModel):
+    """热门榜单响应"""
+    rankings: List[HotRankingItem] = Field(description="热门榜单列表")
+    total: int = Field(description="总数")
+
+
+class RankingsListResponse(BaseModel):
+    """榜单列表响应"""
+    rankings: List[RankingListItem] = Field(description="榜单列表")
+    total: int = Field(description="总数")
+    page: int = Field(description="当前页码")
+    limit: int = Field(description="每页数量")
+    has_next: bool = Field(description="是否有下一页")
+
+
 # 更新模型引用
 PageConfig.model_rebuild()
 SubPageConfig.model_rebuild()

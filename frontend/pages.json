@@ -35,6 +35,12 @@
 			"style": {
 				"navigationBarTitleText": "设置"
 			}
+		},
+		{
+			"path": "pages/settings/api-config",
+			"style": {
+				"navigationBarTitleText": "API配置"
+			}
 		}
 	],
 	"globalStyle": {

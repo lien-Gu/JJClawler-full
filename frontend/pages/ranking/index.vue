@@ -108,6 +108,7 @@
 
 <script>
 import { getSitesList } from '@/data/url.js'
+import dataManager from '@/utils/data-manager.js'
 
 export default {
   data() {
@@ -212,16 +213,37 @@ export default {
      */
     async loadRankings(siteId, channelId = '') {
       try {
-        // 这里应该调用API获取榜单数据
-        // const response = await this.$http.get('/api/rankings', { siteId, channelId })
-        // this.rankingList = response.data
-        
         console.log('加载榜单数据:', siteId, channelId)
         
-        // 根据分站和频道生成不同的测试榜单数据
-        this.rankingList = this.generateTestRankings(siteId, channelId)
+        // 使用数据管理器获取榜单数据
+        const rankingsData = await dataManager.getRankingsList({
+          site: siteId,
+          channel: channelId
+        })
+        
+        if (rankingsData && Array.isArray(rankingsData)) {
+          this.rankingList = rankingsData.map(ranking => ({
+            id: ranking.id,
+            name: ranking.name,
+            desc: ranking.description || `${ranking.name}榜单`,
+            bookCount: ranking.book_count || 0,
+            updateTime: this.formatUpdateTime(ranking.last_updated)
+          }))
+        } else {
+          // 如果没有数据，使用生成的测试数据作为后备
+          this.rankingList = this.generateTestRankings(siteId, channelId)
+        }
+        
+        // 在调试模式下显示数据源信息
+        if (dataManager.getEnvironmentInfo().debug) {
+          console.log('榜单数据源:', dataManager.getEnvironmentInfo().environment)
+          console.log('榜单数据:', this.rankingList)
+        }
+        
       } catch (error) {
         console.error('加载榜单数据失败:', error)
+        // 出错时使用测试数据
+        this.rankingList = this.generateTestRankings(siteId, channelId)
       }
     },
     
@@ -371,6 +393,35 @@ export default {
       uni.navigateTo({
         url: `/pages/ranking/detail?id=jiazi&type=special`
       })
+    },
+
+    /**
+     * 格式化更新时间
+     */
+    formatUpdateTime(timeStr) {
+      if (!timeStr) return '未知时间'
+      
+      try {
+        const updateTime = new Date(timeStr)
+        const now = new Date()
+        const diff = now - updateTime
+        
+        const minutes = Math.floor(diff / (1000 * 60))
+        const hours = Math.floor(diff / (1000 * 60 * 60))
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+        
+        if (minutes < 60) {
+          return `${minutes}分钟前更新`
+        } else if (hours < 24) {
+          return `${hours}小时前更新`
+        } else if (days < 7) {
+          return `${days}天前更新`
+        } else {
+          return updateTime.toLocaleDateString() + '更新'
+        }
+      } catch (error) {
+        return '未知时间'
+      }
     }
   }
 }
