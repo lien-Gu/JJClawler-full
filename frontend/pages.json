@@ -47,8 +47,8 @@
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "JJClawler",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		"navigationBarBackgroundColor": "#f4f0eb",
+		"backgroundColor": "#f4f0eb"
 	},
 	"tabBar": {
 		"color": "#000000",

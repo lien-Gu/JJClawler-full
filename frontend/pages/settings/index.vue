@@ -114,12 +114,12 @@ export default {
 <style lang="scss" scoped>
 .settings-page {
   min-height: 100vh;
-  background-color: $page-background;
+  background-color: #f4f0eb;
   padding-bottom: $safe-area-bottom;
 }
 
 .user-section {
-  background-color: white;
+  background-color: #c3c3c3;
   margin-bottom: $spacing-md;
   padding: $spacing-lg;
   
@@ -165,7 +165,7 @@ export default {
 }
 
 .settings-section {
-  background-color: white;
+  background-color: #c3c3c3;
   padding: $spacing-lg;
   
   .section-title {

@@ -42,6 +42,8 @@
 </template>
 
 <script>
+import dataManager from '@/utils/data-manager.js'
+
 export default {
   name: 'FollowPage',
   
@@ -60,14 +62,27 @@ export default {
   },
   
   methods: {
-    loadFollowData() {
-      // 从本地存储获取关注数据
+    async loadFollowData() {
       try {
-        const followList = uni.getStorageSync('followList') || []
-        this.followData = followList
+        // 优先从dataManager获取用户关注数据
+        const userFollows = await dataManager.getUserFollows()
+        if (userFollows && Array.isArray(userFollows)) {
+          this.followData = userFollows
+        } else {
+          // 如果没有或失败，从本地存储获取关注数据
+          const followList = uni.getStorageSync('followList') || []
+          this.followData = followList
+        }
       } catch (error) {
         console.error('加载关注数据失败:', error)
-        this.followData = []
+        // 备用方案：从本地存储获取
+        try {
+          const followList = uni.getStorageSync('followList') || []
+          this.followData = followList
+        } catch (localError) {
+          console.error('本地关注数据也获取失败:', localError)
+          this.followData = []
+        }
       }
     },
     
@@ -129,7 +144,7 @@ export default {
 <style lang="scss" scoped>
 .follow-page {
   min-height: 100vh;
-  background-color: $page-background;
+  background-color: #f4f0eb;
   padding-bottom: $safe-area-bottom;
 }
 
@@ -162,13 +177,13 @@ export default {
     @include flex-between;
     align-items: center;
     padding: $spacing-lg;
-    background-color: white;
+    background-color: #c3c3c3;
     border-radius: $border-radius-medium;
     margin-bottom: $spacing-md;
     box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
     
     &:active {
-      background-color: $background-color;
+      opacity: 0.8;
     }
     
     .item-info {
@@ -244,7 +259,7 @@ export default {
   .goto-btn {
     @include flex-center;
     padding: $spacing-md $spacing-xl;
-    background-color: $primary-color;
+    background-color: #64a347;
     color: white;
     border-radius: $border-radius-medium;
     
