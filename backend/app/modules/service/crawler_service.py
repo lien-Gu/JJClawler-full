@@ -271,9 +271,7 @@ class CrawlerService:
         existing_ranking = session.exec(statement).first()
         
         if existing_ranking:
-            # 更新最后更新时间
-            existing_ranking.last_updated = datetime.now()
-            session.add(existing_ranking)
+            # 榜单已存在，直接返回
             return existing_ranking
         else:
             # 创建新榜单
@@ -283,9 +281,7 @@ class CrawlerService:
                 channel=channel or ranking_type,
                 frequency="hourly" if ranking_type == "jiazi" else "daily",
                 update_interval=1 if ranking_type == "jiazi" else 24,
-                parent_id=None,
-                created_at=datetime.now(),
-                last_updated=datetime.now()
+                parent_id=None
             )
             session.add(new_ranking)
             session.flush()  # 获取生成的ID

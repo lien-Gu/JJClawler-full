@@ -156,22 +156,23 @@ class DataParser:
     @staticmethod
     def _parse_book_snapshot(item: Dict[str, Any], snapshot_time: datetime) -> BookSnapshot:
         """
-        解析书籍快照数据
+        解析书籍快照数据（注意：榜单API中的数据通常不包含详细统计）
         
         Args:
             item: 书籍数据项
             snapshot_time: 快照时间
             
         Returns:
-            BookSnapshot: 书籍快照模型
+            BookSnapshot: 书籍快照模型（统计数据可能为0，需要后续通过详情API补充）
         """
         book_id = str(item.get('novelId') or item.get('novelid', ''))
         
-        # 解析统计数据（可能为字符串格式，需要转换）
-        total_clicks = DataParser._parse_numeric_field(item, ['totalClicks', 'totalclicks'], 0)
-        total_favorites = DataParser._parse_numeric_field(item, ['totalFavorites', 'totalfavorites'], 0)
-        comment_count = DataParser._parse_numeric_field(item, ['commentCount', 'commentcount'], 0)
-        chapter_count = DataParser._parse_numeric_field(item, ['chapterCount', 'chaptercount'], 0)
+        # 解析统计数据（榜单API中通常不包含这些数据）
+        total_clicks = DataParser._parse_numeric_field(item, ['totalClicks', 'totalclicks', 'novelScore'], 0)
+        total_favorites = DataParser._parse_numeric_field(item, ['totalFavorites', 'totalfavorites', 'novelbefavoritedcount'], 0)
+        comment_count = DataParser._parse_numeric_field(item, ['commentCount', 'commentcount', 'comment_count'], 0)
+        chapter_count = DataParser._parse_numeric_field(item, ['chapterCount', 'chaptercount', 'novelChapterCount'], 0)
+        word_count = DataParser._parse_numeric_field(item, ['wordCount', 'wordcount', 'novelSize'], 0)
         
         return BookSnapshot(
             book_id=book_id,
@@ -179,6 +180,7 @@ class DataParser:
             total_favorites=total_favorites,
             comment_count=comment_count,
             chapter_count=chapter_count,
+            word_count=word_count,
             snapshot_time=snapshot_time
         )
     
@@ -203,6 +205,11 @@ class DataParser:
                     if isinstance(value, str):
                         # 去除逗号
                         value = value.replace(',', '')
+                        
+                        # 处理"亿"单位
+                        if '亿' in value:
+                            base_num = float(value.replace('亿', ''))
+                            return int(base_num * 100000000)
                         
                         # 处理"万"单位
                         if '万' in value:

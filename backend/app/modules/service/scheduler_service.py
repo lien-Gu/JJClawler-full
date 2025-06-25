@@ -18,6 +18,7 @@ from pytz import utc
 from app.modules.service.crawler_service import CrawlerService
 from app.modules.service.task_service import get_task_manager, TaskType, execute_with_task
 from app.modules.service.page_service import get_page_service
+from app.modules.service.task_monitor_service import get_task_monitor_service
 from app.utils.log_utils import get_logger
 
 logger = get_logger(__name__)
@@ -30,6 +31,7 @@ class SchedulerService:
         self.scheduler: Optional[AsyncIOScheduler] = None
         self.task_manager = get_task_manager()
         self.page_service = get_page_service()
+        self.task_monitor = get_task_monitor_service()
         self._is_running = False
         self._stats = {"total_executed": 0, "total_failed": 0}
     
@@ -55,21 +57,27 @@ class SchedulerService:
             # 配置定时任务
             self._setup_jobs()
             
+            # 启动任务监控
+            await self.task_monitor.start_monitoring()
+            
             self._is_running = True
             logger.info("调度器服务启动成功")
             
         except Exception as e:
             logger.error(f"调度器启动失败: {e}")
-            self.stop()
+            await self.stop()
             raise
     
-    def stop(self):
+    async def stop(self):
         """停止调度器"""
         if not self._is_running:
             return
         
         try:
             logger.info("停止调度器服务...")
+            
+            # 停止任务监控
+            await self.task_monitor.stop_monitoring()
             
             if self.scheduler:
                 self.scheduler.shutdown(wait=True)
@@ -248,10 +256,10 @@ async def start_scheduler():
     await scheduler_service.start()
 
 
-def stop_scheduler():
+async def stop_scheduler():
     """停止调度器"""
     scheduler_service = get_scheduler_service()
-    scheduler_service.stop()
+    await scheduler_service.stop()
 
 
 def trigger_manual_crawl(target: str) -> str:

@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
     # 停止任务调度器
     try:
         from app.modules.service.scheduler_service import stop_scheduler
-        stop_scheduler()
+        await stop_scheduler()
         logger.info("任务调度器已停止")
     except Exception as e:
         logger.error(f"停止任务调度器失败: {e}")

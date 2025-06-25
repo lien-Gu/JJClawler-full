@@ -15,6 +15,7 @@ from typing import List, Tuple, Dict, Any
 
 from app.utils.http_client import HTTPClient
 from .parser import DataParser
+from .book_detail_crawler import BookDetailCrawler
 from app.modules.models import Book, BookSnapshot
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class JiaziCrawler:
             rate_limit_delay=1.0
         )
         self.parser = DataParser()
+        self.book_detail_crawler = BookDetailCrawler(self.http_client)
         self.url_config = self._load_url_config()
     
     def _load_url_config(self) -> Dict[str, Any]:
@@ -84,9 +86,9 @@ class JiaziCrawler:
             # 提取JSON数据
             raw_data = response.json()
             
-            # 解析数据
+            # 解析基础数据
             try:
-                books, snapshots = self.parser.parse_jiazi_data(raw_data)
+                books, base_snapshots = self.parser.parse_jiazi_data(raw_data)
             except Exception as parse_error:
                 # 解析失败，但爬取成功，抛出特定异常
                 from app.utils.failure_storage import get_failure_storage
@@ -100,6 +102,16 @@ class JiaziCrawler:
                 )
                 logger.error(f"夹子榜数据解析失败，原始数据已保存: {parse_error}")
                 raise parse_error
+            
+            # 获取书籍详情数据（包含统计信息）
+            book_ids = [book.book_id for book in books]
+            current_time = datetime.now()
+            
+            logger.info(f"开始获取 {len(book_ids)} 本书籍的详细统计数据...")
+            detailed_snapshots = await self.book_detail_crawler.fetch_book_details(book_ids, current_time)
+            
+            # 如果详情获取失败，使用基础快照（虽然统计数据为0）
+            snapshots = detailed_snapshots if detailed_snapshots else base_snapshots
             
             # 验证结果
             if not books or not snapshots:
@@ -144,6 +156,8 @@ class JiaziCrawler:
     
     async def close(self):
         """关闭爬虫资源"""
+        if self.book_detail_crawler:
+            await self.book_detail_crawler.close()
         if self.http_client:
             await self.http_client.close()
         logger.debug("夹子榜爬虫已关闭")

@@ -30,7 +30,7 @@ class RankingSnapshot(SQLModel, table=True):
     __tablename__ = "ranking_snapshots"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    ranking_id: str = Field(foreign_key="rankings.ranking_id", index=True, description="榜单ID")
+    ranking_id: int = Field(foreign_key="rankings.id", index=True, description="榜单ID")
     book_id: str = Field(foreign_key="books.book_id", index=True, description="书籍ID")
     position: int = Field(description="榜单位置")
     snapshot_time: datetime = Field(index=True, description="快照时间")

@@ -33,10 +33,13 @@ class BookSnapshot(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     book_id: str = Field(foreign_key="books.book_id", index=True, description="书籍ID")
-    total_clicks: Optional[int] = Field(default=None, description="总点击量")
+    total_clicks: Optional[int] = Field(default=None, description="非V章点击量(novip_clicks)")
     total_favorites: Optional[int] = Field(default=None, description="总收藏量")
     comment_count: Optional[int] = Field(default=None, description="评论数")
-    chapter_count: Optional[int] = Field(default=None, description="章节数")
+    chapter_count: Optional[int] = Field(default=None, description="总章节数")
+    vip_chapter_count: Optional[int] = Field(default=None, description="VIP章节数")
+    word_count: Optional[int] = Field(default=None, description="字数")
+    nutrition_count: Optional[int] = Field(default=None, description="营养液数量")
     snapshot_time: datetime = Field(index=True, description="快照时间")
     
     # 关系字段

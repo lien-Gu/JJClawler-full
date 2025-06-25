@@ -29,6 +29,7 @@ from app.modules.service.scheduler_service import (
     trigger_manual_crawl,
     get_scheduler_stats
 )
+from app.modules.service.task_monitor_service import get_task_monitor_service
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
@@ -305,3 +306,52 @@ async def trigger_scheduled_job(target: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"触发任务失败: {str(e)}")
+
+
+@router.get("/monitor/status")
+async def get_monitor_status():
+    """
+    获取任务监控状态
+    
+    返回任务监控服务的运行状态，包括缺失任务信息和重试历史。
+    用于了解系统是否正常运行，以及是否有任务需要人工干预。
+    """
+    try:
+        monitor_service = get_task_monitor_service()
+        status = monitor_service.get_monitoring_status()
+        
+        return {
+            "status": "success",
+            "data": status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取监控状态失败: {str(e)}")
+
+
+@router.post("/monitor/check")
+async def manual_check_missing_tasks():
+    """
+    手动检查缺失任务
+    
+    立即执行一次任务检查，而不等待定时检查。
+    用于调试或在修复问题后立即验证系统状态。
+    """
+    try:
+        monitor_service = get_task_monitor_service()
+        
+        # 手动触发一次检查
+        await monitor_service._check_missing_tasks()
+        
+        status = monitor_service.get_monitoring_status()
+        
+        return {
+            "status": "success",
+            "message": "手动检查已完成",
+            "data": status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"手动检查失败: {str(e)}")
