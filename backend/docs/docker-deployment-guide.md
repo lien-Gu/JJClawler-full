@@ -46,11 +46,12 @@ sudo apt install -y curl wget git vim htop
 # 安装 Docker 依赖
 sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
-# 添加 Docker 官方 GPG 密钥
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# 2. 导入镜像站 GPG 密钥
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 
 
 # 添加 Docker 仓库
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # 安装 Docker
 sudo apt update
@@ -90,135 +91,15 @@ cd /opt/jjcrawler
 
 ### 1. 创建 Dockerfile
 
-```dockerfile
-# /opt/jjcrawler/Dockerfile
-FROM python:3.11-slim
-
-# 设置工作目录
-WORKDIR /app
-
-# 设置环境变量
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制依赖文件
-COPY pyproject.toml poetry.lock* ./
-
-# 安装 Poetry
-RUN pip install poetry
-
-# 配置 Poetry
-RUN poetry config virtualenvs.create false
-
-# 安装依赖
-RUN poetry install --no-dev --no-interaction --no-ansi
-
-# 复制应用代码
-COPY app/ ./app/
-COPY data/ ./data/
-
-# 创建数据目录
-RUN mkdir -p /app/data/failures /app/data/tasks/history
-
-# 设置数据目录权限
-RUN chmod -R 755 /app/data
-
-# 暴露端口
-EXPOSE 8000
-
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# 启动命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+../docker/Dockerfile
 
 ### 2. 创建 docker-compose.yml
 
-```yaml
-# /opt/jjcrawler/docker-compose.yml
-version: '3.8'
-
-services:
-  jjcrawler:
-    build: .
-    container_name: jjcrawler-backend
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      # 数据持久化
-      - ./data:/app/data
-      # 日志挂载
-      - ./logs:/app/logs
-    environment:
-      # 应用配置
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - MAX_RETRIES=3
-      - REQUEST_TIMEOUT=30
-      - CRAWL_DELAY=1.0
-      # 数据库配置
-      - DATABASE_URL=sqlite:///app/data/jjcrawler.db
-      # 调度器配置
-      - SCHEDULER_ENABLED=true
-      - SCHEDULER_TIMEZONE=Asia/Shanghai
-    labels:
-      - "app=jjcrawler"
-      - "version=1.0.0"
-    networks:
-      - jjcrawler-network
-    
-    # 资源限制（适用于 2C4G 服务器）
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
-networks:
-  jjcrawler-network:
-    driver: bridge
-```
+../docker/docker-compose.yml
 
 ### 3. 创建环境配置文件
 
-```bash
-# /opt/jjcrawler/.env
-# 应用环境
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-
-# 服务器配置
-HOST=0.0.0.0
-PORT=8000
-
-# 爬虫配置
-MAX_RETRIES=3
-REQUEST_TIMEOUT=30
-CRAWL_DELAY=1.0
-
-# 数据库配置
-DATABASE_URL=sqlite:///app/data/jjcrawler.db
-
-# 调度器配置
-SCHEDULER_ENABLED=true
-SCHEDULER_TIMEZONE=Asia/Shanghai
-
-# 失败存储配置
-FAILURE_STORAGE_DAYS=7
-```
+../docker/.env
 
 ### 4. 创建 nginx 反向代理配置（可选）
 
@@ -278,19 +159,6 @@ git clone <your-repo-url> .
 # tar -xzf jjcrawler.tar.gz
 ```
 
-### 2. 准备数据目录
-
-```bash
-# 创建必要的目录
-mkdir -p data/failures data/tasks/history logs
-
-# 设置权限
-chmod -R 755 data logs
-
-# 检查 urls.json 配置文件
-ls -la data/urls.json
-```
-
 ### 3. 构建 Docker 镜像
 
 ```bash
@@ -300,6 +168,27 @@ docker-compose build
 # 查看构建结果
 docker images | grep jjcrawler
 ```
+这一步docker-compose build报错：
+
+>[+] Building 30.3s (2/2) FINISHED                                                              docker:default
+ => [jjcrawler internal] load build definition from Dockerfile                                           0.1s
+ => => transferring dockerfile: 1.00kB                                                                   0.0s
+ => ERROR [jjcrawler internal] load metadata for docker.io/library/python:3.11-slim                     30.0s
+------
+ > [jjcrawler internal] load metadata for docker.io/library/python:3.11-slim:
+------
+failed to solve: DeadlineExceeded: DeadlineExceeded: python:3.11-slim: failed to resolve source metadata for docker.io/library/python:3.11-slim: failed to do request: Head "https://registry-1.docker.io/v2/library/python/manifests/3.11-slim": dial tcp 69.171.227.37:443: i/o timeout
+
+应当是国内网络的问题
+单独拉取也失败：docker pull python:3.11-slim
+使用国内镜像拉取
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/python:3.11-slim 阿里云失败
+docker pull swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim-bookworm 华为云成功
+重新构建，还是报同样的错误
+把dockerfile原本报错的那一行改了，直接改成下载的路径
+FROM python:3.11-slim改为
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim-bookworm
+
 
 ### 4. 启动服务
 
