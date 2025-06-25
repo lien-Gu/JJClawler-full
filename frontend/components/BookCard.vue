@@ -1,5 +1,9 @@
 <template>
-  <view class="book-card" :class="{ 'clickable': clickable }" @tap="onClick">
+  <BaseCard
+    :clickable="clickable"
+    @click="onClick"
+  >
+    <!-- 书籍头部信息 -->
     <view class="book-header">
       <view class="book-cover" v-if="book.cover">
         <image :src="book.cover" mode="aspectFit" class="cover-image" />
@@ -30,10 +34,12 @@
       </view>
     </view>
     
+    <!-- 书籍描述 -->
     <view class="book-description" v-if="book.description && showDescription">
       <text class="desc-text">{{ book.description }}</text>
     </view>
     
+    <!-- 统计信息 -->
     <view class="book-stats">
       <view class="stat-item" v-if="book.wordCount">
         <text class="stat-label">字数</text>
@@ -53,6 +59,7 @@
       </view>
     </view>
     
+    <!-- 榜单历史 -->
     <view class="book-rankings" v-if="showRankings && book.rankings && book.rankings.length">
       <text class="rankings-label">榜单历史：</text>
       <view class="rankings-list">
@@ -66,21 +73,38 @@
       </view>
     </view>
     
-    <view class="book-actions" v-if="showActions">
-      <view class="action-btn follow-btn" @tap.stop="onFollow">
-        <text class="btn-text">{{ book.isFollowed ? '已关注' : '关注' }}</text>
+    <!-- 操作按钮 -->
+    <template #footer v-if="showActions">
+      <view class="book-actions">
+        <BaseButton 
+          :type="book.isFollowed ? 'secondary' : 'default'"
+          :text="book.isFollowed ? '已关注' : '关注'"
+          size="small"
+          @click="onFollow"
+        />
+        <BaseButton 
+          type="primary"
+          text="阅读"
+          size="small"
+          @click="onRead"
+        />
+        <BaseButton 
+          type="text"
+          text="分享"
+          size="small"
+          @click="onShare"
+        />
       </view>
-      <view class="action-btn read-btn" @tap.stop="onRead">
-        <text class="btn-text">阅读</text>
-      </view>
-      <view class="action-btn share-btn" @tap.stop="onShare">
-        <text class="btn-text">分享</text>
-      </view>
-    </view>
-  </view>
+    </template>
+  </BaseCard>
 </template>
 
 <script>
+import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import formatterMixin from '@/mixins/formatter.js'
+import navigationMixin from '@/mixins/navigation.js'
+
 /**
  * 书籍卡片组件
  * @description 用于展示书籍信息的卡片组件，支持封面、统计数据、操作等
@@ -96,6 +120,11 @@
  */
 export default {
   name: 'BookCard',
+  components: {
+    BaseCard,
+    BaseButton
+  },
+  mixins: [formatterMixin, navigationMixin],
   props: {
     book: {
       type: Object,
@@ -119,6 +148,7 @@ export default {
       default: false
     }
   },
+  emits: ['click', 'follow', 'read', 'share'],
   
   computed: {
     /**
@@ -134,46 +164,6 @@ export default {
   
   methods: {
     /**
-     * 格式化字数显示
-     */
-    formatWordCount(count) {
-      if (typeof count !== 'number') return count || '未知'
-      
-      if (count >= 10000) {
-        return (count / 10000).toFixed(1) + '万字'
-      } else if (count >= 1000) {
-        return (count / 1000).toFixed(1) + '千字'
-      }
-      
-      return count + '字'
-    },
-    
-    /**
-     * 格式化时间显示
-     */
-    formatTime(time) {
-      if (!time) return '未知'
-      
-      const now = new Date()
-      const updateTime = new Date(time)
-      const diff = now - updateTime
-      
-      const minutes = Math.floor(diff / (1000 * 60))
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-      
-      if (minutes < 60) {
-        return `${minutes}分钟前`
-      } else if (hours < 24) {
-        return `${hours}小时前`
-      } else if (days < 30) {
-        return `${days}天前`
-      } else {
-        return updateTime.toLocaleDateString()
-      }
-    },
-    
-    /**
      * 点击卡片事件
      */
     onClick() {
@@ -185,7 +175,8 @@ export default {
     /**
      * 关注/取消关注
      */
-    onFollow() {
+    onFollow(e) {
+      e.stopPropagation()
       this.$emit('follow', {
         book: this.book,
         isFollowed: !this.book.isFollowed
@@ -195,14 +186,16 @@ export default {
     /**
      * 阅读书籍
      */
-    onRead() {
+    onRead(e) {
+      e.stopPropagation()
       this.$emit('read', this.book)
     },
     
     /**
      * 分享书籍
      */
-    onShare() {
+    onShare(e) {
+      e.stopPropagation()
       this.$emit('share', this.book)
     }
   }
@@ -210,28 +203,11 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.book-card {
-  @include card-style;
-  padding: $spacing-lg;
-  margin-bottom: $spacing-sm;
-  transition: all 0.3s ease;
-  
-  &.clickable {
-    cursor: pointer;
-    
-    &:hover {
-      transform: translateY(-2rpx);
-      box-shadow: $shadow-dark;
-    }
-    
-    &:active {
-      transform: translateY(0);
-    }
-  }
-}
+@import '@/styles/design-tokens.scss';
 
 .book-header {
-  @include flex-between;
+  display: flex;
+  justify-content: space-between;
   align-items: flex-start;
   margin-bottom: $spacing-md;
 }
@@ -240,131 +216,149 @@ export default {
   flex-shrink: 0;
   width: 100rpx;
   height: 140rpx;
-  border-radius: $border-radius-small;
+  border-radius: $radius-sm;
   overflow: hidden;
   margin-right: $spacing-md;
   
   &.placeholder {
-    @include flex-center;
-    background-color: $background-color;
-    border: 2rpx solid $border-light;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $surface-container-high;
+    border: 1px solid rgba($text-secondary, 0.2);
     
     .cover-text {
       font-size: 40rpx;
+      opacity: 0.6;
     }
   }
   
   .cover-image {
     width: 100%;
     height: 100%;
+    object-fit: cover;
   }
 }
 
 .book-info {
   flex: 1;
+  min-width: 0;
   
   .book-title {
     display: block;
-    font-size: $font-size-lg;
-    font-weight: bold;
+    font-size: 32rpx;
+    font-weight: 600;
     color: $text-primary;
     margin-bottom: $spacing-xs;
-    @include text-ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .book-author {
     display: block;
-    font-size: $font-size-sm;
+    font-size: 24rpx;
     color: $text-secondary;
-    margin-bottom: 4rpx;
+    margin-bottom: 8rpx;
   }
   
   .book-category {
     display: block;
-    font-size: $font-size-xs;
-    color: $text-placeholder;
+    font-size: 20rpx;
+    color: rgba($text-secondary, 0.7);
     margin-bottom: $spacing-xs;
   }
   
   .book-tags {
-    @include flex-center;
+    display: flex;
+    align-items: center;
     flex-wrap: wrap;
     gap: $spacing-xs;
     
     .tag {
-      padding: 2rpx 8rpx;
-      background-color: $background-color;
+      padding: 4rpx 12rpx;
+      background: $surface-container-high;
       color: $text-secondary;
-      font-size: $font-size-xs;
-      border-radius: $border-radius-small;
-      border: 1rpx solid $border-light;
+      font-size: 18rpx;
+      border-radius: $radius-sm;
+      border: 1px solid rgba($text-secondary, 0.1);
     }
   }
 }
 
 .book-rank {
-  @include flex-column-center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   flex-shrink: 0;
   margin-left: $spacing-sm;
   
   .rank-number {
-    font-size: $font-size-xl;
-    font-weight: bold;
-    color: $accent-color;
+    font-size: 40rpx;
+    font-weight: 700;
+    color: $brand-primary;
   }
   
   .rank-label {
-    font-size: $font-size-xs;
-    color: $text-placeholder;
+    font-size: 18rpx;
+    color: rgba($text-secondary, 0.7);
   }
 }
 
 .book-description {
   margin-bottom: $spacing-md;
   padding: $spacing-sm;
-  background-color: $background-color;
-  border-radius: $border-radius-small;
+  background: $surface-container-high;
+  border-radius: $radius-sm;
   
   .desc-text {
-    font-size: $font-size-sm;
+    font-size: 24rpx;
     color: $text-secondary;
     line-height: 1.5;
-    @include text-ellipsis-multiline(3);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
 .book-stats {
-  @include flex-between;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: $spacing-sm 0;
-  border-top: 2rpx solid $border-light;
-  border-bottom: 2rpx solid $border-light;
+  border-top: 1px solid rgba($text-secondary, 0.1);
+  border-bottom: 1px solid rgba($text-secondary, 0.1);
   margin-bottom: $spacing-sm;
   
   .stat-item {
-    @include flex-column-center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     flex: 1;
     
     .stat-label {
-      font-size: $font-size-xs;
-      color: $text-placeholder;
-      margin-bottom: 4rpx;
+      font-size: 20rpx;
+      color: rgba($text-secondary, 0.7);
+      margin-bottom: 8rpx;
     }
     
     .stat-value {
-      font-size: $font-size-sm;
-      font-weight: bold;
+      font-size: 24rpx;
+      font-weight: 600;
       color: $text-primary;
       
       &.status-completed {
-        color: #4cd964;
+        color: #34c759;
       }
       
       &.status-ongoing {
-        color: $primary-color;
+        color: $brand-primary;
       }
       
       &.score {
-        color: $accent-color;
+        color: #ff9500;
       }
     }
   }
@@ -374,70 +368,35 @@ export default {
   margin-bottom: $spacing-sm;
   
   .rankings-label {
-    font-size: $font-size-sm;
+    font-size: 24rpx;
     color: $text-secondary;
     margin-bottom: $spacing-xs;
   }
   
   .rankings-list {
-    @include flex-center;
+    display: flex;
+    align-items: center;
     gap: $spacing-xs;
     
     .ranking-item {
-      padding: 4rpx 12rpx;
-      background-color: $primary-color;
-      color: white;
-      font-size: $font-size-xs;
-      border-radius: $border-radius-small;
-      @include text-ellipsis;
+      padding: 8rpx 16rpx;
+      background: $brand-primary;
+      color: $surface-default;
+      font-size: 20rpx;
+      border-radius: $radius-sm;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       max-width: 150rpx;
     }
   }
 }
 
 .book-actions {
-  @include flex-center;
-  gap: $spacing-sm;
-  
-  .action-btn {
-    @include flex-center;
-    padding: $spacing-xs $spacing-md;
-    border-radius: $border-radius-medium;
-    transition: all 0.3s ease;
-    flex: 1;
-    
-    .btn-text {
-      font-size: $font-size-sm;
-    }
-    
-    &:active {
-      opacity: 0.7;
-    }
-  }
-  
-  .follow-btn {
-    background-color: $secondary-color;
-    
-    .btn-text {
-      color: white;
-    }
-  }
-  
-  .read-btn {
-    background-color: $primary-color;
-    
-    .btn-text {
-      color: white;
-    }
-  }
-  
-  .share-btn {
-    background-color: transparent;
-    border: 2rpx solid $border-medium;
-    
-    .btn-text {
-      color: $text-secondary;
-    }
-  }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-sm;
 }
 </style> 

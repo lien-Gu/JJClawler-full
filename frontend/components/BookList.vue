@@ -77,12 +77,16 @@
 </template>
 
 <script>
+import formatterMixin from '@/mixins/formatter.js'
+import navigationMixin from '@/mixins/navigation.js'
+
 /**
  * 书籍列表组件
  * @description 可复用的书籍列表展示组件，支持多种显示模式
  */
 export default {
   name: 'BookList',
+  mixins: [formatterMixin, navigationMixin],
   
   props: {
     // 书籍列表数据
@@ -127,6 +131,7 @@ export default {
       default: '暂无数据'
     }
   },
+  emits: ['book-tap', 'unfollow'],
   
   methods: {
     /**
@@ -141,16 +146,6 @@ export default {
      */
     handleUnfollow(book, index) {
       this.$emit('unfollow', { book, index })
-    },
-    
-    /**
-     * 格式化数字
-     */
-    formatNumber(num) {
-      if (num >= 10000) {
-        return (num / 10000).toFixed(1) + '万'
-      }
-      return num.toString()
     },
     
     /**
@@ -196,39 +191,41 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/design-tokens.scss';
+
 .book-list {
   .list-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 32rpx 24rpx;
+    padding: 0 $spacing-lg $spacing-md;
     
     .list-title {
       font-size: 36rpx;
       font-weight: 600;
-      color: #000000;
-      font-family: 'Inter', sans-serif;
+      color: $text-primary;
+      font-family: $font-family-base;
     }
     
     .list-count {
       font-size: 28rpx;
       font-weight: 400;
-      color: #666666;
-      font-family: 'Inter', sans-serif;
+      color: $text-secondary;
+      font-family: $font-family-base;
     }
   }
   
   .books-container {
-    padding: 0 32rpx;
+    padding: 0 $spacing-lg;
     
     .book-item {
       display: flex;
       align-items: center;
-      background-color: #c3c3c3;
-      border-radius: 16rpx;
-      padding: 24rpx;
-      margin-bottom: 16rpx;
-      transition: $transition-fast;
+      background: $surface-container-high;
+      border-radius: $radius-md;
+      padding: $spacing-md;
+      margin-bottom: $spacing-sm;
+      transition: $transition-normal;
       
       &:active {
         opacity: 0.8;
@@ -238,18 +235,18 @@ export default {
       .book-rank {
         width: 48rpx;
         height: 48rpx;
-        background-color: #999999;
-        border-radius: 50%;
+        background: $brand-primary;
+        border-radius: $radius-full;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 24rpx;
+        margin-right: $spacing-md;
         flex-shrink: 0;
         
         .rank-number {
           font-size: 24rpx;
           font-weight: 600;
-          color: #ffffff;
+          color: $surface-default;
         }
       }
       
@@ -258,24 +255,25 @@ export default {
         min-width: 0;
         
         .book-title-row {
-          margin-bottom: 12rpx;
+          margin-bottom: $spacing-xs;
           
           .book-title {
             font-size: 32rpx;
             font-weight: 500;
-            color: #000000;
-            font-family: 'Inter', sans-serif;
+            color: $text-primary;
+            font-family: $font-family-base;
             display: -webkit-box;
             -webkit-box-orient: vertical;
             -webkit-line-clamp: 1;
             overflow: hidden;
+            text-overflow: ellipsis;
           }
         }
         
         .book-stats {
           display: flex;
           flex-wrap: wrap;
-          gap: 16rpx;
+          gap: $spacing-sm;
           
           .stat-item {
             display: flex;
@@ -283,12 +281,12 @@ export default {
             font-size: 24rpx;
             
             .stat-label {
-              color: #666666;
+              color: $text-secondary;
               margin-right: 8rpx;
             }
             
             .stat-value {
-              color: #333333;
+              color: $text-primary;
               font-weight: 500;
               
               &.positive {
@@ -300,7 +298,7 @@ export default {
               }
               
               &.neutral {
-                color: #999999;
+                color: rgba($text-secondary, 0.7);
               }
             }
           }
@@ -308,19 +306,19 @@ export default {
       }
       
       .book-actions {
-        margin-left: 16rpx;
+        margin-left: $spacing-sm;
         flex-shrink: 0;
         
         .action-btn {
-          padding: 12rpx 24rpx;
-          border-radius: 16rpx;
+          padding: $spacing-xs $spacing-md;
+          border-radius: $radius-md;
           
           &.unfollow-btn {
-            background-color: #ff3b30;
+            background: #ff3b30;
             
             .action-text {
               font-size: 24rpx;
-              color: #ffffff;
+              color: $surface-default;
             }
           }
           
@@ -333,13 +331,13 @@ export default {
   }
   
   .empty-state {
-    padding: 120rpx 32rpx;
+    padding: 120rpx $spacing-lg;
     text-align: center;
     
     .empty-text {
       font-size: 28rpx;
-      color: #999999;
-      font-family: 'Inter', sans-serif;
+      color: rgba($text-secondary, 0.7);
+      font-family: $font-family-base;
     }
   }
 }

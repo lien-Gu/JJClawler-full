@@ -1,15 +1,18 @@
 <template>
-  <view class="ranking-card" :class="{ 'clickable': clickable }" @tap="onClick">
-    <view class="ranking-header">
-      <view class="ranking-info">
-        <text class="ranking-title">{{ ranking.name || ranking.title }}</text>
-        <text class="ranking-desc" v-if="ranking.description">{{ ranking.description }}</text>
-      </view>
-      <view class="ranking-badge" v-if="ranking.isHot">
+  <BaseCard
+    :clickable="clickable"
+    :title="ranking.name || ranking.title"
+    :subtitle="ranking.description"
+    @click="onClick"
+  >
+    <!-- 头部操作区域 -->
+    <template #header-action>
+      <view v-if="ranking.isHot" class="ranking-badge">
         <text class="badge-text">热门</text>
       </view>
-    </view>
+    </template>
     
+    <!-- 统计信息 -->
     <view class="ranking-stats">
       <view class="stat-item">
         <text class="stat-label">书籍数量</text>
@@ -25,7 +28,8 @@
       </view>
     </view>
     
-    <view class="ranking-footer" v-if="showPreview && ranking.topBooks">
+    <!-- 书籍预览 -->
+    <view v-if="showPreview && ranking.topBooks" class="ranking-preview">
       <text class="preview-label">热门书籍预览：</text>
       <view class="book-preview">
         <text 
@@ -38,18 +42,32 @@
       </view>
     </view>
     
-    <view class="ranking-actions" v-if="showActions">
-      <view class="action-btn follow-btn" @tap.stop="onFollow">
-        <text class="btn-text">{{ ranking.isFollowed ? '已关注' : '关注' }}</text>
+    <!-- 操作按钮 -->
+    <template #footer v-if="showActions">
+      <view class="ranking-actions">
+        <BaseButton 
+          :type="ranking.isFollowed ? 'secondary' : 'primary'"
+          :text="ranking.isFollowed ? '已关注' : '关注'"
+          size="small"
+          @click="onFollow"
+        />
+        <BaseButton 
+          type="text"
+          text="分享"
+          size="small"
+          @click="onShare"
+        />
       </view>
-      <view class="action-btn share-btn" @tap.stop="onShare">
-        <text class="btn-text">分享</text>
-      </view>
-    </view>
-  </view>
+    </template>
+  </BaseCard>
 </template>
 
 <script>
+import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import formatterMixin from '@/mixins/formatter.js'
+import navigationMixin from '@/mixins/navigation.js'
+
 /**
  * 榜单卡片组件
  * @description 用于展示榜单信息的卡片组件，支持统计数据、预览、操作等
@@ -63,6 +81,11 @@
  */
 export default {
   name: 'RankingCard',
+  components: {
+    BaseCard,
+    BaseButton
+  },
+  mixins: [formatterMixin, navigationMixin],
   props: {
     ranking: {
       type: Object,
@@ -82,48 +105,9 @@ export default {
       default: false
     }
   },
+  emits: ['click', 'follow', 'share'],
   
   methods: {
-    /**
-     * 格式化数字显示
-     */
-    formatNumber(num) {
-      if (typeof num !== 'number') return num || '0'
-      
-      if (num >= 10000) {
-        return (num / 10000).toFixed(1) + '万'
-      } else if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'k'
-      }
-      
-      return num.toString()
-    },
-    
-    /**
-     * 格式化时间显示
-     */
-    formatTime(time) {
-      if (!time) return '未知'
-      
-      const now = new Date()
-      const updateTime = new Date(time)
-      const diff = now - updateTime
-      
-      const minutes = Math.floor(diff / (1000 * 60))
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-      
-      if (minutes < 60) {
-        return `${minutes}分钟前`
-      } else if (hours < 24) {
-        return `${hours}小时前`
-      } else if (days < 7) {
-        return `${days}天前`
-      } else {
-        return updateTime.toLocaleDateString()
-      }
-    },
-    
     /**
      * 点击卡片事件
      */
@@ -136,7 +120,8 @@ export default {
     /**
      * 关注/取消关注
      */
-    onFollow() {
+    onFollow(e) {
+      e.stopPropagation()
       this.$emit('follow', {
         ranking: this.ranking,
         isFollowed: !this.ranking.isFollowed
@@ -146,7 +131,8 @@ export default {
     /**
      * 分享榜单
      */
-    onShare() {
+    onShare(e) {
+      e.stopPropagation()
       this.$emit('share', this.ranking)
     }
   }
@@ -154,161 +140,83 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.ranking-card {
-  @include card-style;
-  padding: $spacing-lg;
-  margin-bottom: $spacing-sm;
-  transition: all 0.3s ease;
-  
-  &.clickable {
-    cursor: pointer;
-    
-    &:hover {
-      transform: translateY(-2rpx);
-      box-shadow: $shadow-dark;
-    }
-    
-    &:active {
-      transform: translateY(0);
-    }
-  }
-}
-
-.ranking-header {
-  @include flex-between;
-  align-items: flex-start;
-  margin-bottom: $spacing-md;
-}
-
-.ranking-info {
-  flex: 1;
-  
-  .ranking-title {
-    display: block;
-    font-size: $font-size-lg;
-    font-weight: bold;
-    color: $text-primary;
-    margin-bottom: $spacing-xs;
-    @include text-ellipsis;
-  }
-  
-  .ranking-desc {
-    font-size: $font-size-sm;
-    color: $text-secondary;
-    line-height: 1.4;
-    @include text-ellipsis-multiline(2);
-  }
-}
+@import '@/styles/design-tokens.scss';
 
 .ranking-badge {
-  flex-shrink: 0;
-  margin-left: $spacing-sm;
-  
   .badge-text {
     display: inline-block;
-    padding: 4rpx 12rpx;
-    background-color: $accent-color;
-    color: white;
-    font-size: $font-size-xs;
-    border-radius: $border-radius-small;
+    padding: 8rpx 24rpx;
+    background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+    color: $surface-default;
+    font-size: 20rpx;
+    font-weight: 500;
+    border-radius: $radius-full;
+    box-shadow: 0 4rpx 12rpx rgba(255, 107, 107, 0.3);
   }
 }
 
 .ranking-stats {
-  @include flex-between;
-  padding: $spacing-sm 0;
-  border-top: 2rpx solid $border-light;
-  border-bottom: 2rpx solid $border-light;
-  margin-bottom: $spacing-sm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-md 0;
+  border-top: 1px solid rgba($text-secondary, 0.1);
+  border-bottom: 1px solid rgba($text-secondary, 0.1);
+  margin: $spacing-md 0;
   
   .stat-item {
-    @include flex-column-center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     flex: 1;
     
     .stat-label {
-      font-size: $font-size-xs;
-      color: $text-placeholder;
-      margin-bottom: 4rpx;
+      font-size: 20rpx;
+      color: $text-secondary;
+      margin-bottom: 8rpx;
     }
     
     .stat-value {
-      font-size: $font-size-md;
-      font-weight: bold;
-      color: $primary-color;
+      font-size: 28rpx;
+      font-weight: 600;
+      color: $brand-primary;
     }
   }
 }
 
-.ranking-footer {
-  margin-bottom: $spacing-sm;
+.ranking-preview {
+  margin-top: $spacing-md;
   
   .preview-label {
-    font-size: $font-size-sm;
+    font-size: 24rpx;
     color: $text-secondary;
-    margin-bottom: $spacing-xs;
+    margin-bottom: $spacing-sm;
   }
   
   .book-preview {
-    @include flex-center;
+    display: flex;
     flex-wrap: wrap;
     gap: $spacing-xs;
     
     .book-name {
-      padding: 4rpx 12rpx;
-      background-color: $background-color;
+      padding: 8rpx 16rpx;
+      background: $surface-container-high;
       color: $text-primary;
-      font-size: $font-size-xs;
-      border-radius: $border-radius-small;
-      @include text-ellipsis;
+      font-size: 20rpx;
+      border-radius: $radius-md;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       max-width: 200rpx;
     }
   }
 }
 
 .ranking-actions {
-  @include flex-center;
-  gap: $spacing-sm;
-  
-  .action-btn {
-    @include flex-center;
-    padding: $spacing-xs $spacing-md;
-    border-radius: $border-radius-medium;
-    transition: all 0.3s ease;
-    
-    .btn-text {
-      font-size: $font-size-sm;
-    }
-    
-    &:active {
-      opacity: 0.7;
-    }
-  }
-  
-  .follow-btn {
-    background-color: $primary-color;
-    color: white;
-    
-    .btn-text {
-      color: white;
-    }
-  }
-  
-  .share-btn {
-    background-color: transparent;
-    border: 2rpx solid $border-medium;
-    
-    .btn-text {
-      color: $text-secondary;
-    }
-  }
-}
-
-// 关注状态样式
-.ranking-card .follow-btn.followed {
-  background-color: $text-placeholder;
-  
-  .btn-text {
-    color: white;
-  }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-sm;
 }
 </style> 
