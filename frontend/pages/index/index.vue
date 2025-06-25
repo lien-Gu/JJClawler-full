@@ -1,335 +1,252 @@
 <template>
   <view class="index-page">
-    <!-- 主要内容区域 -->
-    <view class="content-container">
-      <!-- 问候语 -->
-      <view class="greeting-section">
-        <text class="greeting-text">嗨~</text>
-      </view>
-      
-      <!-- 统计报告卡片 -->
-      <view class="summary-card" @tap="goToStatisticsDetail">
-        <view class="summary-content">
-          <text class="summary-title">统计报告</text>
-          <view class="summary-stats">
-            <text class="stats-text">总书籍: {{ overviewStats.total_books || 0 }}</text>
-            <text class="stats-text">总榜单: {{ overviewStats.total_rankings || 0 }}</text>
-          </view>
-          <view class="summary-button" @tap.stop="refreshData">
-            <text class="button-text">刷新数据</text>
-          </view>
-        </view>
-      </view>
-      
-      <!-- 分项统计 -->
-      <view class="reports-section">
-        <text class="section-title">分项</text>
-        <scroll-view class="reports-scroll" scroll-x show-scrollbar="false">
-          <view class="reports-container">
-            <view class="report-card" @tap="goToRankingStats">
-              <text class="report-title">榜单统计</text>
-              <text class="report-desc">查看榜单数据</text>
-            </view>
-            <view class="report-card" @tap="goToBookStats">
-              <text class="report-title">书籍统计</text>
-              <text class="report-desc">查看书籍数据</text>
-            </view>
-            <view class="report-card" @tap="goToChannelStats">
-              <text class="report-title">频道统计</text>
-              <text class="report-desc">查看频道数据</text>
-            </view>
-          </view>
-        </scroll-view>
-      </view>
-
-      <!-- 热门榜单 -->
-      <view class="hot-rankings-section">
-        <text class="section-title">热门榜单</text>
-        <view class="rankings-list">
-          <view 
-            class="ranking-item" 
-            v-for="ranking in hotRankings" 
-            :key="ranking.id"
-            @tap="goToRankingDetail(ranking)"
-          >
-            <text class="ranking-name">{{ ranking.name }}</text>
-            <text class="ranking-count">{{ ranking.total_books || 0 }}本</text>
-          </view>
-        </view>
-        <view class="view-more" @tap="goToRanking">
-          <text class="more-text">查看更多</text>
-        </view>
-      </view>
+    <!-- 问候语 -->
+    <view class="greeting-section">
+      <text class="greeting-text">嗨~</text>
     </view>
+    
+    <!-- 报告列表 -->
+    <scroll-view 
+      class="reports-container"
+      scroll-y
+      :refresher-enabled="true"
+      :refresher-triggered="refreshing"
+      @refresherrefresh="onRefresh"
+      @scrolltolower="onLoadMore"
+    >
+      <view class="reports-list">
+        <ReportCarousel
+          v-for="report in reportsList"
+          :key="report.id"
+          :report="report"
+          @click="handleReportClick"
+        />
+        
+        <!-- 加载更多提示 -->
+        <view v-if="loading" class="loading-more">
+          <text class="loading-text">加载中...</text>
+        </view>
+        
+        <!-- 没有更多数据提示 -->
+        <view v-if="!hasMore && reportsList.length > 0" class="no-more">
+          <text class="no-more-text">没有更多报告了</text>
+        </view>
+        
+        <!-- 空状态 -->
+        <view v-if="reportsList.length === 0 && !loading" class="empty-state">
+          <text class="empty-text">暂无统计报告</text>
+        </view>
+      </view>
+    </scroll-view>
+    
+    <!-- TabBar -->
+    <TabBar :current-index="0" />
   </view>
 </template>
 
 <script>
-import dataManager from '@/utils/data-manager.js'
+import TabBar from '@/components/TabBar.vue';
+import ReportCarousel from '@/components/ReportCarousel.vue';
+import dataManager from '@/utils/data-manager.js';
 
 export default {
-	name: 'IndexPage',
-	
-	data() {
-		return {
-      overviewStats: {},
-      hotRankings: []
-		}
-	},
-	
-	onLoad() {
-		this.loadData()
-	},
-
-  onShow() {
-    // 每次显示页面时检查数据
-    this.loadData()
+  name: 'IndexPage',
+  components: {
+    TabBar,
+    ReportCarousel
   },
-	
-	methods: {
-    async loadData() {
+  data() {
+    return {
+      reportsList: [],
+      loading: false,
+      refreshing: false,
+      hasMore: true,
+      page: 1,
+      pageSize: 10
+    };
+  },
+  
+  onLoad() {
+    this.loadReports();
+  },
+  
+  onShow() {
+    // 页面显示时刷新数据
+    this.refreshReports();
+  },
+  
+  methods: {
+    async loadReports() {
+      if (this.loading || !this.hasMore) return;
+      
+      this.loading = true;
+      
       try {
-        const [statsRes, rankingsRes] = await Promise.all([
-          dataManager.getOverviewStats(),
-          dataManager.getHotRankings({ limit: 4 })
-        ])
+        // 调用真实API获取统计报告
+        const response = await this.fetchReports(this.page, this.pageSize);
         
-        if (statsRes) {
-          this.overviewStats = statsRes
-        }
-        
-        if (rankingsRes && Array.isArray(rankingsRes)) {
-          this.hotRankings = rankingsRes
+        if (response.success) {
+          if (this.page === 1) {
+            this.reportsList = response.data;
+          } else {
+            this.reportsList.push(...response.data);
+          }
+          
+          this.hasMore = response.data.length === this.pageSize;
+          this.page++;
         }
       } catch (error) {
-        console.error('数据加载失败:', error)
+        console.error('加载报告失败:', error);
+        uni.showToast({
+          title: '加载失败',
+          icon: 'error'
+        });
+      } finally {
+        this.loading = false;
+        this.refreshing = false;
       }
     },
-
-    async refreshData() {
+    
+    async fetchReports(page, pageSize) {
       try {
-        await this.loadData()
-        uni.showToast({
-          title: '刷新成功',
-          icon: 'success',
-          duration: 1500
-        })
+        // 获取统计概览数据
+        const overviewStats = await dataManager.getOverviewStats();
+        const hotRankings = await dataManager.getHotRankings({ limit: 5 });
+        
+        // 构造报告数据
+        const reports = [
+          {
+            id: 'overview',
+            title: '数据概览',
+            description: `总计 ${overviewStats.total_books || 0} 本书籍，${overviewStats.total_rankings || 0} 个榜单`,
+            createdAt: new Date(),
+            type: 'overview',
+            data: overviewStats
+          },
+          {
+            id: 'hot_rankings',
+            title: '热门榜单',
+            description: '最活跃的书籍排行榜单',
+            createdAt: new Date(),
+            type: 'rankings',
+            data: hotRankings
+          }
+        ];
+        
+        return {
+          success: true,
+          data: page === 1 ? reports : [] // 暂时只返回第一页
+        };
       } catch (error) {
-        uni.showToast({
-          title: '刷新失败',
-          icon: 'none',
-          duration: 2000
-        })
+        console.error('获取报告数据失败:', error);
+        return {
+          success: false,
+          data: []
+        };
       }
     },
-		
-		goToStatisticsDetail() {
-			// 可以跳转到统计详情页面
-			console.log('跳转到统计详情')
-		},
-		
-		goToRankingStats() {
-			uni.switchTab({
-				url: '/pages/ranking/index'
-			})
-		},
-		
-		goToBookStats() {
-			// 可以跳转到书籍统计页面
-			console.log('跳转到书籍统计')
-		},
-		
-		goToChannelStats() {
-			// 可以跳转到频道统计页面
-			console.log('跳转到频道统计')
-		},
-
-    goToRankingDetail(ranking) {
-      uni.navigateTo({
-        url: `/pages/ranking/detail?id=${ranking.id}`
-      })
+    
+    onRefresh() {
+      this.refreshing = true;
+      this.refreshReports();
     },
-
-    goToRanking() {
-      uni.switchTab({
-        url: '/pages/ranking/index'
-      })
+    
+    refreshReports() {
+      this.page = 1;
+      this.hasMore = true;
+      this.reportsList = [];
+      this.loadReports();
+    },
+    
+    onLoadMore() {
+      this.loadReports();
+    },
+    
+    handleReportClick(report) {
+      console.log('点击报告:', report);
+      
+      // 根据报告类型跳转到不同页面
+      if (report.type === 'overview') {
+        // 跳转到统计详情页面（可以创建新页面）
+        console.log('查看数据概览');
+      } else if (report.type === 'rankings') {
+        uni.switchTab({
+          url: '/pages/ranking/index'
+        });
+      }
     }
-	}
-}
+  }
+};
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/design-tokens.scss';
+
 .index-page {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #f4f0eb 0%, #e8e1d7 100%);
-  padding-bottom: $safe-area-bottom;
-}
-
-.content-container {
-  padding: 32rpx;
+  background: $surface-default;
+  padding-bottom: calc(#{$tabbar-height} + env(safe-area-inset-bottom));
 }
 
 .greeting-section {
-  margin-bottom: 48rpx;
-  padding-top: 24rpx;
-  
-  .greeting-text {
-    font-size: 64rpx;
-    font-weight: 700;
-    color: #2c2c2c;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  }
+  padding: $spacing-lg $spacing-lg $spacing-md;
+  margin-top: env(safe-area-inset-top);
 }
 
-.summary-card {
-  background-color: #c3c3c3;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 48rpx;
-  
-  .summary-content {
-    .summary-title {
-      display: block;
-      font-size: 36rpx;
-      font-weight: 600;
-      color: #2c2c2c;
-      margin-bottom: 16rpx;
-    }
-
-    .summary-stats {
-      display: flex;
-      gap: 24rpx;
-      margin-bottom: 24rpx;
-      
-      .stats-text {
-        font-size: 28rpx;
-        color: #666666;
-      }
-    }
-    
-    .summary-button {
-      background-color: #64a347;
-      border-radius: 16rpx;
-      padding: 16rpx 32rpx;
-      align-self: flex-start;
-      
-      .button-text {
-        font-size: 28rpx;
-        font-weight: 500;
-        color: #ffffff;
-      }
-      
-      &:active {
-        opacity: 0.8;
-      }
-    }
-  }
-  
-  &:active {
-    opacity: 0.95;
-  }
+.greeting-text {
+  font-family: $font-family-base;
+  font-size: $h1-font-size-rpx;
+  font-weight: $h1-font-weight;
+  line-height: $h1-line-height-rpx;
+  color: $text-primary;
 }
 
-.reports-section {
-  margin-bottom: 48rpx;
-  
-  .section-title {
-    display: block;
-    font-size: 36rpx;
-    font-weight: 600;
-    color: #2c2c2c;
-    margin-bottom: 24rpx;
-  }
-  
-  .reports-scroll {
-    white-space: nowrap;
-  }
-  
-  .reports-container {
-    display: flex;
-    gap: 16rpx;
-    
-    .report-card {
-      flex-shrink: 0;
-      width: 240rpx;
-      background-color: #c3c3c3;
-      border-radius: 16rpx;
-      padding: 24rpx;
-      
-      .report-title {
-        display: block;
-        font-size: 32rpx;
-        font-weight: 500;
-        color: #2c2c2c;
-        margin-bottom: 8rpx;
-      }
-      
-      .report-desc {
-        font-size: 24rpx;
-        color: #666666;
-        line-height: 1.4;
-      }
-      
-      &:active {
-        opacity: 0.8;
-      }
-    }
-  }
+.reports-container {
+  flex: 1;
+  height: calc(100vh - 200rpx - #{$tabbar-height} - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
-.hot-rankings-section {
-  .section-title {
-    display: block;
-    font-size: 36rpx;
-    font-weight: 600;
-    color: #2c2c2c;
-    margin-bottom: 24rpx;
-  }
+.reports-list {
+  padding: 0 $spacing-md;
+  padding-bottom: $spacing-lg;
+}
 
-  .rankings-list {
-    margin-bottom: 24rpx;
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: $spacing-md 0;
+}
 
-    .ranking-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background-color: #c3c3c3;
-      border-radius: 16rpx;
-      padding: 24rpx;
-      margin-bottom: 12rpx;
+.loading-text {
+  font-family: $font-family-base;
+  font-size: $caption-font-size-rpx;
+  color: $text-secondary;
+}
 
-      .ranking-name {
-        font-size: 32rpx;
-        font-weight: 500;
-        color: #2c2c2c;
-      }
+.no-more {
+  display: flex;
+  justify-content: center;
+  padding: $spacing-md 0;
+}
 
-      .ranking-count {
-        font-size: 24rpx;
-        color: #666666;
-      }
+.no-more-text {
+  font-family: $font-family-base;
+  font-size: $caption-font-size-rpx;
+  color: $text-secondary;
+  opacity: 0.6;
+}
 
-      &:active {
-        opacity: 0.8;
-      }
-    }
-  }
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400rpx;
+}
 
-  .view-more {
-    display: flex;
-    justify-content: center;
-    padding: 16rpx;
-
-    .more-text {
-      font-size: 28rpx;
-      color: #64a347;
-      font-weight: 500;
-    }
-
-    &:active {
-      opacity: 0.7;
-    }
-  }
+.empty-text {
+  font-family: $font-family-base;
+  font-size: 32rpx;
+  color: $text-secondary;
+  opacity: 0.6;
 }
 </style>

@@ -1,0 +1,82 @@
+// JJClawer Design System Tokens
+// Based on Figma design v1.0
+
+// Brand Colors
+$brand-primary: #4A4459;
+$surface-dark: #E8DEF8; 
+$surface-white: #F3EDF7;
+$surface-default: #FFFFFF;
+$surface-container-high: #ECE6F0;
+
+// Text Colors
+$text-primary: #161616;
+$text-secondary: #454444;
+
+// Typography System
+$font-family-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+// H1 Typography
+$h1-font-size: 32px;
+$h1-font-weight: 600; // Semi Bold
+$h1-line-height: 40px;
+
+// Caption Typography  
+$caption-font-size: 14px;
+$caption-font-weight: 400; // Regular
+$caption-line-height: 22px;
+
+// Convert to rpx for uni-app
+$h1-font-size-rpx: 64rpx; // 32px * 2
+$h1-line-height-rpx: 80rpx; // 40px * 2
+
+$caption-font-size-rpx: 28rpx; // 14px * 2  
+$caption-line-height-rpx: 44rpx; // 22px * 2
+
+// Spacing System (Material Design inspired)
+$spacing-xs: 8rpx;    // 4px
+$spacing-sm: 16rpx;   // 8px
+$spacing-md: 32rpx;   // 16px
+$spacing-lg: 48rpx;   // 24px
+$spacing-xl: 64rpx;   // 32px
+$spacing-2xl: 96rpx;  // 48px
+
+// Border Radius System
+$radius-sm: 8rpx;     // 4px
+$radius-md: 16rpx;    // 8px  
+$radius-lg: 24rpx;    // 12px
+$radius-xl: 32rpx;    // 16px
+$radius-2xl: 56rpx;   // 28px (for carousel cards)
+$radius-3xl: 160rpx;  // 80px (for tab bar)
+$radius-full: 9999rpx; // full circle
+
+// Component Specific
+$tabbar-height: 160rpx; // 80px
+$tabbar-background: $surface-white;
+$tabbar-item-width: 164rpx; // 82px
+$tabbar-icon-size: 48rpx; // 24px
+$tabbar-active-bg: $surface-dark;
+
+$carousel-height: 240rpx; // 120px
+$carousel-gap: 16rpx; // 8px  
+$carousel-padding: 32rpx; // 16px
+
+// Shadows (Material Design inspired)
+$shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+$shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
+
+// Z-index system
+$z-index-modal: 1000;
+$z-index-tabbar: 100;
+$z-index-sticky: 10;
+$z-index-normal: 1;
+
+// Transition timing
+$transition-fast: 0.15s ease;
+$transition-normal: 0.25s ease;
+$transition-slow: 0.3s ease;
+
+// Breakpoints for responsive design
+$breakpoint-sm: 320px;
+$breakpoint-md: 375px;
+$breakpoint-lg: 414px;
