@@ -167,17 +167,60 @@ class TaskManager:
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """获取任务信息"""
         data = self._read_tasks()
-        all_tasks = data["current_tasks"] + data["completed_tasks"] + data["failed_tasks"]
+        all_tasks = data.get("current_tasks", []) + data.get("completed_tasks", []) + data.get("failed_tasks", [])
         
         for task_data in all_tasks:
-            if task_data["task_id"] == task_id:
-                return TaskInfo(**task_data)
+            if task_data.get("task_id") == task_id:
+                # 过滤掉不需要的字段
+                filtered_data = {
+                    "task_id": task_data.get("task_id", ""),
+                    "task_type": task_data.get("task_type", ""),
+                    "status": task_data.get("status", ""),
+                    "created_at": task_data.get("created_at", ""),
+                    "started_at": task_data.get("started_at"),
+                    "completed_at": task_data.get("completed_at"),
+                    "progress": task_data.get("progress", 0),
+                    "items_crawled": task_data.get("items_crawled", 0),
+                    "error_message": task_data.get("error_message"),
+                    "metadata": task_data.get("metadata", {})
+                }
+                return TaskInfo(**filtered_data)
         return None
+    
+    def get_task_status(self, task_id: str) -> Optional[TaskInfo]:
+        """获取任务状态（别名方法）"""
+        return self.get_task(task_id)
     
     def get_current_tasks(self) -> List[TaskInfo]:
         """获取当前任务"""
         data = self._read_tasks()
         return [TaskInfo(**task) for task in data["current_tasks"]]
+    
+    def get_all_tasks(self) -> Dict[str, List[TaskInfo]]:
+        """获取所有任务"""
+        data = self._read_tasks()
+        
+        def create_task_info(task_data):
+            # 过滤掉不需要的字段，只保留TaskInfo需要的字段
+            filtered_data = {
+                "task_id": task_data.get("task_id", ""),
+                "task_type": task_data.get("task_type", ""),
+                "status": task_data.get("status", ""),
+                "created_at": task_data.get("created_at", ""),
+                "started_at": task_data.get("started_at"),
+                "completed_at": task_data.get("completed_at"),
+                "progress": task_data.get("progress", 0),
+                "items_crawled": task_data.get("items_crawled", 0),
+                "error_message": task_data.get("error_message"),
+                "metadata": task_data.get("metadata", {})
+            }
+            return TaskInfo(**filtered_data)
+        
+        return {
+            "current": [create_task_info(task) for task in data.get("current_tasks", [])],
+            "completed": [create_task_info(task) for task in data.get("completed_tasks", [])],
+            "failed": [create_task_info(task) for task in data.get("failed_tasks", [])]
+        }
     
     def get_task_summary(self) -> Dict[str, Any]:
         """获取任务摘要"""
@@ -245,59 +288,3 @@ async def execute_with_task(task_id: str, executor: Callable, *args, **kwargs) -
         logger.error(f"任务执行失败: {task_id} - {e}")
         return False
 
-
-async def execute_jiazi_task() -> Dict[str, Any]:
-    """执行夹子榜爬取任务"""
-    from app.modules.service.crawler_service import CrawlerService
-    
-    task_id = create_jiazi_task()
-    crawler_service = CrawlerService()
-    
-    success = await execute_with_task(
-        task_id, 
-        crawler_service.crawl_and_save_jiazi
-    )
-    
-    if success:
-        task = get_task_manager().get_task(task_id)
-        return {
-            "success": True,
-            "task_id": task_id,
-            "message": "夹子榜爬取任务执行成功",
-            "result": task.metadata if task else {}
-        }
-    else:
-        return {
-            "success": False,
-            "task_id": task_id,
-            "message": "夹子榜爬取任务执行失败"
-        }
-
-
-async def execute_page_task(channel: str) -> Dict[str, Any]:
-    """执行页面爬取任务"""
-    from app.modules.service.crawler_service import CrawlerService
-    
-    task_id = create_page_task(channel)
-    crawler_service = CrawlerService()
-    
-    success = await execute_with_task(
-        task_id,
-        crawler_service.crawl_and_save_page,
-        channel
-    )
-    
-    if success:
-        task = get_task_manager().get_task(task_id)
-        return {
-            "success": True,
-            "task_id": task_id,
-            "message": f"页面爬取任务执行成功: {channel}",
-            "result": task.metadata if task else {}
-        }
-    else:
-        return {
-            "success": False,
-            "task_id": task_id,
-            "message": f"页面爬取任务执行失败: {channel}"
-        }

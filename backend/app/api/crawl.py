@@ -13,21 +13,16 @@ from app.modules.models import (
     TaskCreateResponse,
     CrawlJiaziRequest,
     CrawlRankingRequest,
-    TaskInfo
+    TaskInfo as ApiTaskInfo
 )
 from app.modules.service.task_service import (
     get_task_manager,
     create_jiazi_task,
-    create_page_task,
-    execute_jiazi_task,
-    execute_page_task,
-    TaskType
+    create_page_task
 )
-from app.modules.service.crawler_service import CrawlerService
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
-    trigger_manual_crawl,
-    get_scheduler_stats
+    trigger_manual_crawl
 )
 from app.modules.service.task_monitor_service import get_task_monitor_service
 
@@ -121,7 +116,7 @@ async def get_tasks(
     """
     try:
         task_manager = get_task_manager()
-        all_tasks = task_manager.file_manager.get_all_tasks()
+        all_tasks = task_manager.get_all_tasks()
         
         current_tasks = []
         completed_tasks = []
@@ -129,7 +124,7 @@ async def get_tasks(
         
         # 转换任务信息格式
         for task in all_tasks["current"]:
-            current_tasks.append(TaskInfo(
+            current_tasks.append(ApiTaskInfo(
                 task_id=task.task_id,
                 task_type=task.task_type,
                 status=task.status,
@@ -142,7 +137,7 @@ async def get_tasks(
             ))
         
         for task in all_tasks["completed"]:
-            completed_tasks.append(TaskInfo(
+            completed_tasks.append(ApiTaskInfo(
                 task_id=task.task_id,
                 task_type=task.task_type,
                 status=task.status,
@@ -155,7 +150,7 @@ async def get_tasks(
             ))
         
         for task in all_tasks["failed"]:
-            failed_tasks.append(TaskInfo(
+            failed_tasks.append(ApiTaskInfo(
                 task_id=task.task_id,
                 task_type=task.task_type,
                 status=task.status,
@@ -193,7 +188,7 @@ async def get_tasks(
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
 
 
-@router.get("/tasks/{task_id}", response_model=TaskInfo)
+@router.get("/tasks/{task_id}", response_model=ApiTaskInfo)
 async def get_task_detail(task_id: str):
     """
     获取特定任务详情
@@ -207,7 +202,7 @@ async def get_task_detail(task_id: str):
         if not task:
             raise HTTPException(status_code=404, detail=f"任务 {task_id} 不存在")
         
-        return TaskInfo(
+        return ApiTaskInfo(
             task_id=task.task_id,
             task_type=task.task_type,
             status=task.status,
@@ -255,12 +250,12 @@ async def get_scheduler_status():
     """
     try:
         scheduler_service = get_scheduler_service()
-        statistics = scheduler_service.get_job_statistics()
+        status_info = scheduler_service.get_status()
         scheduled_jobs = scheduler_service.get_scheduled_jobs()
         
         return {
-            "status": "running" if statistics['is_running'] else "stopped",
-            "statistics": statistics,
+            "status": "running" if status_info['is_running'] else "stopped",
+            "statistics": status_info,
             "scheduled_jobs": scheduled_jobs
         }
         
