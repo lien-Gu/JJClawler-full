@@ -19,6 +19,7 @@ class Book(SQLModel, table=True):
     author_name: str = Field(index=True, description="作者名")
     novel_class: Optional[str] = Field(default=None, description="小说分类")
     tags: Optional[str] = Field(default=None, description="标签(JSON字符串)")
+    vip_chapter_count: Optional[int] = Field(default=None, description="VIP章节数（静态属性）")
     first_seen: datetime = Field(default_factory=datetime.now, description="首次发现时间")
     last_updated: datetime = Field(default_factory=datetime.now, description="最后更新时间")
     
@@ -33,11 +34,10 @@ class BookSnapshot(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     book_id: str = Field(foreign_key="books.book_id", index=True, description="书籍ID")
-    total_clicks: Optional[int] = Field(default=None, description="非V章点击量(novip_clicks)")
-    total_favorites: Optional[int] = Field(default=None, description="总收藏量")
+    novip_clicks: Optional[int] = Field(default=None, description="非V章点击量")
+    favorites: Optional[int] = Field(default=None, description="收藏量")
     comment_count: Optional[int] = Field(default=None, description="评论数")
     chapter_count: Optional[int] = Field(default=None, description="总章节数")
-    vip_chapter_count: Optional[int] = Field(default=None, description="VIP章节数")
     word_count: Optional[int] = Field(default=None, description="字数")
     nutrition_count: Optional[int] = Field(default=None, description="营养液数量")
     snapshot_time: datetime = Field(index=True, description="快照时间")

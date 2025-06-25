@@ -88,14 +88,16 @@ class CrawlerService:
         try:
             # 抓取数据
             async with self._get_jiazi_crawler() as crawler:
-                books, book_snapshots = await crawler.crawl()
+                crawl_result = await crawler.crawl()
             
             # 保存数据
             result = await self._save_crawled_data(
-                books, book_snapshots, 
+                crawl_result.books, 
+                crawl_result.snapshots, 
                 ranking_name="夹子榜", 
                 ranking_type="jiazi",
-                task_id=task_id
+                task_id=task_id,
+                vip_chapter_data=crawl_result.vip_chapter_data
             )
             
             logger.info(f"夹子榜数据采集完成: {result}")
@@ -179,7 +181,8 @@ class CrawlerService:
                                ranking_name: str,
                                ranking_type: str,
                                channel: Optional[str] = None,
-                               task_id: Optional[str] = None) -> Dict[str, Any]:
+                               task_id: Optional[str] = None,
+                               vip_chapter_data: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
         """
         保存抓取的数据到数据库
         
@@ -189,6 +192,8 @@ class CrawlerService:
             ranking_name: 榜单名称
             ranking_type: 榜单类型
             channel: 频道标识
+            task_id: 任务ID
+            vip_chapter_data: VIP章节数据 (book_id -> vip_chapter_count)
             
         Returns:
             保存结果统计
@@ -211,8 +216,8 @@ class CrawlerService:
                     session, ranking_name, ranking_type, channel
                 )
                 
-                # 2. 保存书籍数据
-                books_result = self._save_books(session, books)
+                # 2. 保存书籍数据（包含VIP章节数）
+                books_result = self._save_books(session, books, vip_chapter_data)
                 
                 # 3. 保存书籍快照
                 snapshots_result = self._save_book_snapshots(session, book_snapshots)
@@ -287,13 +292,14 @@ class CrawlerService:
             session.flush()  # 获取生成的ID
             return new_ranking
     
-    def _save_books(self, session, books: List[Book]) -> Dict[str, int]:
+    def _save_books(self, session, books: List[Book], vip_chapter_data: Optional[Dict[str, int]] = None) -> Dict[str, int]:
         """
         保存书籍信息
         
         Args:
             session: 数据库会话
             books: 书籍列表
+            vip_chapter_data: VIP章节数据 (book_id -> vip_chapter_count)
             
         Returns:
             保存结果统计
@@ -315,9 +321,18 @@ class CrawlerService:
                 existing_book.novel_class = book.novel_class
                 existing_book.tags = book.tags
                 existing_book.last_updated = datetime.now()
+                
+                # 更新VIP章节数（如果有数据）
+                if vip_chapter_data and book.book_id in vip_chapter_data:
+                    existing_book.vip_chapter_count = vip_chapter_data[book.book_id]
+                
                 session.add(existing_book)
                 updated_count += 1
             else:
+                # 设置VIP章节数（如果有数据）
+                if vip_chapter_data and book.book_id in vip_chapter_data:
+                    book.vip_chapter_count = vip_chapter_data[book.book_id]
+                
                 # 添加新书籍
                 session.add(book)
                 new_count += 1

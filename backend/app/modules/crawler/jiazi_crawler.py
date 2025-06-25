@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, NamedTuple
 
 from app.utils.http_client import HTTPClient
 from .parser import DataParser
@@ -19,6 +19,13 @@ from .book_detail_crawler import BookDetailCrawler
 from app.modules.models import Book, BookSnapshot
 
 logger = logging.getLogger(__name__)
+
+
+class JiaziCrawlResult(NamedTuple):
+    """夹子榜爬取结果"""
+    books: List['Book']
+    snapshots: List['BookSnapshot'] 
+    vip_chapter_data: Dict[str, int]  # book_id -> vip_chapter_count
 
 
 class JiaziCrawler:
@@ -63,12 +70,12 @@ class JiaziCrawler:
             logger.error(f"夹子榜URL配置加载失败: {e}")
             raise
     
-    async def crawl(self) -> Tuple[List[Book], List[BookSnapshot]]:
+    async def crawl(self) -> JiaziCrawlResult:
         """
         抓取夹子榜数据
         
         Returns:
-            (books, book_snapshots): 书籍信息和快照数据
+            JiaziCrawlResult: 包含书籍信息、快照数据和VIP章节数据
         """
         logger.info("开始抓取夹子榜数据")
         
@@ -108,21 +115,31 @@ class JiaziCrawler:
             current_time = datetime.now()
             
             logger.info(f"开始获取 {len(book_ids)} 本书籍的详细统计数据...")
-            detailed_snapshots = await self.book_detail_crawler.fetch_book_details(book_ids, current_time)
+            detail_results = await self.book_detail_crawler.fetch_book_details(book_ids, current_time)
             
-            # 如果详情获取失败，使用基础快照（虽然统计数据为0）
-            snapshots = detailed_snapshots if detailed_snapshots else base_snapshots
+            # 提取快照和VIP章节数据
+            if detail_results:
+                snapshots = [result.snapshot for result in detail_results]
+                vip_chapter_data = {result.snapshot.book_id: result.vip_chapter_count for result in detail_results}
+            else:
+                # 如果详情获取失败，使用基础快照（虽然统计数据为0）
+                snapshots = base_snapshots
+                vip_chapter_data = {}
             
             # 验证结果
             if not books or not snapshots:
                 logger.warning("夹子榜抓取结果为空")
-                return [], []
+                return JiaziCrawlResult(books=[], snapshots=[], vip_chapter_data={})
             
             if len(books) != len(snapshots):
                 logger.warning(f"数据不一致: 书籍 {len(books)} 本, 快照 {len(snapshots)} 条")
             
             logger.info(f"夹子榜抓取完成: {len(books)} 本书籍")
-            return books, snapshots
+            return JiaziCrawlResult(
+                books=books,
+                snapshots=snapshots,
+                vip_chapter_data=vip_chapter_data
+            )
             
         except Exception as e:
             logger.error(f"夹子榜抓取失败: {e}")

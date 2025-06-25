@@ -10,13 +10,19 @@
 import logging
 import asyncio
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, NamedTuple
 from urllib.parse import quote
 
 from app.utils.http_client import HTTPClient
 from app.modules.models import BookSnapshot
 
 logger = logging.getLogger(__name__)
+
+
+class BookDetailResult(NamedTuple):
+    """书籍详情获取结果"""
+    snapshot: BookSnapshot
+    vip_chapter_count: int
 
 
 class BookDetailCrawler:
@@ -45,7 +51,7 @@ class BookDetailCrawler:
         # 书籍详情API URL模板
         self.novel_api_url = "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId={}"
     
-    async def fetch_book_details(self, book_ids: List[str], snapshot_time: datetime = None) -> List[BookSnapshot]:
+    async def fetch_book_details(self, book_ids: List[str], snapshot_time: datetime = None) -> List[BookDetailResult]:
         """
         批量获取书籍详情并创建快照
         
@@ -54,23 +60,23 @@ class BookDetailCrawler:
             snapshot_time: 快照时间，默认为当前时间
             
         Returns:
-            List[BookSnapshot]: 书籍快照列表
+            List[BookDetailResult]: 书籍详情结果列表（包含快照和VIP章节数）
         """
         if snapshot_time is None:
             snapshot_time = datetime.now()
         
         logger.info(f"开始获取 {len(book_ids)} 本书籍的详情信息")
         
-        snapshots = []
+        results = []
         successful_count = 0
         failed_count = 0
         
         for i, book_id in enumerate(book_ids):
             try:
                 # 获取单本书籍详情
-                snapshot = await self._fetch_single_book_detail(book_id, snapshot_time)
-                if snapshot:
-                    snapshots.append(snapshot)
+                result = await self._fetch_single_book_detail(book_id, snapshot_time)
+                if result:
+                    results.append(result)
                     successful_count += 1
                 else:
                     failed_count += 1
@@ -88,9 +94,9 @@ class BookDetailCrawler:
                 continue
         
         logger.info(f"书籍详情获取完成: 成功 {successful_count} 本, 失败 {failed_count} 本")
-        return snapshots
+        return results
     
-    async def _fetch_single_book_detail(self, book_id: str, snapshot_time: datetime) -> Optional[BookSnapshot]:
+    async def _fetch_single_book_detail(self, book_id: str, snapshot_time: datetime) -> Optional[BookDetailResult]:
         """
         获取单本书籍的详情信息
         
@@ -99,7 +105,7 @@ class BookDetailCrawler:
             snapshot_time: 快照时间
             
         Returns:
-            BookSnapshot: 书籍快照，如果获取失败返回None
+            BookDetailResult: 书籍详情结果，如果获取失败返回None
         """
         try:
             # 构建请求URL
@@ -113,14 +119,18 @@ class BookDetailCrawler:
             data = response.json()
             
             # 提取统计数据
-            snapshot = self._parse_book_detail(data, book_id, snapshot_time)
-            return snapshot
+            snapshot, vip_chapter_count = self._parse_book_detail(data, book_id, snapshot_time)
+            
+            return BookDetailResult(
+                snapshot=snapshot,
+                vip_chapter_count=vip_chapter_count
+            )
             
         except Exception as e:
             logger.error(f"获取书籍 {book_id} 详情失败: {e}")
             return None
     
-    def _parse_book_detail(self, data: Dict[str, Any], book_id: str, snapshot_time: datetime) -> BookSnapshot:
+    def _parse_book_detail(self, data: Dict[str, Any], book_id: str, snapshot_time: datetime) -> Tuple[BookSnapshot, int]:
         """
         解析书籍详情数据
         
@@ -130,13 +140,13 @@ class BookDetailCrawler:
             snapshot_time: 快照时间
             
         Returns:
-            BookSnapshot: 书籍快照
+            Tuple[BookSnapshot, int]: 书籍快照和VIP章节数
         """
         # 解析非V章点击量 - novip_clicks格式: "247,737(章均)"
-        total_clicks = self._parse_clicks_field(data.get('novip_clicks', '0'))
+        novip_clicks = self._parse_clicks_field(data.get('novip_clicks', '0'))
         
         # 解析收藏量 - novelbefavoritedcount格式: "253062"
-        total_favorites = self._parse_number_field(data.get('novelbefavoritedcount', '0'))
+        favorites = self._parse_number_field(data.get('novelbefavoritedcount', '0'))
         
         # 解析评论数 - comment_count格式: "137,649"
         comment_count = self._parse_number_field(data.get('comment_count', '0'))
@@ -144,7 +154,7 @@ class BookDetailCrawler:
         # 解析总章节数 - novelChapterCount格式: "81"
         chapter_count = self._parse_number_field(data.get('novelChapterCount', '0'))
         
-        # 解析VIP章节数 - vipChapterid格式: "19"
+        # 解析VIP章节数 - vipChapterid格式: "19" (作为静态属性返回)
         vip_chapter_count = self._parse_number_field(data.get('vipChapterid', '0'))
         
         # 解析字数 - novelSize格式: "502,038"
@@ -153,19 +163,20 @@ class BookDetailCrawler:
         # 解析营养液数量 - nutrition_novel格式: "243219"
         nutrition_count = self._parse_number_field(data.get('nutrition_novel', '0'))
         
-        logger.debug(f"书籍 {book_id} 详情: 点击{total_clicks}, 收藏{total_favorites}, 评论{comment_count}, 总章节{chapter_count}, VIP章节{vip_chapter_count}, 字数{word_count}, 营养液{nutrition_count}")
+        logger.debug(f"书籍 {book_id} 详情: 点击{novip_clicks}, 收藏{favorites}, 评论{comment_count}, 总章节{chapter_count}, VIP章节{vip_chapter_count}, 字数{word_count}, 营养液{nutrition_count}")
         
-        return BookSnapshot(
+        snapshot = BookSnapshot(
             book_id=book_id,
-            total_clicks=total_clicks,
-            total_favorites=total_favorites,
+            novip_clicks=novip_clicks,
+            favorites=favorites,
             comment_count=comment_count,
             chapter_count=chapter_count,
-            vip_chapter_count=vip_chapter_count,
             word_count=word_count,
             nutrition_count=nutrition_count,
             snapshot_time=snapshot_time
         )
+        
+        return snapshot, vip_chapter_count
     
     def _parse_clicks_field(self, clicks_str: str) -> int:
         """
