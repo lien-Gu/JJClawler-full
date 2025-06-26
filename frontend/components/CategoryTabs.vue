@@ -151,31 +151,22 @@ export default {
 .sub-tab-item {
   flex-shrink: 0;
   padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
   position: relative;
   cursor: pointer;
+  transition: all $transition-normal;
   
   &.sub-tab-active {
-    .sub-tab-text {
-      color: $brand-primary;
-      font-weight: 600;
-    }
+    background: $surface-dark;
     
-    // 底部下划线
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: -#{$spacing-sm};
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60%;
-      height: 4rpx; // 2px
-      background: $brand-primary;
-      border-radius: $radius-sm;
+    .sub-tab-text {
+      color: $text-primary;
+      font-weight: 600;
     }
   }
   
   &:active {
-    opacity: 0.7;
+    transform: scale(0.95);
   }
 }
 

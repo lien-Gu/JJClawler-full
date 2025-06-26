@@ -150,15 +150,10 @@ export default {
     handleReportClick(report) {
       console.log('点击报告:', report);
       
-      // 根据报告类型跳转到不同页面
-      if (report.type === 'overview') {
-        // 跳转到统计详情页面（可以创建新页面）
-        console.log('查看数据概览');
-      } else if (report.type === 'rankings') {
-        uni.switchTab({
-          url: '/pages/ranking/index'
-        });
-      }
+      // 跳转到报告详情页面
+      uni.navigateTo({
+        url: `/pages/report/detail?type=${report.type}&title=${encodeURIComponent(report.title)}`
+      });
     }
   }
 };

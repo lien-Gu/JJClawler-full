@@ -23,6 +23,7 @@
       :loading="false"
       :refreshing="refreshing"
       :has-more="false"
+      :show-no-more="false"
       :refresher-enabled="true"
       empty-icon="📚"
       empty-title="还没有关注的书籍"
@@ -30,10 +31,10 @@
       @refresh="onRefresh"
     >
       <view class="books-list">
-        <swiper-item
+        <view
           v-for="item in followData" 
           :key="item.id"
-          class="book-swiper-item"
+          class="book-item-wrapper"
         >
           <view class="book-item" @tap="goToDetail(item)">
             <view class="book-main-content">
@@ -47,15 +48,16 @@
                 <text class="status-text">{{ item.isOnList ? '榜上' : '榜外' }}</text>
               </view>
             </view>
-          </view>
-          
-          <!-- 滑动操作区域 -->
-          <view class="swipe-actions">
-            <view class="action-btn unfollow-btn" @tap="unfollowItem(item)">
-              <text class="action-text">取消关注</text>
+            <view class="book-actions">
+              <BaseButton
+                type="text"
+                icon="✖"
+                size="small"
+                @click="unfollowItem(item, $event)"
+              />
             </view>
           </view>
-        </swiper-item>
+        </view>
       </view>
       
       <template #empty-action>
@@ -165,7 +167,12 @@ export default {
       return 'neutral'
     },
     
-    unfollowItem(item) {
+    unfollowItem(item, event) {
+      // 阻止事件冒泡
+      if (event) {
+        event.stopPropagation()
+      }
+      
       uni.showModal({
         title: '确认取消关注',
         content: `确定要取消关注"${item.name || item.title}"吗？`,
@@ -266,8 +273,8 @@ export default {
 }
 
 .books-list {
-  .book-swiper-item {
-    margin-bottom: $spacing-sm;
+  .book-item-wrapper {
+    margin-bottom: $spacing-md;
     
     .book-item {
       display: flex;
@@ -340,32 +347,10 @@ export default {
           }
         }
       }
-    }
-    
-    .swipe-actions {
-      display: flex;
-      align-items: center;
-      height: 100%;
       
-      .action-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 120rpx;
-        height: 100%;
-        
-        &.unfollow-btn {
-          background: #ff3b30;
-          
-          .action-text {
-            font-size: 24rpx;
-            color: $surface-default;
-          }
-        }
-        
-        &:active {
-          opacity: 0.8;
-        }
+      .book-actions {
+        margin-left: $spacing-sm;
+        flex-shrink: 0;
       }
     }
   }

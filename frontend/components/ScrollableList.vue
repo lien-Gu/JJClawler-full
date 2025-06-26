@@ -15,7 +15,7 @@
       <LoadingMore
         :loading="loading"
         :has-more="hasMore"
-        :show-no-more="items.length > 0"
+        :show-no-more="showNoMore && items.length > 0"
         :loading-text="loadingText"
         :no-more-text="noMoreText"
       />
@@ -81,6 +81,10 @@ export default {
     noMoreText: {
       type: String,
       default: '没有更多数据了'
+    },
+    showNoMore: {
+      type: Boolean,
+      default: true
     },
     emptyIcon: {
       type: String,

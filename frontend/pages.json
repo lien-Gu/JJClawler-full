@@ -42,6 +42,12 @@
 				"navigationBarTitleText": "加载中...",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/report/detail",
+			"style": {
+				"navigationBarTitleText": "统计报告"
+			}
 		}
 	],
 	"globalStyle": {

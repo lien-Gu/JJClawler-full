@@ -37,7 +37,6 @@
         @click="handleRankingClick"
       />
     </ScrollableList>
-    
   </view>
 </template>
 
@@ -47,6 +46,7 @@ import CategoryTabs from '@/components/CategoryTabs.vue';
 import RankingListItem from '@/components/RankingListItem.vue';
 import ScrollableList from '@/components/ScrollableList.vue';
 import dataManager from '@/utils/data-manager.js';
+import { getSitesList } from '@/data/url.js';
 
 export default {
   name: 'RankingPage',
@@ -61,42 +61,7 @@ export default {
       searchKeyword: '',
       currentMainTab: '',
       currentSubTab: '',
-      categories: [
-        {
-          key: 'jiazi',
-          name: '夹子',
-          children: []
-        },
-        {
-          key: 'yanqing',
-          name: '言情',
-          children: [
-            { key: 'guyan', name: '古言' },
-            { key: 'xiandai', name: '现言' },
-            { key: 'guchuan', name: '古穿' },
-            { key: 'weilai', name: '未来' }
-          ]
-        },
-        {
-          key: 'chunai',
-          name: '纯爱',
-          children: [
-            { key: 'dushi', name: '都市' },
-            { key: 'gudai', name: '古代' },
-            { key: 'weilai', name: '未来' }
-          ]
-        },
-        {
-          key: 'yanshen',
-          name: '衍生',
-          children: []
-        },
-        {
-          key: 'baihe',
-          name: '百合',
-          children: []
-        }
-      ],
+      categories: [],
       allRankings: [],
       filteredRankings: [],
       loading: false,
@@ -108,6 +73,7 @@ export default {
   },
   
   onLoad(options) {
+    this.initCategories();
     this.initData();
     this.loadRankings();
   },
@@ -118,6 +84,20 @@ export default {
   },
   
   methods: {
+    initCategories() {
+      // 从 url.js 加载分类数据
+      const sites = getSitesList();
+      this.categories = sites.map(site => ({
+        key: site.id,
+        name: site.name,
+        children: site.channels.map(channel => ({
+          key: channel.id,
+          name: channel.name,
+          channel: channel.channel
+        }))
+      }));
+    },
+    
     initData() {
       // 默认选择第一个分类
       if (this.categories.length > 0) {
@@ -271,5 +251,4 @@ export default {
   background: $surface-default;
   padding-bottom: env(safe-area-inset-bottom);
 }
-
-</style> 
+</style>
