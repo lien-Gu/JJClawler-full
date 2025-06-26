@@ -56,7 +56,7 @@ export default {
       
       // 跳转到报告详情页
       uni.navigateTo({
-        url: `/pages/reports/detail?id=${this.report.id}`
+        url: `/pages/report/detail?id=${this.report.id}`
       });
     },
     

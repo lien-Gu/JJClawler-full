@@ -149,7 +149,6 @@ export default {
     
     handleReportClick(report) {
       console.log('点击报告:', report);
-      
       // 跳转到报告详情页面
       uni.navigateTo({
         url: `/pages/report/detail?type=${report.type}&title=${encodeURIComponent(report.title)}`
