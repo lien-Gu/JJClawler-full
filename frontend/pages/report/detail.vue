@@ -294,8 +294,10 @@ export default {
       align-items: center;
       padding: $spacing-md 0;
       
-      &:not(:last-child) {
-        border-bottom: 1px solid rgba($text-secondary, 0.1);
+      border-bottom: 1px solid rgba($text-secondary, 0.1);
+      
+      &:last-child {
+        border-bottom: none;
       }
       
       &:active {
@@ -444,9 +446,6 @@ export default {
           }
         }
         
-        &:hover {
-          background: rgba($text-secondary, 0.05);
-        }
       }
     }
   }

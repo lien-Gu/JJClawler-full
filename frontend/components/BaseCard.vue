@@ -6,7 +6,8 @@
       { 
         'card-clickable': clickable,
         'card-elevated': elevated,
-        'card-bordered': bordered
+        'card-bordered': bordered,
+        'no-header': !hasHeader
       }
     ]"
     @click="handleClick"
@@ -115,10 +116,6 @@ export default {
   // 阴影
   &.card-elevated {
     box-shadow: $shadow-sm;
-    
-    &:hover {
-      box-shadow: $shadow-md;
-    }
   }
   
   // 边框
@@ -196,11 +193,11 @@ export default {
 
 .card-body {
   padding: 0 $spacing-lg $spacing-lg;
-  
-  // 如果没有header，则增加顶部padding
-  .base-card:not(.has-header) & {
-    padding-top: $spacing-lg;
-  }
+}
+
+// 如果没有header，则增加顶部padding
+.base-card.no-header .card-body {
+  padding-top: $spacing-lg;
 }
 
 .card-footer {
