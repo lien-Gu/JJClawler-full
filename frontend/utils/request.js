@@ -2,7 +2,7 @@
  * 简化的网络请求工具
  */
 
-import configManager from './config.js'
+import envConfig from './env-config.js'
 
 /**
  * 基础请求方法
@@ -14,7 +14,7 @@ function request(options) {
     // 构建完整的URL
     let url = options.url
     if (!url.startsWith('http')) {
-      url = configManager.getAPIBaseURL() + url
+      url = envConfig.getBaseURL() + url
     }
     
     uni.request({
@@ -25,7 +25,7 @@ function request(options) {
         'Content-Type': 'application/json',
         ...options.header
       },
-      timeout: options.timeout || configManager.getAPITimeout(),
+      timeout: options.timeout || 10000,
       success: (response) => {
         if (response.statusCode === 200) {
           resolve(response.data)

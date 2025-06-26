@@ -6,54 +6,39 @@
     </view>
     
     <!-- 报告列表 -->
-    <scroll-view 
-      class="reports-container"
-      scroll-y
-      :refresher-enabled="true"
-      :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh"
-      @scrolltolower="onLoadMore"
+    <ScrollableList
+      :items="reportsList"
+      :loading="loading"
+      :refreshing="refreshing"
+      :has-more="hasMore"
+      :height="'calc(100vh - 200rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom))'"
+      empty-icon="📊"
+      empty-title="暂无统计报告"
+      no-more-text="没有更多报告了"
+      @refresh="onRefresh"
+      @load-more="onLoadMore"
     >
-      <view class="reports-list">
-        <ReportCarousel
-          v-for="report in reportsList"
-          :key="report.id"
-          :report="report"
-          @click="handleReportClick"
-        />
-        
-        <!-- 加载更多提示 -->
-        <view v-if="loading" class="loading-more">
-          <text class="loading-text">加载中...</text>
-        </view>
-        
-        <!-- 没有更多数据提示 -->
-        <view v-if="!hasMore && reportsList.length > 0" class="no-more">
-          <text class="no-more-text">没有更多报告了</text>
-        </view>
-        
-        <!-- 空状态 -->
-        <view v-if="reportsList.length === 0 && !loading" class="empty-state">
-          <text class="empty-text">暂无统计报告</text>
-        </view>
-      </view>
-    </scroll-view>
+      <ReportCarousel
+        v-for="report in reportsList"
+        :key="report.id"
+        :report="report"
+        @click="handleReportClick"
+      />
+    </ScrollableList>
     
-    <!-- TabBar -->
-    <TabBar :current-index="0" />
   </view>
 </template>
 
 <script>
-import TabBar from '@/components/TabBar.vue';
 import ReportCarousel from '@/components/ReportCarousel.vue';
+import ScrollableList from '@/components/ScrollableList.vue';
 import dataManager from '@/utils/data-manager.js';
 
 export default {
   name: 'IndexPage',
   components: {
-    TabBar,
-    ReportCarousel
+    ReportCarousel,
+    ScrollableList
   },
   data() {
     return {
@@ -185,7 +170,7 @@ export default {
 .index-page {
   min-height: 100vh;
   background: $surface-default;
-  padding-bottom: calc(#{$tabbar-height} + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .greeting-section {
@@ -201,52 +186,4 @@ export default {
   color: $text-primary;
 }
 
-.reports-container {
-  flex: 1;
-  height: calc(100vh - 200rpx - #{$tabbar-height} - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-}
-
-.reports-list {
-  padding: 0 $spacing-md;
-  padding-bottom: $spacing-lg;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: $spacing-md 0;
-}
-
-.loading-text {
-  font-family: $font-family-base;
-  font-size: $caption-font-size-rpx;
-  color: $text-secondary;
-}
-
-.no-more {
-  display: flex;
-  justify-content: center;
-  padding: $spacing-md 0;
-}
-
-.no-more-text {
-  font-family: $font-family-base;
-  font-size: $caption-font-size-rpx;
-  color: $text-secondary;
-  opacity: 0.6;
-}
-
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400rpx;
-}
-
-.empty-text {
-  font-family: $font-family-base;
-  font-size: 32rpx;
-  color: $text-secondary;
-  opacity: 0.6;
-}
 </style>

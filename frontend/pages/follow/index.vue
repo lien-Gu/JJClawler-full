@@ -18,14 +18,18 @@
     </view>
     
     <!-- 关注书籍列表 -->
-    <scroll-view 
-      class="books-container"
-      scroll-y
+    <ScrollableList
+      :items="followData"
+      :loading="false"
+      :refreshing="refreshing"
+      :has-more="false"
       :refresher-enabled="true"
-      :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh"
+      empty-icon="📚"
+      empty-title="还没有关注的书籍"
+      empty-description="在榜单中发现感兴趣的书籍并关注它们"
+      @refresh="onRefresh"
     >
-      <view class="books-list" v-if="followData.length > 0">
+      <view class="books-list">
         <swiper-item
           v-for="item in followData" 
           :key="item.id"
@@ -54,28 +58,22 @@
         </swiper-item>
       </view>
       
-      <!-- 空状态 -->
-      <view class="empty-state" v-else>
-        <text class="empty-icon">📚</text>
-        <text class="empty-title">还没有关注的书籍</text>
-        <text class="empty-desc">在榜单中发现感兴趣的书籍并关注它们</text>
+      <template #empty-action>
         <BaseButton 
           type="primary"
           text="去发现书籍"
           @click="goToRanking"
         />
-      </view>
-    </scroll-view>
+      </template>
+    </ScrollableList>
     
-    <!-- 底部导航 -->
-    <TabBar :current-index="2" />
   </view>
 </template>
 
 <script>
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
-import TabBar from '@/components/TabBar.vue'
+import ScrollableList from '@/components/ScrollableList.vue'
 import dataManager from '@/utils/data-manager.js'
 import formatterMixin from '@/mixins/formatter.js'
 import navigationMixin from '@/mixins/navigation.js'
@@ -85,7 +83,7 @@ export default {
   components: {
     BaseCard,
     BaseButton,
-    TabBar
+    ScrollableList
   },
   mixins: [formatterMixin, navigationMixin],
   
@@ -227,7 +225,7 @@ export default {
 .follow-page {
   min-height: 100vh;
   background: $surface-white;
-  padding-bottom: 160rpx; // 为TabBar留出空间
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .stats-section {
@@ -265,11 +263,6 @@ export default {
       }
     }
   }
-}
-
-.books-container {
-  flex: 1;
-  padding: 0 $spacing-lg;
 }
 
 .books-list {
@@ -378,32 +371,4 @@ export default {
   }
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120rpx $spacing-lg;
-  text-align: center;
-  
-  .empty-icon {
-    font-size: 120rpx;
-    margin-bottom: $spacing-lg;
-    opacity: 0.6;
-  }
-  
-  .empty-title {
-    font-size: 32rpx;
-    font-weight: 600;
-    color: $text-primary;
-    margin-bottom: $spacing-xs;
-  }
-  
-  .empty-desc {
-    font-size: 24rpx;
-    color: $text-secondary;
-    margin-bottom: $spacing-xl;
-    line-height: 1.5;
-  }
-}
 </style>

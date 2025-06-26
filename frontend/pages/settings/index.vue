@@ -87,14 +87,14 @@
     <view class="other-section">
       <BaseCard class="other-card">
         <view class="other-list">
-          <view class="setting-item clickable" @tap="goToApiConfig">
+          <view class="setting-item clickable" @tap="showEnvSelector">
             <view class="item-left">
               <view class="item-icon">
                 <text class="icon-text">🔧</text>
               </view>
               <view class="item-info">
-                <text class="item-title">API配置</text>
-                <text class="item-desc">配置数据源和环境</text>
+                <text class="item-title">环境切换</text>
+                <text class="item-desc">当前: {{ currentEnvName }}</text>
               </view>
             </view>
             <text class="item-arrow">›</text>
@@ -116,21 +116,18 @@
       </BaseCard>
     </view>
     
-    <!-- 底部导航 -->
-    <TabBar :current-index="3" />
   </view>
 </template>
 
 <script>
 import BaseCard from '@/components/BaseCard.vue'
-import TabBar from '@/components/TabBar.vue'
 import navigationMixin from '@/mixins/navigation.js'
+import envConfig from '@/utils/env-config.js'
 
 export default {
   name: 'SettingsPage',
   components: {
-    BaseCard,
-    TabBar
+    BaseCard
   },
   mixins: [navigationMixin],
   
@@ -140,12 +137,15 @@ export default {
       settings: {
         autoUpdate: true,
         localCache: true
-      }
+      },
+      currentEnv: '',
+      currentEnvName: ''
     }
   },
   
   onLoad() {
     this.loadSettings()
+    this.loadCurrentEnv()
   },
   
   methods: {
@@ -200,8 +200,68 @@ export default {
       })
     },
     
-    goToApiConfig() {
-      this.navigateTo('/pages/settings/api-config')
+    loadCurrentEnv() {
+      this.currentEnv = envConfig.getCurrentEnv()
+      const envNames = {
+        'test': '测试环境',
+        'dev': '开发环境', 
+        'prod': '生产环境'
+      }
+      this.currentEnvName = envNames[this.currentEnv] || this.currentEnv
+    },
+    
+    showEnvSelector() {
+      const envs = envConfig.getAvailableEnvs()
+      const envNames = envs.map(env => {
+        const displayNames = {
+          'test': '测试环境 (假数据)',
+          'dev': '开发环境 (localhost:8000)',
+          'prod': '生产环境 (服务器)'
+        }
+        return displayNames[env.key] || env.name
+      })
+      
+      uni.showActionSheet({
+        itemList: envNames,
+        success: (res) => {
+          const selectedEnv = envs[res.tapIndex]
+          if (selectedEnv && !selectedEnv.current) {
+            this.switchEnvironment(selectedEnv.key)
+          }
+        }
+      })
+    },
+    
+    switchEnvironment(env) {
+      uni.showModal({
+        title: '切换环境',
+        content: `确定要切换到${env === 'test' ? '测试' : env === 'dev' ? '开发' : '生产'}环境吗？`,
+        success: (res) => {
+          if (res.confirm) {
+            const success = envConfig.switchEnv(env)
+            if (success) {
+              this.loadCurrentEnv()
+              uni.showToast({
+                title: '环境切换成功',
+                icon: 'success',
+                duration: 1500
+              })
+              
+              // 重新加载页面数据
+              setTimeout(() => {
+                uni.reLaunch({
+                  url: '/pages/index/index'
+                })
+              }, 1500)
+            } else {
+              uni.showToast({
+                title: '环境切换失败',
+                icon: 'none'
+              })
+            }
+          }
+        }
+      })
     },
     
     clearData() {
@@ -253,7 +313,7 @@ export default {
 .settings-page {
   min-height: 100vh;
   background: $surface-white;
-  padding-bottom: 160rpx; // 为TabBar留出空间
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .user-section {

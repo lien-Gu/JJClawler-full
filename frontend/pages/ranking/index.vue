@@ -17,59 +17,44 @@
     />
     
     <!-- 榜单列表 -->
-    <scroll-view 
-      class="rankings-container"
-      scroll-y
-      :refresher-enabled="true"
-      :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh"
-      @scrolltolower="onLoadMore"
+    <ScrollableList
+      :items="filteredRankings"
+      :loading="loading"
+      :refreshing="refreshing"
+      :has-more="hasMore"
+      :height="'calc(100vh - 300rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom))'"
+      empty-icon="📋"
+      empty-title="暂无榜单数据"
+      no-more-text="没有更多榜单了"
+      @refresh="onRefresh"
+      @load-more="onLoadMore"
     >
-      <view class="rankings-list">
-        <RankingListItem
-          v-for="(ranking, index) in filteredRankings"
-          :key="ranking.id"
-          :ranking="ranking"
-          :index="index"
-          @click="handleRankingClick"
-        />
-        
-        <!-- 加载更多提示 -->
-        <view v-if="loading" class="loading-more">
-          <text class="loading-text">加载中...</text>
-        </view>
-        
-        <!-- 没有更多数据提示 -->
-        <view v-if="!hasMore && filteredRankings.length > 0" class="no-more">
-          <text class="no-more-text">没有更多榜单了</text>
-        </view>
-        
-        <!-- 空状态 -->
-        <view v-if="filteredRankings.length === 0 && !loading" class="empty-state">
-          <text class="empty-text">暂无榜单数据</text>
-        </view>
-      </view>
-    </scroll-view>
+      <RankingListItem
+        v-for="(ranking, index) in filteredRankings"
+        :key="ranking.id"
+        :ranking="ranking"
+        :index="index"
+        @click="handleRankingClick"
+      />
+    </ScrollableList>
     
-    <!-- TabBar -->
-    <TabBar :current-index="1" />
   </view>
 </template>
 
 <script>
-import TabBar from '@/components/TabBar.vue';
 import SearchBar from '@/components/SearchBar.vue';
 import CategoryTabs from '@/components/CategoryTabs.vue';
 import RankingListItem from '@/components/RankingListItem.vue';
+import ScrollableList from '@/components/ScrollableList.vue';
 import dataManager from '@/utils/data-manager.js';
 
 export default {
   name: 'RankingPage',
   components: {
-    TabBar,
     SearchBar,
     CategoryTabs,
-    RankingListItem
+    RankingListItem,
+    ScrollableList
   },
   data() {
     return {
@@ -284,55 +269,7 @@ export default {
 .ranking-page {
   min-height: 100vh;
   background: $surface-default;
-  padding-bottom: calc(#{$tabbar-height} + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.rankings-container {
-  flex: 1;
-  height: calc(100vh - 300rpx - #{$tabbar-height} - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-}
-
-.rankings-list {
-  padding: 0 $spacing-md;
-  padding-bottom: $spacing-lg;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: $spacing-md 0;
-}
-
-.loading-text {
-  font-family: $font-family-base;
-  font-size: $caption-font-size-rpx;
-  color: $text-secondary;
-}
-
-.no-more {
-  display: flex;
-  justify-content: center;
-  padding: $spacing-md 0;
-}
-
-.no-more-text {
-  font-family: $font-family-base;
-  font-size: $caption-font-size-rpx;
-  color: $text-secondary;
-  opacity: 0.6;
-}
-
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400rpx;
-}
-
-.empty-text {
-  font-family: $font-family-base;
-  font-size: 32rpx;
-  color: $text-secondary;
-  opacity: 0.6;
-}
 </style> 
