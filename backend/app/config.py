@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """应用配置"""
     
     # 项目信息
-    PROJECT_NAME: str = "JJCrawler3"
+    PROJECT_NAME: str = "JJCrawler"
     VERSION: str = "0.1.0"
     DEBUG: bool = True
     

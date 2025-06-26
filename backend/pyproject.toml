@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "jjclawer3"
+name = "jjcrawler"
 version = "0.1.0"
 description = "晋江文学城爬虫后端项目 - FastAPI + SQLModel实现"
 authors = ["lien <38693632+lien-Gu@users.noreply.github.com>"]

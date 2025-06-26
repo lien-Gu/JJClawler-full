@@ -3,34 +3,16 @@ Book数据访问对象
 
 封装Book和BookSnapshot的数据库操作
 """
-import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from sqlmodel import Session, select, func, and_, or_, desc
-from app.modules.database import get_session_sync
+from sqlmodel import select, func, and_, or_, desc
+
+from app.modules.base import BaseDAO
 from app.modules.models import Book, BookSnapshot
 
-logger = logging.getLogger(__name__)
 
-
-class BookDAO:
+class BookDAO(BaseDAO):
     """Book数据访问对象"""
-    
-    def __init__(self):
-        self._session: Optional[Session] = None
-    
-    @property
-    def session(self) -> Session:
-        """获取数据库会话"""
-        if self._session is None:
-            self._session = get_session_sync()
-        return self._session
-    
-    def close(self):
-        """关闭数据库会话"""
-        if self._session:
-            self._session.close()
-            self._session = None
 
     # ==================== Book基础CRUD ====================
     

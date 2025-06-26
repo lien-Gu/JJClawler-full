@@ -79,159 +79,58 @@ for channel in "${channels[@]}"; do
 done
 ```
 
-### 方法2：Python脚本
+### 方法2：直接API调用 (简化版)
 
-#### 创建夹子榜爬虫脚本 (`manual_jiazi_crawl.py`)
-```python
-import asyncio
-from app.modules.service.crawler_service import CrawlerService
-from app.modules.service.task_service import get_task_manager, TaskType, execute_with_task
-
-async def run_jiazi_crawl():
-    """手动运行夹子榜爬虫"""
-    print("开始执行夹子榜爬虫...")
-    
-    task_manager = get_task_manager()
-    task_id = task_manager.create_task(
-        TaskType.JIAZI, 
-        {"trigger_source": "manual"}
-    )
-    
-    async def crawl_func():
-        crawler_service = CrawlerService()
-        try:
-            result = await crawler_service.crawl_and_save_jiazi()
-            print(f"爬取完成: {result}")
-            return result
-        finally:
-            crawler_service.close()
-    
-    success = await execute_with_task(task_id, crawl_func)
-    
-    if success:
-        print(f"夹子榜爬虫执行成功，任务ID: {task_id}")
-    else:
-        print(f"夹子榜爬虫执行失败，任务ID: {task_id}")
-
-if __name__ == "__main__":
-    asyncio.run(run_jiazi_crawl())
-```
-
-#### 创建页面爬虫脚本 (`manual_page_crawl.py`)
-```python
-import asyncio
-import sys
-from app.modules.service.crawler_service import CrawlerService
-from app.modules.service.task_service import get_task_manager, TaskType, execute_with_task
-from app.modules.service.page_service import get_page_service
-
-async def run_page_crawl(channel: str):
-    """手动运行指定频道的页面爬虫"""
-    print(f"开始执行频道 {channel} 的页面爬虫...")
-    
-    # 验证频道
-    page_service = get_page_service()
-    available_channels = page_service.get_ranking_channels()
-    valid_channels = [c['channel'] for c in available_channels]
-    
-    if channel not in valid_channels:
-        print(f"错误：无效频道 {channel}")
-        print(f"可用频道：{valid_channels}")
-        return
-    
-    # 创建并执行任务
-    task_manager = get_task_manager()
-    task_id = task_manager.create_task(
-        TaskType.PAGE, 
-        {"trigger_source": "manual", "channel": channel}
-    )
-    
-    async def crawl_func():
-        crawler_service = CrawlerService()
-        try:
-            result = await crawler_service.crawl_and_save_page(channel)
-            print(f"频道 {channel} 爬取完成: {result}")
-            return result
-        finally:
-            crawler_service.close()
-    
-    success = await execute_with_task(task_id, crawl_func)
-    
-    if success:
-        print(f"频道 {channel} 爬虫执行成功，任务ID: {task_id}")
-    else:
-        print(f"频道 {channel} 爬虫执行失败，任务ID: {task_id}")
-
-async def run_all_page_crawls():
-    """运行所有页面爬虫"""
-    print("开始执行所有页面爬虫...")
-    
-    page_service = get_page_service()
-    channels = page_service.get_ranking_channels()
-    
-    for channel_info in channels:
-        channel = channel_info['channel']
-        if channel == 'jiazi':
-            continue
-        
-        print(f"\n正在爬取频道：{channel} ({channel_info.get('zh_name', '未知')})")
-        await run_page_crawl(channel)
-        await asyncio.sleep(2)
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        channel = sys.argv[1]
-        asyncio.run(run_page_crawl(channel))
-    else:
-        asyncio.run(run_all_page_crawls())
-```
-
-#### 创建完整执行脚本 (`run_all_crawlers.py`)
-```python
-import asyncio
-from manual_jiazi_crawl import run_jiazi_crawl
-from manual_page_crawl import run_all_page_crawls
-
-async def run_all_crawlers():
-    """运行所有爬虫任务"""
-    print("=" * 50)
-    print("开始执行所有爬虫任务")
-    print("=" * 50)
-    
-    # 1. 运行夹子榜爬虫
-    print("\n1. 执行夹子榜爬虫")
-    await run_jiazi_crawl()
-    
-    # 2. 运行所有页面爬虫
-    print("\n2. 执行所有页面爬虫")
-    await run_all_page_crawls()
-    
-    print("\n" + "=" * 50)
-    print("所有爬虫任务执行完成")
-    print("=" * 50)
-
-if __name__ == "__main__":
-    asyncio.run(run_all_crawlers())
-```
-
-### 方法3：命令行执行
+由于项目已移除手动脚本，推荐直接使用API调用：
 
 ```bash
-# 进入项目目录
-cd backend
-poetry shell
+# 创建简单的执行脚本
+cat > run_crawler.sh << 'EOF'
+#!/bin/bash
+BASE_URL="http://localhost:8000/api/v1"
 
-# 运行夹子榜爬虫
-python manual_jiazi_crawl.py
+echo "=== 夹子榜爬虫 ==="
+curl -X POST "$BASE_URL/crawl/jiazi" -H "Content-Type: application/json" -d '{"immediate": true}'
 
-# 运行特定频道页面爬虫
-python manual_page_crawl.py yq
+echo -e "\n=== 页面爬虫 ==="
+for channel in yq ca ys nocp_plus bh index; do
+    echo "正在爬取频道: $channel"
+    curl -X POST "$BASE_URL/crawl/page/$channel" -H "Content-Type: application/json" -d '{"immediate": true}'
+    sleep 2
+done
 
-# 运行所有页面爬虫
-python manual_page_crawl.py
+echo -e "\n=== 爬虫执行完成 ==="
+EOF
 
-# 运行所有爬虫
-python run_all_crawlers.py
+chmod +x run_crawler.sh
+./run_crawler.sh
+```
+
+### 方法3：Python代码示例
+
+如需在Python代码中调用爬虫：
+
+```python
+import asyncio
+from app.modules.service.crawler_service import CrawlerService
+
+async def run_manual_crawl():
+    """手动执行爬虫"""
+    with CrawlerService() as crawler:
+        # 执行夹子榜爬虫
+        print("执行夹子榜爬虫...")
+        jiazi_result = await crawler.crawl_and_save_jiazi()
+        print(f"夹子榜结果: {jiazi_result}")
+        
+        # 执行页面爬虫
+        for channel in ['yq', 'ca', 'ys']:
+            print(f"执行频道 {channel} 爬虫...")
+            page_result = await crawler.crawl_and_save_page(channel)
+            print(f"频道 {channel} 结果: {page_result}")
+            await asyncio.sleep(1)
+
+# 在项目根目录下执行
+# poetry run python -c "import asyncio; from your_script import run_manual_crawl; asyncio.run(run_manual_crawl())"
 ```
 
 ## 任务监控
@@ -261,41 +160,64 @@ curl -X GET "http://localhost:8000/api/v1/crawl/monitor/status"
 
 ### 监控脚本
 
-创建 `monitor_tasks.py`：
+创建简单的监控脚本 `monitor.sh`：
+```bash
+#!/bin/bash
+echo "=== JJCrawler 任务监控 ==="
+
+while true; do
+    echo "$(date): 检查任务状态..."
+    
+    # 检查任务状态
+    curl -s http://localhost:8000/api/v1/crawl/tasks | jq '.'
+    
+    # 检查调度器状态
+    echo -e "\n调度器状态:"
+    curl -s http://localhost:8000/api/v1/crawl/scheduler/status | jq '.'
+    
+    echo -e "\n等待30秒...\n"
+    sleep 30
+done
+```
+
+或者使用Python简化版本：
 ```python
 import asyncio
-import time
-from app.modules.service.task_service import get_task_manager
+import httpx
+import json
+from datetime import datetime
 
-async def monitor_tasks():
-    """监控任务状态"""
-    task_manager = get_task_manager()
-    
-    while True:
-        try:
-            summary = task_manager.get_task_summary()
-            print(f"\n任务状态 [{time.strftime('%Y-%m-%d %H:%M:%S')}]:")
-            print(f"  当前任务: {summary['current_count']}")
-            print(f"  已完成: {summary['completed_count']}")
-            print(f"  失败任务: {summary['failed_count']}")
-            
-            # 显示当前运行的任务
-            if summary['current_tasks']:
-                print("  正在运行的任务:")
-                for task in summary['current_tasks']:
-                    print(f"    - {task['task_id']} ({task['task_type']}) - {task['status']}")
-            
-            await asyncio.sleep(30)  # 每30秒检查一次
-            
-        except KeyboardInterrupt:
-            print("\n监控已停止")
-            break
-        except Exception as e:
-            print(f"监控错误: {e}")
-            await asyncio.sleep(5)
+async def monitor_crawler():
+    """简化的任务监控"""
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                # 获取任务状态
+                response = await client.get("http://localhost:8000/api/v1/crawl/tasks")
+                tasks = response.json()
+                
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 任务状态:")
+                print(f"  总任务数: {len(tasks)}")
+                
+                running = [t for t in tasks if t.get('status') == 'running']
+                completed = [t for t in tasks if t.get('status') == 'completed']
+                failed = [t for t in tasks if t.get('status') == 'failed']
+                
+                print(f"  运行中: {len(running)}")
+                print(f"  已完成: {len(completed)}")
+                print(f"  失败: {len(failed)}")
+                
+                await asyncio.sleep(30)
+                
+            except KeyboardInterrupt:
+                print("\n监控停止")
+                break
+            except Exception as e:
+                print(f"监控错误: {e}")
+                await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    asyncio.run(monitor_tasks())
+    asyncio.run(monitor_crawler())
 ```
 
 ## 故障排除

@@ -5,11 +5,13 @@
 """
 import re
 import html
-import logging
 from typing import Any, Dict, List, Optional, Union, Callable
 from decimal import Decimal, InvalidOperation
 
-logger = logging.getLogger(__name__)
+from app.utils.log_utils import get_logger
+from app.utils.number_utils import parse_number
+
+logger = get_logger(__name__)
 
 
 def validate_data(data: Any, rules: Dict[str, Callable]) -> Dict[str, Any]:
@@ -229,12 +231,7 @@ def normalize_book_id(book_id: Any) -> Optional[str]:
 
 def parse_numeric_field(data: Any, field_name: str = "unknown") -> Optional[int]:
     """
-    从数据中解析数字字段（专为爬虫数据设计）
-    
-    支持的格式：
-    - 纯数字：123, "456"
-    - 带单位：1.2万, 3千, "5.6万"
-    - 中文数字：一万, 三千 (基础支持)
+    从数据中解析数字字段（向后兼容，推荐使用parse_number）
     
     Args:
         data: 要解析的数据
@@ -243,74 +240,10 @@ def parse_numeric_field(data: Any, field_name: str = "unknown") -> Optional[int]
     Returns:
         Optional[int]: 解析后的数字，失败时返回None
     """
-    if data is None:
-        return None
-    
-    # 转换为字符串并清理
-    text = str(data).strip()
-    if not text:
-        return None
-    
-    try:
-        # 移除常见的无用字符
-        text = text.replace(',', '').replace('，', '')
-        
-        # 尝试直接转换为整数
-        if text.isdigit():
-            return int(text)
-        
-        # 处理负数
-        if text.startswith('-') and text[1:].isdigit():
-            return int(text)
-        
-        # 处理带单位的数字
-        import re
-        
-        # 匹配数字+单位的模式
-        pattern = r'([\d.]+)\s*([万千]?)'
-        match = re.search(pattern, text)
-        
-        if match:
-            number_str, unit = match.groups()
-            try:
-                number = float(number_str)
-                
-                if unit == '万':
-                    return int(number * 10000)
-                elif unit == '千':
-                    return int(number * 1000)
-                else:
-                    return int(number)
-            except ValueError:
-                pass
-        
-        # 处理纯小数
-        try:
-            return int(float(text))
-        except ValueError:
-            pass
-        
-        # 基础中文数字转换
-        chinese_map = {
-            '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-            '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-            '万': 10000, '千': 1000, '百': 100
-        }
-        
-        if all(c in chinese_map or c in '零' for c in text):
-            # 简单的中文数字转换（仅支持基本格式）
-            if text == '一万':
-                return 10000
-            elif text == '三千':
-                return 3000
-            # 可以根据需要扩展更多规则
-        
-        logger.debug(f"无法解析数字字段 {field_name}: {text}")
-        return None
-        
-    except Exception as e:
-        logger.debug(f"解析数字字段 {field_name} 时出错: {text} - {e}")
-        return None
+    result = parse_number(data)
+    if result is None:
+        logger.debug(f"无法解析数字字段 {field_name}: {data}")
+    return result
 
 
 def parse_number_with_unit(text: str) -> Optional[int]:

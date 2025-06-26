@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from app.modules.models import Book, BookSnapshot, Ranking, RankingSnapshot, BookDetail
+from app.utils.number_utils import parse_number, format_number
 
 
 def book_to_detail(
@@ -98,9 +99,7 @@ def format_ranking_item(
 
 def extract_numeric_value(text: str, default: int = 0) -> int:
     """
-    从文本中提取数字值
-    
-    处理各种格式的数字文本（如 "1.2万"、"3千"）
+    从文本中提取数字值（向后兼容）
     
     Args:
         text: 包含数字的文本
@@ -109,29 +108,8 @@ def extract_numeric_value(text: str, default: int = 0) -> int:
     Returns:
         提取的数字值
     """
-    if not text or not isinstance(text, str):
-        return default
-    
-    # 移除空白字符
-    text = text.strip()
-    
-    # 处理空字符串
-    if not text:
-        return default
-    
-    try:
-        # 处理万、千等单位
-        if '万' in text:
-            num_part = text.replace('万', '').replace(',', '')
-            return int(float(num_part) * 10000)
-        elif '千' in text:
-            num_part = text.replace('千', '').replace(',', '')
-            return int(float(num_part) * 1000)
-        else:
-            # 移除逗号并转换为整数
-            return int(text.replace(',', ''))
-    except (ValueError, TypeError):
-        return default
+    result = parse_number(text, default)
+    return result if result is not None else default
 
 
 def normalize_datetime(dt: Any) -> Optional[datetime]:

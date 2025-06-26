@@ -3,7 +3,6 @@ FastAPI 应用入口
 
 晋江文学城爬虫后端服务主应用
 """
-import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -11,20 +10,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings, ensure_directories
+from app.middleware import ErrorHandlingMiddleware
+from app.utils.log_utils import get_logger
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    logger.info("正在启动 JJCrawler3 应用...")
+    logger.info("正在启动 JJCrawler 应用...")
     
     # 确保必要目录存在
     ensure_directories()
@@ -99,6 +95,9 @@ def create_app() -> FastAPI:
         allowed_origins = ["*"]
     else:
         allowed_origins = cors_origins
+    
+    # 添加错误处理中间件
+    app.add_middleware(ErrorHandlingMiddleware)
     
     app.add_middleware(
         CORSMiddleware,

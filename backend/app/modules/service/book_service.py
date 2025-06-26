@@ -6,36 +6,31 @@ Book业务服务
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
+from app.modules.base import BaseService, handle_service_error
 from app.modules.dao import BookDAO, RankingDAO
 from app.modules.models import (
     BookDetail, BookInRanking, BookRankingHistory, 
     BookTrendData, Book, BookSnapshot
 )
-from app.utils.log_utils import get_logger
 from app.utils.transform_utils import book_to_detail
 
-logger = get_logger(__name__)
 
-
-class BookService:
+class BookService(BaseService):
     """Book业务服务类"""
     
     def __init__(self):
+        super().__init__()
         self.book_dao = BookDAO()
         self.ranking_dao = RankingDAO()
-    
-    def close(self):
-        """关闭服务"""
-        self.book_dao.close()
-        self.ranking_dao.close()
+        self.add_dao(self.book_dao)
+        self.add_dao(self.ranking_dao)
     
     def get_total_books(self) -> int:
         """获取书籍总数"""
         try:
             return self.book_dao.count_books()
         except Exception as e:
-            logger.error(f"获取书籍总数失败: {e}")
-            return 0
+            return handle_service_error(self.logger, "获取书籍总数", e, 0)
     
     def get_recent_snapshots_count(self, hours: int = 24) -> int:
         """获取最近N小时的快照数量"""
@@ -43,8 +38,7 @@ class BookService:
             cutoff_time = datetime.now() - timedelta(hours=hours)
             return self.book_dao.count_snapshots_since(cutoff_time)
         except Exception as e:
-            logger.error(f"获取最近快照数量失败: {e}")
-            return 0
+            return handle_service_error(self.logger, "获取最近快照数量", e, 0)
     
     def get_book_detail(self, book_id: str) -> Optional[BookDetail]:
         """获取书籍详细信息（包含最新动态数据）"""
