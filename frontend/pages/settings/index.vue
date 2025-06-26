@@ -2,94 +2,230 @@
   <view class="settings-page">
     <!-- 用户信息区域 -->
     <view class="user-section">
-      <view class="user-info">
-        <view class="avatar-section">
-          <view class="user-avatar placeholder">
-            <text class="avatar-text">👤</text>
+      <BaseCard class="user-card">
+        <view class="user-info">
+          <view class="avatar-section">
+            <view class="user-avatar" @tap="selectAvatar">
+              <image v-if="userAvatar" :src="userAvatar" class="avatar-image" />
+              <view v-else class="avatar-placeholder">
+                <text class="avatar-icon">👤</text>
+              </view>
+            </view>
+          </view>
+          
+          <view class="user-details">
+            <text class="user-name">游客用户</text>
+            <text class="user-status">未登录</text>
           </view>
         </view>
-        
-        <view class="user-details">
-          <text class="user-name">游客用户</text>
-          <text class="user-status">未登录</text>
-        </view>
-      </view>
+      </BaseCard>
     </view>
     
     <!-- 功能设置区域 -->
     <view class="settings-section">
-      <view class="section-title">功能设置</view>
-      
-      <!-- 设置项列表 -->
-      <view class="settings-list">
-        <view class="setting-item" @tap="goToApiConfig">
-          <view class="item-content">
-            <text class="item-icon">🔧</text>
-            <view class="item-info">
-              <text class="item-title">API配置</text>
-              <text class="item-desc">配置数据源和环境</text>
-            </view>
-          </view>
-          <text class="item-arrow">></text>
-        </view>
+      <BaseCard class="settings-card">
+        <template #header>
+          <text class="settings-title">功能设置</text>
+        </template>
         
-        <view class="setting-item" @tap="clearCache">
-          <view class="item-content">
-            <text class="item-icon">🗑️</text>
-            <view class="item-info">
-              <text class="item-title">清除缓存</text>
-              <text class="item-desc">清除本地存储的数据</text>
+        <!-- 设置项列表 -->
+        <view class="settings-list">
+          <!-- 自动更新 -->
+          <view class="setting-item">
+            <view class="item-left">
+              <view class="item-icon auto-update">
+                <text class="icon-text">🔁</text>
+              </view>
+              <view class="item-info">
+                <text class="item-title">自动更新</text>
+                <text class="item-desc">自动获取最新数据</text>
+              </view>
             </view>
+            <switch 
+              :checked="settings.autoUpdate" 
+              @change="toggleAutoUpdate"
+              color="#4A4459"
+            />
           </view>
-          <text class="item-arrow">></text>
-        </view>
-        
-        <view class="setting-item" @tap="showAbout">
-          <view class="item-content">
-            <text class="item-icon">ℹ️</text>
-            <view class="item-info">
-              <text class="item-title">关于应用</text>
-              <text class="item-desc">版本信息和反馈</text>
+          
+          <!-- 本地缓存 -->
+          <view class="setting-item">
+            <view class="item-left">
+              <view class="item-icon local-cache">
+                <text class="icon-text">💾</text>
+              </view>
+              <view class="item-info">
+                <text class="item-title">本地缓存</text>
+                <text class="item-desc">启用本地数据缓存</text>
+              </view>
             </view>
+            <switch 
+              :checked="settings.localCache" 
+              @change="toggleLocalCache"
+              color="#4A4459"
+            />
           </view>
-          <text class="item-arrow">></text>
+          
+          <!-- 清理数据 -->
+          <view class="setting-item clickable" @tap="clearData">
+            <view class="item-left">
+              <view class="item-icon clear-data">
+                <text class="icon-text">🗑️</text>
+              </view>
+              <view class="item-info">
+                <text class="item-title">清理数据</text>
+                <text class="item-desc">清除本地数据和缓存</text>
+              </view>
+            </view>
+            <text class="item-arrow">›</text>
+          </view>
         </view>
-      </view>
+      </BaseCard>
     </view>
+    
+    <!-- 其他设置 -->
+    <view class="other-section">
+      <BaseCard class="other-card">
+        <view class="other-list">
+          <view class="setting-item clickable" @tap="goToApiConfig">
+            <view class="item-left">
+              <view class="item-icon">
+                <text class="icon-text">🔧</text>
+              </view>
+              <view class="item-info">
+                <text class="item-title">API配置</text>
+                <text class="item-desc">配置数据源和环境</text>
+              </view>
+            </view>
+            <text class="item-arrow">›</text>
+          </view>
+          
+          <view class="setting-item clickable" @tap="showAbout">
+            <view class="item-left">
+              <view class="item-icon">
+                <text class="icon-text">ℹ️</text>
+              </view>
+              <view class="item-info">
+                <text class="item-title">关于应用</text>
+                <text class="item-desc">版本信息和反馈</text>
+              </view>
+            </view>
+            <text class="item-arrow">›</text>
+          </view>
+        </view>
+      </BaseCard>
+    </view>
+    
+    <!-- 底部导航 -->
+    <TabBar :current-index="3" />
   </view>
 </template>
 
 <script>
+import BaseCard from '@/components/BaseCard.vue'
+import TabBar from '@/components/TabBar.vue'
+import navigationMixin from '@/mixins/navigation.js'
+
 export default {
   name: 'SettingsPage',
+  components: {
+    BaseCard,
+    TabBar
+  },
+  mixins: [navigationMixin],
   
   data() {
-    return {}
+    return {
+      userAvatar: '',
+      settings: {
+        autoUpdate: true,
+        localCache: true
+      }
+    }
+  },
+  
+  onLoad() {
+    this.loadSettings()
   },
   
   methods: {
-    goToApiConfig() {
-      uni.navigateTo({
-        url: '/pages/settings/api-config'
+    loadSettings() {
+      try {
+        const savedSettings = uni.getStorageSync('appSettings')
+        if (savedSettings) {
+          this.settings = { ...this.settings, ...savedSettings }
+        }
+        
+        const savedAvatar = uni.getStorageSync('userAvatar')
+        if (savedAvatar) {
+          this.userAvatar = savedAvatar
+        }
+      } catch (error) {
+        console.error('加载设置失败:', error)
+      }
+    },
+    
+    saveSettings() {
+      try {
+        uni.setStorageSync('appSettings', this.settings)
+      } catch (error) {
+        console.error('保存设置失败:', error)
+      }
+    },
+    
+    toggleAutoUpdate(e) {
+      this.settings.autoUpdate = e.detail.value
+      this.saveSettings()
+    },
+    
+    toggleLocalCache(e) {
+      this.settings.localCache = e.detail.value
+      this.saveSettings()
+    },
+    
+    selectAvatar() {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          const tempFilePath = res.tempFilePaths[0]
+          this.userAvatar = tempFilePath
+          try {
+            uni.setStorageSync('userAvatar', tempFilePath)
+          } catch (error) {
+            console.error('保存头像失败:', error)
+          }
+        }
       })
     },
     
-    clearCache() {
+    goToApiConfig() {
+      this.navigateTo('/pages/settings/api-config')
+    },
+    
+    clearData() {
       uni.showModal({
-        title: '确认清除',
-        content: '确定要清除所有本地缓存数据吗？',
+        title: '确认清理',
+        content: '确定要清理所有本地数据和缓存吗？此操作不可恢复。',
+        confirmColor: '#ff3b30',
         success: (res) => {
           if (res.confirm) {
             try {
               uni.clearStorageSync()
+              this.settings = {
+                autoUpdate: true,
+                localCache: true
+              }
+              this.userAvatar = ''
               uni.showToast({
-                title: '清除成功',
+                title: '清理成功',
                 icon: 'success',
                 duration: 1500
               })
             } catch (error) {
               uni.showToast({
-                title: '清除失败',
+                title: '清理失败',
                 icon: 'none',
                 duration: 2000
               })
@@ -112,115 +248,172 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/design-tokens.scss';
+
 .settings-page {
   min-height: 100vh;
-  background-color: #f4f0eb;
-  padding-bottom: $safe-area-bottom;
+  background: $surface-white;
+  padding-bottom: 160rpx; // 为TabBar留出空间
 }
 
 .user-section {
-  background-color: #c3c3c3;
-  margin-bottom: $spacing-md;
   padding: $spacing-lg;
   
-  .user-info {
-    @include flex-center;
-    gap: $spacing-md;
-    
-    .avatar-section {
-      .user-avatar {
-        width: 120rpx;
-        height: 120rpx;
-        border-radius: 50%;
-        overflow: hidden;
-        background-color: $background-color;
-        @include flex-center;
-        
-        &.placeholder {
-          .avatar-text {
-            font-size: 60rpx;
-            opacity: 0.6;
+  .user-card {
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: $spacing-lg;
+      padding: $spacing-md 0;
+      
+      .avatar-section {
+        .user-avatar {
+          width: 120rpx;
+          height: 120rpx;
+          border-radius: $radius-full;
+          overflow: hidden;
+          cursor: pointer;
+          
+          .avatar-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          
+          .avatar-placeholder {
+            width: 100%;
+            height: 100%;
+            background: $surface-container-high;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            .avatar-icon {
+              font-size: 60rpx;
+              opacity: 0.6;
+            }
           }
         }
       }
-    }
-    
-    .user-details {
-      flex: 1;
       
-      .user-name {
-        display: block;
-        font-size: $font-size-lg;
-        font-weight: bold;
-        color: $text-primary;
-        margin-bottom: 4rpx;
-      }
-      
-      .user-status {
-        font-size: $font-size-sm;
-        color: $text-secondary;
+      .user-details {
+        flex: 1;
+        
+        .user-name {
+          display: block;
+          font-size: 32rpx;
+          font-weight: 600;
+          color: $text-primary;
+          margin-bottom: 8rpx;
+        }
+        
+        .user-status {
+          font-size: 24rpx;
+          color: $text-secondary;
+        }
       }
     }
   }
 }
 
 .settings-section {
-  background-color: #c3c3c3;
-  padding: $spacing-lg;
+  padding: 0 $spacing-lg $spacing-lg;
   
-  .section-title {
-    font-size: $font-size-lg;
-    font-weight: bold;
-    color: $text-primary;
-    margin-bottom: $spacing-lg;
-  }
-  
-  .settings-list {
-    .setting-item {
-      @include flex-between;
-      align-items: center;
-      padding: $spacing-lg 0;
-      border-bottom: 2rpx solid $border-light;
-      
-      &:last-child {
-        border-bottom: none;
-      }
-      
-      &:active {
-        background-color: $background-color;
-      }
-      
-      .item-content {
-        @include flex-center;
-        gap: $spacing-md;
-        flex: 1;
-        
-        .item-icon {
-          font-size: 40rpx;
-        }
-        
-        .item-info {
-          flex: 1;
-          
-          .item-title {
-            display: block;
-            font-size: $font-size-md;
-            color: $text-primary;
-            margin-bottom: 4rpx;
-          }
-          
-          .item-desc {
-            font-size: $font-size-sm;
-            color: $text-secondary;
-          }
-        }
-      }
-      
-      .item-arrow {
-        font-size: $font-size-md;
-        color: $text-placeholder;
-      }
+  .settings-card {
+    .settings-title {
+      font-size: 28rpx;
+      font-weight: 600;
+      color: $text-primary;
     }
   }
+}
+
+.other-section {
+  padding: 0 $spacing-lg;
+}
+
+.settings-list,
+.other-list {
+  .setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-lg 0;
+    
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba($text-secondary, 0.1);
+    }
+    
+    &.clickable {
+      &:active {
+        background: rgba($text-secondary, 0.05);
+        margin: 0 (-$spacing-md);
+        padding-left: $spacing-md;
+        padding-right: $spacing-md;
+        border-radius: $radius-sm;
+      }
+    }
+    
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+      flex: 1;
+      
+      .item-icon {
+        width: 56rpx;
+        height: 56rpx;
+        border-radius: $radius-md;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
+        .icon-text {
+          font-size: 28rpx;
+        }
+        
+        &.auto-update {
+          background: rgba(#34c759, 0.1);
+        }
+        
+        &.local-cache {
+          background: rgba(#007aff, 0.1);
+        }
+        
+        &.clear-data {
+          background: rgba(#ff3b30, 0.1);
+        }
+      }
+      
+      .item-info {
+        flex: 1;
+        
+        .item-title {
+          display: block;
+          font-size: 28rpx;
+          font-weight: 500;
+          color: $text-primary;
+          margin-bottom: 4rpx;
+        }
+        
+        .item-desc {
+          font-size: 22rpx;
+          color: $text-secondary;
+          line-height: 1.3;
+        }
+      }
+    }
+    
+    .item-arrow {
+      font-size: 28rpx;
+      color: rgba($text-secondary, 0.6);
+      font-weight: 300;
+    }
+  }
+}
+
+/* 微信小程序 switch 组件样式调整 */
+switch {
+  transform: scale(0.8);
 }
 </style>

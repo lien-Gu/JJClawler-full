@@ -1,55 +1,102 @@
 <template>
   <view class="follow-page">
-    <!-- 页面头部 -->
-    <view class="page-header">
-      <text class="page-title">我的关注</text>
-      <view class="header-stats">
-        <text class="stats-text">榜单 {{ followData.length }}</text>
-      </view>
+    <!-- 统计信息卡片 -->
+    <view class="stats-section">
+      <BaseCard variant="filled" class="stats-card">
+        <view class="stats-content">
+          <view class="stat-item">
+            <text class="stat-number">{{ followStats.totalBooks }}</text>
+            <text class="stat-label">关注书籍</text>
+          </view>
+          <view class="stat-divider"></view>
+          <view class="stat-item">
+            <text class="stat-number">{{ followStats.onListBooks }}</text>
+            <text class="stat-label">正在上榜</text>
+          </view>
+        </view>
+      </BaseCard>
     </view>
     
-    <!-- 关注列表 -->
-    <view class="content-section">
-      <view class="follow-list" v-if="followData.length > 0">
-        <view 
-          class="follow-item" 
+    <!-- 关注书籍列表 -->
+    <scroll-view 
+      class="books-container"
+      scroll-y
+      :refresher-enabled="true"
+      :refresher-triggered="refreshing"
+      @refresherrefresh="onRefresh"
+    >
+      <view class="books-list" v-if="followData.length > 0">
+        <swiper-item
           v-for="item in followData" 
           :key="item.id"
-          @tap="goToDetail(item)"
+          class="book-swiper-item"
         >
-          <view class="item-info">
-            <text class="item-title">{{ item.name || item.title }}</text>
-            <text class="item-desc">{{ item.description || item.author }}</text>
+          <view class="book-item" @tap="goToDetail(item)">
+            <view class="book-main-content">
+              <text class="book-title">{{ item.name || item.title }}</text>
+              <text class="book-growth" :class="getGrowthClass(item.weeklyGrowth)">
+                本周 {{ formatGrowth(item.weeklyGrowth) }}
+              </text>
+            </view>
+            <view class="book-status" :class="{ 'on-list': item.isOnList }">
+              <view class="status-indicator">
+                <text class="status-text">{{ item.isOnList ? '榜上' : '榜外' }}</text>
+              </view>
+            </view>
           </view>
-          <view class="item-action">
-            <view class="unfollow-btn" @tap.stop="unfollowItem(item)">
+          
+          <!-- 滑动操作区域 -->
+          <view class="swipe-actions">
+            <view class="action-btn unfollow-btn" @tap="unfollowItem(item)">
               <text class="action-text">取消关注</text>
             </view>
           </view>
-        </view>
+        </swiper-item>
       </view>
       
+      <!-- 空状态 -->
       <view class="empty-state" v-else>
-        <text class="empty-icon">💫</text>
-        <text class="empty-title">还没有关注内容</text>
-        <text class="empty-desc">去榜单页面关注感兴趣的内容吧</text>
-        <view class="goto-btn" @tap="goToRanking">
-          <text class="btn-text">去看看</text>
-        </view>
+        <text class="empty-icon">📚</text>
+        <text class="empty-title">还没有关注的书籍</text>
+        <text class="empty-desc">在榜单中发现感兴趣的书籍并关注它们</text>
+        <BaseButton 
+          type="primary"
+          text="去发现书籍"
+          @click="goToRanking"
+        />
       </view>
-    </view>
+    </scroll-view>
+    
+    <!-- 底部导航 -->
+    <TabBar :current-index="2" />
   </view>
 </template>
 
 <script>
+import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import TabBar from '@/components/TabBar.vue'
 import dataManager from '@/utils/data-manager.js'
+import formatterMixin from '@/mixins/formatter.js'
+import navigationMixin from '@/mixins/navigation.js'
 
 export default {
   name: 'FollowPage',
+  components: {
+    BaseCard,
+    BaseButton,
+    TabBar
+  },
+  mixins: [formatterMixin, navigationMixin],
   
   data() {
     return {
-      followData: []
+      followData: [],
+      refreshing: false,
+      followStats: {
+        totalBooks: 0,
+        onListBooks: 0
+      }
     }
   },
   
@@ -73,17 +120,51 @@ export default {
           const followList = uni.getStorageSync('followList') || []
           this.followData = followList
         }
+        
+        // 更新统计信息
+        this.updateStats()
       } catch (error) {
         console.error('加载关注数据失败:', error)
         // 备用方案：从本地存储获取
         try {
           const followList = uni.getStorageSync('followList') || []
           this.followData = followList
+          this.updateStats()
         } catch (localError) {
           console.error('本地关注数据也获取失败:', localError)
           this.followData = []
+          this.updateStats()
         }
       }
+    },
+    
+    updateStats() {
+      this.followStats.totalBooks = this.followData.length
+      this.followStats.onListBooks = this.followData.filter(item => item.isOnList).length
+    },
+    
+    async onRefresh() {
+      this.refreshing = true
+      await this.loadFollowData()
+      this.refreshing = false
+    },
+    
+    formatGrowth(growth) {
+      if (!growth && growth !== 0) return '无数据'
+      if (growth > 0) {
+        return `+${growth}%`
+      } else if (growth < 0) {
+        return `${growth}%`
+      } else {
+        return '0%'
+      }
+    },
+    
+    getGrowthClass(growth) {
+      if (!growth && growth !== 0) return 'neutral'
+      if (growth > 0) return 'positive'
+      if (growth < 0) return 'negative'
+      return 'neutral'
     },
     
     unfollowItem(item) {
@@ -104,6 +185,7 @@ export default {
         const newList = followList.filter(follow => follow.id !== item.id)
         uni.setStorageSync('followList', newList)
         this.followData = newList
+        this.updateStats()
         
         uni.showToast({
           title: '已取消关注',
@@ -133,99 +215,163 @@ export default {
     },
     
     goToRanking() {
-      uni.switchTab({
-        url: '/pages/ranking/index'
-      })
+      this.switchMainTab('ranking')
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/design-tokens.scss';
+
 .follow-page {
   min-height: 100vh;
-  background-color: #f4f0eb;
-  padding-bottom: $safe-area-bottom;
+  background: $surface-white;
+  padding-bottom: 160rpx; // 为TabBar留出空间
 }
 
-.page-header {
-  background-color: white;
+.stats-section {
   padding: $spacing-lg;
-  border-bottom: 2rpx solid $border-light;
   
-  .page-title {
-    font-size: $font-size-xl;
-    font-weight: bold;
-    color: $text-primary;
-    margin-bottom: $spacing-xs;
-  }
-  
-  .header-stats {
-    .stats-text {
-      font-size: $font-size-sm;
-      color: $text-secondary;
-    }
-  }
-}
-
-.content-section {
-  padding: $spacing-lg;
-}
-
-.follow-list {
-  .follow-item {
-    @include flex-between;
-    align-items: center;
-    padding: $spacing-lg;
-    background-color: #c3c3c3;
-    border-radius: $border-radius-medium;
-    margin-bottom: $spacing-md;
-    box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
-    
-    &:active {
-      opacity: 0.8;
-    }
-    
-    .item-info {
-      flex: 1;
+  .stats-card {
+    .stats-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: $spacing-md 0;
       
-      .item-title {
-        display: block;
-        font-size: $font-size-md;
-        font-weight: bold;
-        color: $text-primary;
-        margin-bottom: 4rpx;
-        @include text-ellipsis;
-      }
-      
-      .item-desc {
-        font-size: $font-size-sm;
-        color: $text-secondary;
-        @include text-ellipsis;
-      }
-    }
-    
-    .item-action {
-      margin-left: $spacing-md;
-      
-      .unfollow-btn {
-        padding: $spacing-xs $spacing-md;
-        background-color: $background-color;
-        border-radius: $border-radius-small;
-        border: 2rpx solid $border-light;
+      .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         
-        .action-text {
-          font-size: $font-size-xs;
+        .stat-number {
+          font-size: 48rpx;
+          font-weight: 700;
+          color: $brand-primary;
+          margin-bottom: 8rpx;
+        }
+        
+        .stat-label {
+          font-size: 24rpx;
           color: $text-secondary;
+        }
+      }
+      
+      .stat-divider {
+        width: 1px;
+        height: 60rpx;
+        background: rgba($text-secondary, 0.2);
+      }
+    }
+  }
+}
+
+.books-container {
+  flex: 1;
+  padding: 0 $spacing-lg;
+}
+
+.books-list {
+  .book-swiper-item {
+    margin-bottom: $spacing-sm;
+    
+    .book-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: $spacing-lg;
+      background: $surface-container-high;
+      border-radius: $radius-md;
+      transition: $transition-normal;
+      
+      &:active {
+        transform: scale(0.98);
+        opacity: 0.8;
+      }
+      
+      .book-main-content {
+        flex: 1;
+        min-width: 0;
+        
+        .book-title {
+          display: block;
+          font-size: 32rpx;
+          font-weight: 500;
+          color: $text-primary;
+          margin-bottom: 8rpx;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        
+        .book-growth {
+          font-size: 24rpx;
+          font-weight: 500;
+          
+          &.positive {
+            color: #34c759;
+          }
+          
+          &.negative {
+            color: #ff3b30;
+          }
+          
+          &.neutral {
+            color: $text-secondary;
+          }
+        }
+      }
+      
+      .book-status {
+        margin-left: $spacing-md;
+        
+        .status-indicator {
+          padding: 8rpx 16rpx;
+          border-radius: $radius-full;
+          background: rgba($text-secondary, 0.1);
+          
+          .status-text {
+            font-size: 20rpx;
+            color: $text-secondary;
+          }
+        }
+        
+        &.on-list {
+          .status-indicator {
+            background: rgba($brand-primary, 0.1);
+            
+            .status-text {
+              color: $brand-primary;
+            }
+          }
+        }
+      }
+    }
+    
+    .swipe-actions {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      
+      .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 120rpx;
+        height: 100%;
+        
+        &.unfollow-btn {
+          background: #ff3b30;
+          
+          .action-text {
+            font-size: 24rpx;
+            color: $surface-default;
+          }
         }
         
         &:active {
-          background-color: #fee;
-          border-color: #faa;
-          
-          .action-text {
-            color: #f56565;
-          }
+          opacity: 0.8;
         }
       }
     }
@@ -233,44 +379,31 @@ export default {
 }
 
 .empty-state {
-  @include flex-column-center;
-  padding: $spacing-xl;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx $spacing-lg;
   text-align: center;
   
   .empty-icon {
     font-size: 120rpx;
     margin-bottom: $spacing-lg;
+    opacity: 0.6;
   }
   
   .empty-title {
-    font-size: $font-size-lg;
-    font-weight: bold;
+    font-size: 32rpx;
+    font-weight: 600;
     color: $text-primary;
     margin-bottom: $spacing-xs;
   }
   
   .empty-desc {
-    font-size: $font-size-sm;
+    font-size: 24rpx;
     color: $text-secondary;
-    margin-bottom: $spacing-lg;
+    margin-bottom: $spacing-xl;
     line-height: 1.5;
-  }
-  
-  .goto-btn {
-    @include flex-center;
-    padding: $spacing-md $spacing-xl;
-    background-color: #64a347;
-    color: white;
-    border-radius: $border-radius-medium;
-    
-    .btn-text {
-      font-size: $font-size-md;
-      font-weight: bold;
-    }
-    
-    &:active {
-      opacity: 0.8;
-    }
   }
 }
 </style>
