@@ -70,12 +70,20 @@ check_environment() {
     fi
     log_success "Docker 已安装: $(docker --version)"
     
-    # 检查Docker Compose
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose 未安装，请先安装 Docker Compose"
+    # 检查Docker Compose (现在已集成到Docker中)
+    if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
+        log_error "Docker Compose 未安装或不可用，请确保 Docker 版本支持 Compose 插件"
         exit 1
     fi
-    log_success "Docker Compose 已安装: $(docker-compose --version)"
+
+    # 优先使用集成的 docker compose，回退到独立的 docker-compose
+    if docker compose version &> /dev/null; then
+        log_success "Docker Compose 已安装 (集成版本): $(docker compose version)"
+        COMPOSE_CMD="docker compose"
+    else
+        log_success "Docker Compose 已安装 (独立版本): $(docker-compose --version)"
+        COMPOSE_CMD="docker-compose"
+    fi
     
     # 检查项目文件
     if [ ! -f "Dockerfile" ]; then
@@ -108,7 +116,7 @@ deploy_direct() {
     
     # 构建和启动
     log_info "构建和启动容器..."
-    docker-compose up -d --build
+    $COMPOSE_CMD up -d --build
     
     # 等待服务启动
     log_info "等待服务启动..."
@@ -122,7 +130,7 @@ deploy_direct() {
         log_info "前端访问配置: http://服务器IP:8000"
     else
         log_error "服务启动失败，请检查日志"
-        docker-compose logs --tail=20 jjcrawler
+        $COMPOSE_CMD logs --tail=20 jjcrawler
         exit 1
     fi
 }
@@ -144,7 +152,7 @@ deploy_nginx() {
     
     # 构建和启动
     log_info "构建和启动容器..."
-    docker-compose -f docker-compose.nginx.yml up -d --build
+    $COMPOSE_CMD -f docker-compose.nginx.yml up -d --build
     
     # 等待服务启动
     log_info "等待服务启动..."
@@ -158,7 +166,7 @@ deploy_nginx() {
         log_info "前端访问配置: http://服务器IP"
     else
         log_error "服务启动失败，请检查日志"
-        docker-compose -f docker-compose.nginx.yml logs --tail=20
+        $COMPOSE_CMD -f docker-compose.nginx.yml logs --tail=20
         exit 1
     fi
 }
@@ -168,16 +176,16 @@ show_status() {
     log_info "查看服务状态..."
     
     # 检查直接模式
-    if docker-compose ps | grep jjcrawler-backend > /dev/null; then
+    if $COMPOSE_CMD ps | grep jjcrawler-backend > /dev/null; then
         log_info "直接模式服务状态:"
-        docker-compose ps
+        $COMPOSE_CMD ps
         return
     fi
-    
+
     # 检查nginx模式
-    if docker-compose -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
+    if $COMPOSE_CMD -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
         log_info "Nginx代理模式服务状态:"
-        docker-compose -f docker-compose.nginx.yml ps
+        $COMPOSE_CMD -f docker-compose.nginx.yml ps
         return
     fi
     
@@ -189,19 +197,19 @@ show_logs() {
     log_info "查看服务日志..."
     
     # 检查哪种模式在运行
-    if docker-compose ps | grep jjcrawler-backend > /dev/null; then
-        docker-compose logs -f --tail=50 jjcrawler
-    elif docker-compose -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
+    if $COMPOSE_CMD ps | grep jjcrawler-backend > /dev/null; then
+        $COMPOSE_CMD logs -f --tail=50 jjcrawler
+    elif $COMPOSE_CMD -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
         echo "选择要查看的日志:"
         echo "1) JJCrawler 应用日志"
         echo "2) Nginx 日志"
         echo "3) 所有日志"
         read -p "请选择 (1-3): " choice
-        
+
         case $choice in
-            1) docker-compose -f docker-compose.nginx.yml logs -f --tail=50 jjcrawler ;;
-            2) docker-compose -f docker-compose.nginx.yml logs -f --tail=50 nginx ;;
-            3) docker-compose -f docker-compose.nginx.yml logs -f --tail=50 ;;
+            1) $COMPOSE_CMD -f docker-compose.nginx.yml logs -f --tail=50 jjcrawler ;;
+            2) $COMPOSE_CMD -f docker-compose.nginx.yml logs -f --tail=50 nginx ;;
+            3) $COMPOSE_CMD -f docker-compose.nginx.yml logs -f --tail=50 ;;
             *) log_error "无效选择" ;;
         esac
     else
@@ -213,11 +221,11 @@ show_logs() {
 restart_service() {
     log_info "重启服务..."
     
-    if docker-compose ps | grep jjcrawler-backend > /dev/null; then
-        docker-compose restart jjcrawler
+    if $COMPOSE_CMD ps | grep jjcrawler-backend > /dev/null; then
+        $COMPOSE_CMD restart jjcrawler
         log_success "直接模式服务已重启"
-    elif docker-compose -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
-        docker-compose -f docker-compose.nginx.yml restart
+    elif $COMPOSE_CMD -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
+        $COMPOSE_CMD -f docker-compose.nginx.yml restart
         log_success "Nginx代理模式服务已重启"
     else
         log_warning "没有检测到运行中的服务"
@@ -228,13 +236,13 @@ restart_service() {
 stop_service() {
     log_info "停止服务..."
     
-    if docker-compose ps | grep jjcrawler-backend > /dev/null; then
-        docker-compose down
+    if $COMPOSE_CMD ps | grep jjcrawler-backend > /dev/null; then
+        $COMPOSE_CMD down
         log_success "直接模式服务已停止"
     fi
-    
-    if docker-compose -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
-        docker-compose -f docker-compose.nginx.yml down
+
+    if $COMPOSE_CMD -f docker-compose.nginx.yml ps | grep jjcrawler > /dev/null; then
+        $COMPOSE_CMD -f docker-compose.nginx.yml down
         log_success "Nginx代理模式服务已停止"
     fi
     

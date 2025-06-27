@@ -52,9 +52,9 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 # 添加 Docker 仓库
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# 安装 Docker
+# 安装 Docker (包含 Docker Compose)
 sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 # 启动并设置开机自启
 sudo systemctl start docker
@@ -64,18 +64,23 @@ sudo systemctl enable docker
 sudo usermod -aG docker $USER
 ```
 
-### 3. 安装 Docker Compose
+**注意**: 从 Docker Desktop 和较新版本的 Docker Engine 开始，Docker Compose 已经作为插件集成到 Docker 中，无需单独安装。
+
+### 3. 验证 Docker Compose 安装
 
 ```bash
-# 下载 Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+# 验证 Docker Compose 插件安装（推荐方式）
+docker compose version
 
-# 设置执行权限
-sudo chmod +x /usr/local/bin/docker-compose
-
-# 验证安装
+# 如果上述命令失败，检查是否有独立的 docker-compose
 docker-compose --version
+
+# 注销并重新登录以使用户组更改生效
+# 或者运行以下命令刷新用户组
+newgrp docker
 ```
+
+**说明**: Docker Compose 现在作为 Docker 的插件提供，使用 `docker compose` 命令。如果您的系统仍使用独立版本，可以继续使用 `docker-compose` 命令。
 
 ### 4. 创建应用目录
 
@@ -294,8 +299,11 @@ ls -la data/urls.json
 ### 3. 构建 Docker 镜像
 
 ```bash
-# 构建镜像
-docker-compose build
+# 构建镜像 (使用集成的 Docker Compose)
+docker compose build
+
+# 或者使用独立版本（如果需要）
+# docker-compose build
 
 # 查看构建结果
 docker images | grep jjcrawler
@@ -304,14 +312,16 @@ docker images | grep jjcrawler
 ### 4. 启动服务
 
 ```bash
-# 启动服务
-docker-compose up -d
+# 启动服务 (使用集成的 Docker Compose)
+docker compose up -d
 
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看日志
-docker-compose logs -f jjcrawler
+docker compose logs -f jjcrawler
+
+# 注意：如果您的系统使用独立的 docker-compose，请将上述命令中的 'docker compose' 替换为 'docker-compose'
 ```
 
 ### 5. 验证部署
@@ -343,7 +353,7 @@ LOG_FILE="/opt/jjcrawler/logs/monitor.log"
 check_container() {
     if ! docker ps | grep -q $CONTAINER_NAME; then
         echo "$(date): Container $CONTAINER_NAME is not running" >> $LOG_FILE
-        docker-compose restart jjcrawler
+        docker compose restart jjcrawler
         echo "$(date): Container restarted" >> $LOG_FILE
     fi
 }
@@ -393,7 +403,7 @@ echo "*/5 * * * * /opt/jjcrawler/scripts/monitor.sh" | crontab -
     notifempty
     create 644 root root
     postrotate
-        docker-compose exec jjcrawler kill -USR1 1
+        docker compose exec jjcrawler kill -USR1 1
     endscript
 }
 ```
@@ -433,13 +443,13 @@ echo "$(date): Backup completed" >> /opt/jjcrawler/logs/backup.log
 
 ```bash
 # 查看详细日志
-docker-compose logs jjcrawler
+docker compose logs jjcrawler
 
 # 检查配置文件
-docker-compose config
+docker compose config
 
 # 重新构建镜像
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 #### 端口占用
@@ -508,10 +518,10 @@ sysctl -p
 
 ```bash
 # 重启服务
-docker-compose restart jjcrawler
+docker compose restart jjcrawler
 
 # 强制重启
-docker-compose down && docker-compose up -d
+docker compose down && docker compose up -d
 ```
 
 #### 数据恢复
@@ -521,7 +531,7 @@ docker-compose down && docker-compose up -d
 cp /opt/backups/jjcrawler/jjcrawler_YYYYMMDD_HHMMSS.db /opt/jjcrawler/data/jjcrawler.db
 
 # 重启服务
-docker-compose restart jjcrawler
+docker compose restart jjcrawler
 ```
 
 ## 管理命令参考
@@ -530,19 +540,19 @@ docker-compose restart jjcrawler
 
 ```bash
 # 查看容器状态
-docker-compose ps
+docker compose ps
 
 # 查看实时日志
-docker-compose logs -f jjcrawler
+docker compose logs -f jjcrawler
 
 # 进入容器
-docker-compose exec jjcrawler bash
+docker compose exec jjcrawler bash
 
 # 查看资源使用
 docker stats jjcrawler-backend
 
 # 更新镜像
-docker-compose pull && docker-compose up -d
+docker compose pull && docker compose up -d
 ```
 
 ### 数据管理
@@ -563,13 +573,13 @@ curl -X POST http://localhost:8000/api/v1/admin/cleanup
 
 ```bash
 # 启动服务
-docker-compose up -d
+docker compose up -d
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 重启服务
-docker-compose restart
+docker compose restart
 
 # 查看服务状态
 systemctl status docker
@@ -589,7 +599,7 @@ systemctl status docker
 如果在部署过程中遇到问题，请：
 
 1. 检查本文档的故障排除部分
-2. 查看应用日志：`docker-compose logs jjcrawler`
+2. 查看应用日志：`docker compose logs jjcrawler`
 3. 检查系统资源使用情况
 4. 提供详细的错误信息和环境信息
 
