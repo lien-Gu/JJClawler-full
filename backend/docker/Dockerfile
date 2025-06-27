@@ -8,23 +8,26 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# 安装系统依赖
+# 配置国内镜像源以加速下载
+RUN echo "deb http://mirrors.tencent.com/debian/ bookworm main" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.tencent.com/debian/ bookworm-updates main" >> /etc/apt/sources.list
+
+# 安装系统依赖（简化版）
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# 配置 pip 国内镜像源
+RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple/
+
 # 复制依赖文件
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock* requirements.txt ./
 
-# 安装 Poetry
-RUN pip install poetry
-
-# 配置 Poetry
-RUN poetry config virtualenvs.create false
-
-# 安装依赖
-RUN poetry install --without dev --no-interaction --no-ansi
+# 尝试使用 Poetry，失败则使用 pip
+RUN pip install poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --only main --no-interaction --no-ansi || \
+    pip install -r requirements.txt
 
 # 复制应用代码
 COPY app/ ./app/

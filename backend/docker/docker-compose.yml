@@ -5,46 +5,19 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: jjcrawler-backend
+    container_name: jjcrawler
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      # 数据持久化
       - ../data:/app/data
-      # 日志挂载
-      - ./logs:/app/logs
     environment:
-      # 应用配置
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - MAX_RETRIES=3
-      - REQUEST_TIMEOUT=30
-      - CRAWL_DELAY=1.0
-      # 数据库配置
-      - DATABASE_URL=sqlite:///app/data/jjcrawler.db
-      # 调度器配置
-      - SCHEDULER_ENABLED=true
-      - SCHEDULER_TIMEZONE=Asia/Shanghai
-      # CORS配置 - 允许前端访问
+      - DEBUG=false
+      - DATABASE_URL=sqlite:///./data/jjcrawler.db
       - CORS_ORIGINS=*
-      - CORS_ALLOW_CREDENTIALS=true
-    labels:
-      - "app=jjcrawler"
-      - "version=1.0.0"
-    networks:
-      - jjcrawler-network
-    
-    # 资源限制（适用于 2C4G 服务器）
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
-networks:
-  jjcrawler-network:
-    driver: bridge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
