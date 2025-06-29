@@ -15,7 +15,6 @@ from app.utils.log_utils import get_logger
 
 logger = get_logger(__name__)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
@@ -90,12 +89,13 @@ def create_app() -> FastAPI:
     
     # 配置CORS - 允许前端访问
     import os
-    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
-    if cors_origins == ["*"] or settings.DEBUG:
+    if settings.DEBUG:
         allowed_origins = ["*"]
     else:
-        allowed_origins = cors_origins
-    
+        origins_str = os.getenv("CORS_ORIGINS")
+        # 如果环境变量设置了，则按逗号分割；否则默认为允许所有
+        allowed_origins = [origin.strip() for origin in origins_str.split(",")] if origins_str else ["*"]
+
     # 添加错误处理中间件
     app.add_middleware(ErrorHandlingMiddleware)
     
@@ -134,39 +134,40 @@ def setup_routes(app: FastAPI):
         return {
             "status": "ok",
             "timestamp": datetime.now().isoformat(),
-            "service": "jjcrawler3",
+            "service": "jjcrawler",
             "version": get_settings().VERSION
         }
-    
+
     @app.get("/stats", tags=["基础"])
     async def get_system_stats():
-        """获取系统统计信息"""
-        try:
-            from app.modules.service.crawler_service import CrawlerService
-            crawler_service = CrawlerService()
-            stats = await crawler_service.get_crawl_statistics()
-            crawler_service.close()
-            
-            from app.modules.service.task_service import get_task_manager
-            task_manager = get_task_manager()
-            task_summary = task_manager.get_task_summary()
-            
-            from app.modules.service.scheduler_service import get_scheduler_stats
-            scheduler_stats = get_scheduler_stats()
-            
-            return {
-                "status": "ok",
-                "timestamp": datetime.now().isoformat(),
-                "crawler_stats": stats,
-                "task_stats": task_summary,
-                "scheduler_stats": scheduler_stats
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "timestamp": datetime.now().isoformat(),
-                "error": str(e)
-            }
+        """
+        获取系统统计信息.
+        此端点中的异常将由 ErrorHandlingMiddleware 统一处理.
+        """
+        # 局部导入以避免循环依赖，这是可接受的模式
+        from app.modules.service.crawler_service import CrawlerService
+        from app.modules.service.task_service import get_task_manager
+        from app.modules.service.scheduler_service import get_scheduler_stats
+
+        # CrawlerService 可能需要资源管理，如果它支持 async context manager 会更好
+        # 例如: async with CrawlerService() as crawler_service:
+        # 这里我们遵循现有模式
+        crawler_service = CrawlerService()
+        stats = await crawler_service.get_crawl_statistics()
+        crawler_service.close()  # 确保资源被关闭
+
+        task_manager = get_task_manager()
+        task_summary = task_manager.get_task_summary()
+
+        scheduler_stats = get_scheduler_stats()
+
+        return {
+            "status": "ok",
+            "timestamp": datetime.now().isoformat(),
+            "crawler_stats": stats,
+            "task_stats": task_summary,
+            "scheduler_stats": scheduler_stats
+        }
     
     # 注册API v1路由
     from app.api import pages, rankings, books, crawl, stats, users

@@ -29,6 +29,10 @@ black = "^24.0.0"
 isort = "^5.13.0"
 ruff = "^0.7.0"
 
+# Poetry虚拟环境配置
+[tool.poetry.virtualenvs]
+in-project = true
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

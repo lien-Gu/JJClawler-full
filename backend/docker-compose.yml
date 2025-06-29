@@ -3,14 +3,14 @@ version: '3.8'
 services:
   jjcrawler:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: jjcrawler
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      - ../data:/app/data
+      - ./data:/app/data
     environment:
       - DEBUG=false
       - DATABASE_URL=sqlite:///./data/jjcrawler.db

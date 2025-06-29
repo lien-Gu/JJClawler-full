@@ -15,12 +15,13 @@ fi
 
 # 检查文件
 if [ ! -f "Dockerfile" ]; then
-    echo "错误: 请在 docker 目录中运行此脚本"
+    echo "错误: 请在 backend 目录中运行此脚本"
+    echo "确保 Dockerfile 文件存在"
     exit 1
 fi
 
 # 确保数据目录存在
-mkdir -p ../data/tasks/history ../data/failures
+mkdir -p ./data/tasks/history ./data/failures
 
 # 构建和启动
 echo "构建和启动服务..."

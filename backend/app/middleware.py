@@ -5,8 +5,8 @@
 """
 import traceback
 from typing import Callable
-from fastapi import Request, Response, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.utils.log_utils import get_logger
@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
     """统一错误处理中间件"""
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         try:
             response = await call_next(request)
