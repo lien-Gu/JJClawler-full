@@ -7,13 +7,13 @@ from datetime import datetime
 from fastapi import APIRouter
 
 from app.modules.service import BookService, RankingService
-from app.modules.models import OverviewResponse, OverviewStats
 from app.utils.service_utils import service_context, handle_api_error
+from app.utils.response_utils import BaseResponse, success_response, error_response
 
 router = APIRouter(prefix="/stats", tags=["统计数据"])
 
 
-@router.get("/overview", response_model=OverviewResponse)
+@router.get("/overview", response_model=BaseResponse[dict])
 async def get_overview_stats():
     """
     获取首页概览统计数据
@@ -37,17 +37,17 @@ async def get_overview_stats():
             active_rankings = min(total_rankings, (recent_snapshots // 10) + 1)
             
             # 构建响应数据
-            stats = OverviewStats(
-                total_books=total_books,
-                total_rankings=total_rankings,
-                recent_snapshots=recent_snapshots,
-                active_rankings=active_rankings,
-                last_updated=datetime.now()
-            )
+            stats = {
+                "total_books": total_books,
+                "total_rankings": total_rankings,
+                "recent_snapshots": recent_snapshots,
+                "active_rankings": active_rankings,
+                "last_updated": datetime.now().isoformat()
+            }
             
-            return OverviewResponse(
-                stats=stats,
-                status="ok"
+            return success_response(
+                data=stats,
+                message="获取概览统计成功"
             )
             
     except Exception as e:

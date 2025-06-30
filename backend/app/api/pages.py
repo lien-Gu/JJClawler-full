@@ -4,15 +4,15 @@
 提供动态页面结构配置信息的API端点
 使用PageService从配置文件获取页面信息
 """
-from datetime import datetime
 from fastapi import APIRouter, HTTPException
-from app.modules.models import PagesResponse, PageConfig, SubPageConfig, RankingConfig
+
 from app.modules.service.page_service import get_page_service
+from app.utils.response_utils import BaseResponse, success_response, error_response
 
 router = APIRouter(prefix="/pages", tags=["页面配置"])
 
 
-@router.get("", response_model=PagesResponse)
+@router.get("", response_model=BaseResponse[dict])
 async def get_pages():
     """
     获取页面配置
@@ -33,81 +33,91 @@ async def get_pages():
             if config_page.get('parent_id') is None:  # 只处理根页面
                 rankings = []
                 for ranking in config_page.get('rankings', []):
-                    rankings.append(RankingConfig(
-                        ranking_id=ranking['ranking_id'],
-                        name=ranking['name'],
-                        update_frequency=ranking['update_frequency']
-                    ))
+                    rankings.append({
+                        "ranking_id": ranking['ranking_id'],
+                        "name": ranking['name'],
+                        "update_frequency": ranking['update_frequency']
+                    })
                 
                 # 构建子页面路径
                 page_path = f"/rankings/{config_page['page_id']}"
-                ranking_sub_pages.append(SubPageConfig(
-                    name=config_page['name'],
-                    path=page_path,
-                    rankings=rankings
-                ))
+                ranking_sub_pages.append({
+                    "name": config_page['name'],
+                    "path": page_path,
+                    "rankings": rankings
+                })
         
         # 主榜单页面
-        pages.append(PageConfig(
-            name="榜单页面",
-            path="/rankings",
-            sub_pages=ranking_sub_pages
-        ))
+        pages.append({
+            "name": "榜单页面",
+            "path": "/rankings",
+            "sub_pages": ranking_sub_pages
+        })
         
         # 书籍页面
-        pages.append(PageConfig(
-            name="书籍页面",
-            path="/books",
-            sub_pages=[
-                SubPageConfig(
-                    name="书籍搜索",
-                    path="/books/search",
-                    rankings=[]
-                ),
-                SubPageConfig(
-                    name="书籍详情",
-                    path="/books/detail",
-                    rankings=[]
-                )
+        pages.append({
+            "name": "书籍页面",
+            "path": "/books",
+            "sub_pages": [
+                {
+                    "name": "书籍搜索",
+                    "path": "/books/search",
+                    "rankings": []
+                },
+                {
+                    "name": "书籍详情",
+                    "path": "/books/detail",
+                    "rankings": []
+                }
             ]
-        ))
+        })
         
         # 爬虫管理页面
-        pages.append(PageConfig(
-            name="爬虫管理",
-            path="/crawl",
-            sub_pages=[
-                SubPageConfig(
-                    name="任务管理",
-                    path="/crawl/tasks",
-                    rankings=[]
-                ),
-                SubPageConfig(
-                    name="任务监控",
-                    path="/crawl/monitor",
-                    rankings=[]
-                )
+        pages.append({
+            "name": "爬虫管理",
+            "path": "/crawl",
+            "sub_pages": [
+                {
+                    "name": "任务管理",
+                    "path": "/crawl/tasks",
+                    "rankings": []
+                },
+                {
+                    "name": "任务监控",
+                    "path": "/crawl/monitor",
+                    "rankings": []
+                }
             ]
-        ))
+        })
         
         # 计算榜单总数
         total_rankings = sum(
-            len(sub_page.rankings) 
+            len(sub_page["rankings"]) 
             for page in pages 
-            for sub_page in page.sub_pages
+            for sub_page in page["sub_pages"]
         )
         
-        return PagesResponse(
-            pages=pages,
-            total_pages=len(pages),
-            total_rankings=total_rankings
+        return success_response(
+            data={
+                "pages": pages,
+                "total_pages": len(pages),
+                "total_rankings": total_rankings
+            },
+            message="获取页面配置成功"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取页面配置失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取页面配置失败",
+                error_code="PAGE_CONFIG_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=BaseResponse[dict])
 async def get_page_statistics():
     """
     获取页面统计信息
@@ -126,11 +136,14 @@ async def get_page_statistics():
             "timestamp": datetime.now().isoformat()
         }
         
-        return stats
+        return success_response(
+            data=stats,
+            message="获取页面统计成功"
+        )
     except Exception as e:
         # 如果获取失败，返回假数据
         from datetime import datetime
-        return {
+        fake_stats = {
             "total_pages": 7,
             "root_pages": 3,
             "sub_pages": 4,
@@ -145,9 +158,13 @@ async def get_page_statistics():
                 "error": str(e)
             }
         }
+        return success_response(
+            data=fake_stats,
+            message="获取页面统计成功（使用默认数据）"
+        )
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=BaseResponse[dict])
 async def refresh_page_config():
     """
     刷新页面配置缓存
@@ -156,8 +173,22 @@ async def refresh_page_config():
         操作结果
     """
     try:
+        from datetime import datetime
         page_service = get_page_service()
         page_service.refresh_config()
-        return {"message": "页面配置缓存已刷新", "timestamp": ""}
+        return success_response(
+            data={
+                "timestamp": datetime.now().isoformat(),
+                "config_reloaded": True
+            },
+            message="页面配置缓存已刷新"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"刷新配置失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="刷新配置失败",
+                error_code="CONFIG_REFRESH_ERROR",
+                details=str(e)
+            ).model_dump()
+        )

@@ -9,8 +9,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.modules.models import (CrawlJiaziRequest, CrawlRankingRequest, TaskCreateResponse, TaskInfo as ApiTaskInfo,
-                                TasksResponse)
+from app.modules.models import CrawlJiaziRequest, CrawlRankingRequest
+from app.utils.response_utils import BaseResponse, success_response, error_response
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
     trigger_manual_crawl
@@ -21,7 +21,7 @@ from app.modules.service.task_service import (create_jiazi_task, create_page_tas
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
 
-@router.post("/jiazi", response_model=TaskCreateResponse)
+@router.post("/jiazi", response_model=BaseResponse[dict])
 async def trigger_jiazi_crawl(
         request: CrawlJiaziRequest = CrawlJiaziRequest()
 ):
@@ -42,17 +42,28 @@ async def trigger_jiazi_crawl(
             # 这里可以添加到后台任务队列
             message = "夹子榜单爬取任务已创建"
 
-        return TaskCreateResponse(
-            task_id=task_id,
-            message=message + (" (强制模式)" if request.force else ""),
-            status="pending"
+        return success_response(
+            data={
+                "task_id": task_id,
+                "status": "pending",
+                "force": request.force,
+                "immediate": request.immediate
+            },
+            message=message + (" (强制模式)" if request.force else "")
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="创建任务失败",
+                error_code="TASK_CREATE_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.post("/page/{channel}", response_model=TaskCreateResponse)
+@router.post("/page/{channel}", response_model=BaseResponse[dict])
 async def trigger_page_crawl(
         channel: str,
         request: CrawlRankingRequest = CrawlRankingRequest()
@@ -71,7 +82,13 @@ async def trigger_page_crawl(
 
         valid_channels = [c['channel'] for c in available_channels]
         if channel not in valid_channels:
-            raise HTTPException(status_code=400, detail=f"无效频道: {channel}")
+            raise HTTPException(
+                status_code=400, 
+                detail=error_response(
+                    message=f"无效频道: {channel}",
+                    error_code="INVALID_CHANNEL"
+                ).model_dump()
+            )
 
         if request.immediate:
             # 立即通过调度器执行
@@ -82,19 +99,31 @@ async def trigger_page_crawl(
             task_id = create_page_task(channel)
             message = f"分类页面 {channel} 爬取任务已创建"
 
-        return TaskCreateResponse(
-            task_id=task_id,
-            message=message + (" (强制模式)" if request.force else ""),
-            status="pending"
+        return success_response(
+            data={
+                "task_id": task_id,
+                "channel": channel,
+                "status": "pending",
+                "force": request.force,
+                "immediate": request.immediate
+            },
+            message=message + (" (强制模式)" if request.force else "")
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="创建任务失败",
+                error_code="TASK_CREATE_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/tasks", response_model=TasksResponse)
+@router.get("/tasks", response_model=BaseResponse[dict])
 async def get_tasks(
         status: Optional[str] = Query(None, description="状态筛选 (pending/running/completed/failed)"),
         task_type: Optional[str] = Query(None, description="类型筛选 (jiazi/page/book_detail)"),
@@ -114,73 +143,74 @@ async def get_tasks(
         completed_tasks = []
         failed_tasks = []
 
-        # 转换任务信息格式
+        # 转换任务信息格式  
+        def task_to_dict(task):
+            return {
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "status": task.status,
+                "created_at": task.created_at,  # 已经是ISO格式字符串
+                "started_at": task.started_at,
+                "completed_at": getattr(task, 'completed_at', None),
+                "progress": task.progress,
+                "items_crawled": task.items_crawled,
+                "ranking_id": task.metadata.get('channel') if task.metadata else None
+            }
+
         for task in all_tasks["current"]:
-            current_tasks.append(ApiTaskInfo(
-                task_id=task.task_id,
-                task_type=task.task_type,
-                status=task.status,
-                created_at=datetime.fromisoformat(task.created_at),
-                started_at=datetime.fromisoformat(task.started_at) if task.started_at else None,
-                completed_at=None,
-                progress=task.progress,
-                items_crawled=task.items_crawled,
-                ranking_id=task.metadata.get('channel') if task.metadata else None
-            ))
+            current_tasks.append(task_to_dict(task))
 
         for task in all_tasks["completed"]:
-            completed_tasks.append(ApiTaskInfo(
-                task_id=task.task_id,
-                task_type=task.task_type,
-                status=task.status,
-                created_at=datetime.fromisoformat(task.created_at),
-                started_at=datetime.fromisoformat(task.started_at) if task.started_at else None,
-                completed_at=datetime.fromisoformat(task.completed_at) if task.completed_at else None,
-                progress=task.progress,
-                items_crawled=task.items_crawled,
-                ranking_id=task.metadata.get('channel') if task.metadata else None
-            ))
+            completed_tasks.append(task_to_dict(task))
 
         for task in all_tasks["failed"]:
-            failed_tasks.append(ApiTaskInfo(
-                task_id=task.task_id,
-                task_type=task.task_type,
-                status=task.status,
-                created_at=datetime.fromisoformat(task.created_at),
-                started_at=datetime.fromisoformat(task.started_at) if task.started_at else None,
-                completed_at=datetime.fromisoformat(task.completed_at) if task.completed_at else None,
-                progress=task.progress,
-                items_crawled=task.items_crawled,
-                ranking_id=task.metadata.get('channel') if task.metadata else None
-            ))
+            failed_tasks.append(task_to_dict(task))
 
         # 合并完成和失败的任务
         all_completed = completed_tasks + failed_tasks
 
         # 根据筛选条件过滤
         if status:
-            current_tasks = [t for t in current_tasks if t.status == status]
-            all_completed = [t for t in all_completed if t.status == status]
+            current_tasks = [t for t in current_tasks if t["status"] == status]
+            all_completed = [t for t in all_completed if t["status"] == status]
 
         if task_type:
-            current_tasks = [t for t in current_tasks if t.task_type == task_type]
-            all_completed = [t for t in all_completed if t.task_type == task_type]
+            current_tasks = [t for t in current_tasks if t["task_type"] == task_type]
+            all_completed = [t for t in all_completed if t["task_type"] == task_type]
 
         # 分页
         paginated_completed = all_completed[offset:offset + limit]
 
-        return TasksResponse(
-            current_tasks=current_tasks,
-            completed_tasks=paginated_completed,
-            total_current=len(current_tasks),
-            total_completed=len(all_completed)
+        return success_response(
+            data={
+                "current_tasks": current_tasks,  # 已经是字典了，不需要model_dump
+                "completed_tasks": paginated_completed,  # 已经是字典了，不需要model_dump
+                "total_current": len(current_tasks),
+                "total_completed": len(all_completed),
+                "filters": {
+                    "status": status,
+                    "task_type": task_type
+                },
+                "pagination": {
+                    "limit": limit,
+                    "offset": offset
+                }
+            },
+            message="获取任务列表成功"
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取任务列表失败",
+                error_code="TASK_LIST_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/tasks/{task_id}", response_model=ApiTaskInfo)
+@router.get("/tasks/{task_id}", response_model=BaseResponse[dict])
 async def get_task_detail(task_id: str):
     """
     获取特定任务详情
@@ -192,27 +222,44 @@ async def get_task_detail(task_id: str):
         task = task_manager.get_task_status(task_id)
 
         if not task:
-            raise HTTPException(status_code=404, detail=f"任务 {task_id} 不存在")
+            raise HTTPException(
+                status_code=404, 
+                detail=error_response(
+                    message="任务不存在",
+                    error_code="TASK_NOT_FOUND"
+                ).model_dump()
+            )
 
-        return ApiTaskInfo(
-            task_id=task.task_id,
-            task_type=task.task_type,
-            status=task.status,
-            created_at=datetime.fromisoformat(task.created_at),
-            started_at=datetime.fromisoformat(task.started_at) if task.started_at else None,
-            completed_at=datetime.fromisoformat(task.completed_at) if task.completed_at else None,
-            progress=task.progress,
-            items_crawled=task.items_crawled,
-            ranking_id=task.metadata.get('channel') if task.metadata else None
+        return success_response(
+            data={
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "status": task.status,
+                "created_at": task.created_at,
+                "started_at": task.started_at,
+                "completed_at": getattr(task, 'completed_at', None),
+                "progress": task.progress,
+                "items_crawled": task.items_crawled,
+                "ranking_id": task.metadata.get('channel') if task.metadata else None,
+                "metadata": task.metadata
+            },
+            message="获取任务详情成功"
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取任务详情失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取任务详情失败",
+                error_code="TASK_DETAIL_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/channels")
+@router.get("/channels", response_model=BaseResponse[dict])
 async def get_available_channels():
     """
     获取可用的爬取频道列表
@@ -224,16 +271,26 @@ async def get_available_channels():
         page_service = get_page_service()
         channels = page_service.get_ranking_channels()
 
-        return {
-            "channels": channels,
-            "total": len(channels)
-        }
+        return success_response(
+            data={
+                "channels": channels,
+                "total": len(channels)
+            },
+            message="获取频道列表成功"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取频道列表失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取频道列表失败",
+                error_code="CHANNEL_LIST_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/scheduler/status")
+@router.get("/scheduler/status", response_model=BaseResponse[dict])
 async def get_scheduler_status():
     """
     获取调度器状态信息
@@ -245,17 +302,27 @@ async def get_scheduler_status():
         status_info = scheduler_service.get_status()
         scheduled_jobs = scheduler_service.get_scheduled_jobs()
 
-        return {
-            "status": "running" if status_info['is_running'] else "stopped",
-            "statistics": status_info,
-            "scheduled_jobs": scheduled_jobs
-        }
+        return success_response(
+            data={
+                "status": "running" if status_info['is_running'] else "stopped",
+                "statistics": status_info,
+                "scheduled_jobs": scheduled_jobs
+            },
+            message="获取调度器状态成功"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取调度器状态失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取调度器状态失败",
+                error_code="SCHEDULER_STATUS_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/scheduler/jobs")
+@router.get("/scheduler/jobs", response_model=BaseResponse[dict])
 async def get_scheduled_jobs():
     """
     获取所有定时任务信息
@@ -266,16 +333,26 @@ async def get_scheduled_jobs():
         scheduler_service = get_scheduler_service()
         jobs = scheduler_service.get_scheduled_jobs()
 
-        return {
-            "jobs": jobs,
-            "total": len(jobs)
-        }
+        return success_response(
+            data={
+                "jobs": jobs,
+                "total": len(jobs)
+            },
+            message="获取定时任务成功"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取定时任务失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取定时任务失败",
+                error_code="SCHEDULED_JOBS_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.post("/scheduler/trigger/{target}")
+@router.post("/scheduler/trigger/{target}", response_model=BaseResponse[dict])
 async def trigger_scheduled_job(target: str):
     """
     手动触发调度任务
@@ -285,17 +362,27 @@ async def trigger_scheduled_job(target: str):
     try:
         task_id = trigger_manual_crawl(target)
 
-        return {
-            "task_id": task_id,
-            "message": f"已手动触发 {target} 爬取任务",
-            "timestamp": datetime.now().isoformat()
-        }
+        return success_response(
+            data={
+                "task_id": task_id,
+                "target": target,
+                "timestamp": datetime.now().isoformat()
+            },
+            message=f"已手动触发 {target} 爬取任务"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"触发任务失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="触发任务失败",
+                error_code="TRIGGER_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/monitor/status")
+@router.get("/monitor/status", response_model=BaseResponse[dict])
 async def get_monitor_status():
     """
     获取任务监控状态
@@ -307,17 +394,23 @@ async def get_monitor_status():
         monitor_service = get_task_monitor_service()
         status = monitor_service.get_monitoring_status()
 
-        return {
-            "status": "success",
-            "data": status,
-            "timestamp": datetime.now().isoformat()
-        }
+        return success_response(
+            data=status,
+            message="获取监控状态成功"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取监控状态失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取监控状态失败",
+                error_code="MONITOR_STATUS_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.post("/monitor/check")
+@router.post("/monitor/check", response_model=BaseResponse[dict])
 async def manual_check_missing_tasks():
     """
     手动检查缺失任务
@@ -333,12 +426,17 @@ async def manual_check_missing_tasks():
 
         status = monitor_service.get_monitoring_status()
 
-        return {
-            "status": "success",
-            "message": "手动检查已完成",
-            "data": status,
-            "timestamp": datetime.now().isoformat()
-        }
+        return success_response(
+            data=status,
+            message="手动检查已完成"
+        )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"手动检查失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="手动检查失败",
+                error_code="MANUAL_CHECK_ERROR",
+                details=str(e)
+            ).model_dump()
+        )

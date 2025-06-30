@@ -3,8 +3,9 @@ FastAPI 应用入口
 
 晋江文学城爬虫后端服务主应用
 """
-from datetime import datetime
+import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -88,7 +89,6 @@ def create_app() -> FastAPI:
     )
     
     # 配置CORS - 允许前端访问
-    import os
     if settings.DEBUG:
         allowed_origins = ["*"]
     else:
@@ -134,7 +134,7 @@ def setup_routes(app: FastAPI):
         return {
             "status": "ok",
             "timestamp": datetime.now().isoformat(),
-            "service": "jjcrawler",
+            "service": get_settings().PROJECT_NAME,
             "version": get_settings().VERSION
         }
 

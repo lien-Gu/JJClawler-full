@@ -7,18 +7,14 @@ from typing import Optional
 from fastapi import APIRouter, Query, Path, HTTPException
 
 from app.modules.service import BookService
-from app.modules.models import (
-    BookDetail,
-    BookRankingsResponse, 
-    BookTrendsResponse,
-    BookSearchResponse
-)
+from app.modules.models import BookDetail
 from app.utils.service_utils import service_context, handle_api_error, to_api_response
+from app.utils.response_utils import BaseResponse, success_response, error_response, paginated_response
 
 router = APIRouter(prefix="/books", tags=["书籍信息"])
 
 
-@router.get("/{book_id}", response_model=BookDetail)
+@router.get("/{book_id}", response_model=BaseResponse[BookDetail])
 async def get_book_detail(
     book_id: str = Path(..., description="书籍ID")
 ):
@@ -31,15 +27,24 @@ async def get_book_detail(
         with service_context(BookService) as book_service:
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
-                raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
-            return book_detail
+                raise HTTPException(
+                    status_code=404, 
+                    detail=error_response(
+                        message="书籍不存在",
+                        error_code="BOOK_NOT_FOUND"
+                    ).model_dump()
+                )
+            return success_response(
+                data=book_detail,
+                message="获取书籍详情成功"
+            )
     except HTTPException:
         raise
     except Exception as e:
         handle_api_error(e, "获取书籍详情")
 
 
-@router.get("/{book_id}/rankings", response_model=BookRankingsResponse)
+@router.get("/{book_id}/rankings", response_model=BaseResponse[dict])
 async def get_book_rankings(
     book_id: str = Path(..., description="书籍ID"),
     days: int = Query(30, ge=1, le=365, description="历史天数")
@@ -55,13 +60,23 @@ async def get_book_rankings(
             book_detail, current_rankings, history_rankings = book_service.get_book_ranking_history(book_id, days)
             
             if not book_detail:
-                raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
+                raise HTTPException(
+                    status_code=404, 
+                    detail=error_response(
+                        message="书籍不存在",
+                        error_code="BOOK_NOT_FOUND"
+                    ).model_dump()
+                )
             
-            return BookRankingsResponse(
-                book=to_api_response(book_detail),
-                current_rankings=to_api_response(current_rankings),
-                history=to_api_response(history_rankings),
-                total_records=len(history_rankings)
+            return success_response(
+                data={
+                    "book": to_api_response(book_detail),
+                    "current_rankings": to_api_response(current_rankings),
+                    "history": to_api_response(history_rankings),
+                    "total_records": len(history_rankings),
+                    "days": days
+                },
+                message="获取书籍榜单历史成功"
             )
     except HTTPException:
         raise
@@ -69,7 +84,7 @@ async def get_book_rankings(
         handle_api_error(e, "获取书籍榜单历史")
 
 
-@router.get("/{book_id}/trends", response_model=BookTrendsResponse) 
+@router.get("/{book_id}/trends", response_model=BaseResponse[dict]) 
 async def get_book_trends(
     book_id: str = Path(..., description="书籍ID"),
     days: int = Query(30, ge=1, le=365, description="趋势天数")
@@ -85,16 +100,25 @@ async def get_book_trends(
             # 先检查书籍是否存在
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
-                raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
+                raise HTTPException(
+                    status_code=404, 
+                    detail=error_response(
+                        message="书籍不存在",
+                        error_code="BOOK_NOT_FOUND"
+                    ).model_dump()
+                )
             
             # 获取趋势数据
             trends = book_service.get_book_trend_data(book_id, days)
             
-            return BookTrendsResponse(
-                book_id=book_id,
-                title=book_detail.title,
-                days=days,
-                trends=to_api_response(trends)
+            return success_response(
+                data={
+                    "book_id": book_id,
+                    "title": book_detail.title,
+                    "days": days,
+                    "trends": to_api_response(trends)
+                },
+                message="获取书籍趋势数据成功"
             )
     except HTTPException:
         raise
@@ -102,7 +126,7 @@ async def get_book_trends(
         handle_api_error(e, "获取书籍趋势数据")
 
 
-@router.get("", response_model=BookSearchResponse)
+@router.get("", response_model=BaseResponse[dict])
 async def search_books(
     author: Optional[str] = Query(None, description="作者名筛选"),
     title: Optional[str] = Query(None, description="书名筛选"),
@@ -126,9 +150,19 @@ async def search_books(
                 offset=offset
             )
             
-            return BookSearchResponse(
-                total=total,
-                books=to_api_response(books)
+            return success_response(
+                data={
+                    "books": to_api_response(books),
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "filters": {
+                        "author": author,
+                        "title": title,
+                        "novel_class": novel_class
+                    }
+                },
+                message="搜索书籍成功"
             )
     except Exception as e:
         handle_api_error(e, "搜索书籍")

@@ -37,8 +37,8 @@ def book_to_detail(
         tags=book.tags,
         first_seen=book.first_seen,
         last_updated=book.last_updated,
-        latest_clicks=latest_snapshot.total_clicks if latest_snapshot else None,
-        latest_favorites=latest_snapshot.total_favorites if latest_snapshot else None,
+        latest_clicks=latest_snapshot.novip_clicks if latest_snapshot else None,
+        latest_favorites=latest_snapshot.favorites if latest_snapshot else None,
         latest_comments=latest_snapshot.comment_count if latest_snapshot else None,
         latest_chapters=latest_snapshot.chapter_count if latest_snapshot else None
     )

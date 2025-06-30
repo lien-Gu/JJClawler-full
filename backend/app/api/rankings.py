@@ -8,16 +8,8 @@ from typing import Optional
 from fastapi import APIRouter, Query, Path, HTTPException, Depends
 from app.modules.service import RankingService
 from app.modules.service.page_service import get_page_service
-from app.modules.models import (
-    RankingBooksResponse, 
-    RankingHistoryResponse, 
-    RankingConfig,
-    RankingSearchResponse,
-    RankingsListResponse,
-    HotRankingsResponse,
-    RankingListItem,
-    HotRankingItem
-)
+from app.modules.models import RankingConfig
+from app.utils.response_utils import BaseResponse, PaginatedResponse, success_response, error_response, paginated_response
 
 router = APIRouter(prefix="/rankings", tags=["榜单数据"])
 
@@ -27,7 +19,7 @@ def get_ranking_service() -> RankingService:
     return RankingService()
 
 
-@router.get("", response_model=RankingsListResponse)
+@router.get("", response_model=PaginatedResponse[dict])
 async def get_rankings_list(
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
@@ -43,12 +35,12 @@ async def get_rankings_list(
         all_rankings = ranking_service.get_all_rankings()
         
         # 计算分页
-        total = len(all_rankings)
+        page = offset // limit + 1
         start_idx = offset
         end_idx = offset + limit
         paged_rankings = all_rankings[start_idx:end_idx]
         
-        # 转换为RankingListItem格式
+        # 转换为字典格式
         ranking_items = []
         for ranking_info in paged_rankings:
             # 获取该榜单的书籍数量 (简化实现，实际应该从快照中统计)
@@ -62,31 +54,38 @@ async def get_rankings_list(
             except:
                 pass
             
-            ranking_item = RankingListItem(
-                ranking_id=ranking_info.ranking_id,
-                name=ranking_info.name,
-                update_frequency=ranking_info.frequency.value,
-                total_books=total_books,
-                last_updated=last_updated,
-                parent_id=ranking_info.parent_id
-            )
+            ranking_item = {
+                "ranking_id": ranking_info.ranking_id,
+                "name": ranking_info.name,
+                "update_frequency": ranking_info.frequency.value,
+                "total_books": total_books,
+                "last_updated": last_updated,
+                "parent_id": ranking_info.parent_id
+            }
             ranking_items.append(ranking_item)
         
-        return RankingsListResponse(
-            rankings=ranking_items,
-            total=total,
-            page=offset // limit + 1,
-            limit=limit,
-            has_next=end_idx < total
+        return paginated_response(
+            data=ranking_items,
+            page=page,
+            page_size=limit,
+            total_count=len(all_rankings),
+            message="获取榜单列表成功"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取榜单列表失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取榜单列表失败",
+                error_code="RANKING_LIST_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
     finally:
         ranking_service.close()
 
 
-@router.get("/hot", response_model=HotRankingsResponse)
+@router.get("/hot", response_model=BaseResponse[dict])
 async def get_hot_rankings(
     limit: int = Query(10, ge=1, le=50, description="返回数量"),
     ranking_service: RankingService = Depends(get_ranking_service)
@@ -133,32 +132,42 @@ async def get_hot_rankings(
                 # 如果获取失败，给予最低分数
                 recent_activity = 0
             
-            hot_ranking = HotRankingItem(
-                ranking_id=ranking_info.ranking_id,
-                name=ranking_info.name,
-                update_frequency=ranking_info.frequency.value,
-                recent_activity=recent_activity,
-                total_books=total_books,
-                last_updated=last_updated
-            )
+            hot_ranking = {
+                "ranking_id": ranking_info.ranking_id,
+                "name": ranking_info.name,
+                "update_frequency": ranking_info.frequency.value,
+                "recent_activity": recent_activity,
+                "total_books": total_books,
+                "last_updated": last_updated
+            }
             hot_rankings.append(hot_ranking)
         
         # 按活跃度降序排序，取前N个
-        hot_rankings.sort(key=lambda x: x.recent_activity, reverse=True)
+        hot_rankings.sort(key=lambda x: x["recent_activity"], reverse=True)
         top_hot_rankings = hot_rankings[:limit]
         
-        return HotRankingsResponse(
-            rankings=top_hot_rankings,
-            total=len(top_hot_rankings)
+        return success_response(
+            data={
+                "rankings": top_hot_rankings,
+                "total": len(top_hot_rankings)
+            },
+            message="获取热门榜单成功"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取热门榜单失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="获取热门榜单失败",
+                error_code="HOT_RANKING_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
     finally:
         ranking_service.close()
 
 
-@router.get("/search", response_model=RankingSearchResponse)
+@router.get("/search", response_model=BaseResponse[dict])
 async def search_rankings(
     name: Optional[str] = Query(None, description="榜单名称搜索关键词（支持模糊匹配）"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -198,18 +207,30 @@ async def search_rankings(
         end_idx = offset + limit
         paged_rankings = all_rankings[start_idx:end_idx]
         
-        return RankingSearchResponse(
-            total=total,
-            rankings=paged_rankings,
-            query=name,
-            has_next=end_idx < total
+        return success_response(
+            data={
+                "rankings": paged_rankings,
+                "total": total,
+                "query": name,
+                "has_next": end_idx < total,
+                "page": offset // limit + 1,
+                "limit": limit
+            },
+            message="搜索榜单成功"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"搜索榜单失败: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=error_response(
+                message="搜索榜单失败",
+                error_code="RANKING_SEARCH_ERROR",
+                details=str(e)
+            ).model_dump()
+        )
 
 
-@router.get("/{ranking_id}/books", response_model=RankingBooksResponse)
+@router.get("/{ranking_id}/books", response_model=BaseResponse[dict])
 async def get_ranking_books(
     ranking_id: str = Path(..., description="榜单ID"),
     date: str = Query(None, description="指定日期 YYYY-MM-DD"),
@@ -230,30 +251,47 @@ async def get_ranking_books(
             try:
                 snapshot_time = datetime.strptime(date, "%Y-%m-%d")
             except ValueError:
-                raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=error_response(
+                        message="日期格式错误，请使用 YYYY-MM-DD",
+                        error_code="INVALID_DATE_FORMAT"
+                    ).model_dump()
+                )
         
         # 获取榜单书籍数据
         ranking_info, books_in_ranking, actual_snapshot_time = ranking_service.get_ranking_books(ranking_id, snapshot_time, limit, offset)
         
         if not ranking_info:
-            raise HTTPException(status_code=404, detail=f"榜单 {ranking_id} 不存在")
+            raise HTTPException(
+                status_code=404, 
+                detail=error_response(
+                    message="榜单不存在",
+                    error_code="RANKING_NOT_FOUND"
+                ).model_dump()
+            )
         
-        return RankingBooksResponse(
-            ranking=RankingConfig(
-                ranking_id=ranking_info.ranking_id,
-                name=ranking_info.name,
-                update_frequency=ranking_info.frequency.value
-            ),
-            total=len(books_in_ranking),  # TODO: 获取实际总数
-            page=offset // limit + 1,
-            limit=limit,
-            books=[book.model_dump() for book in books_in_ranking]
+        return success_response(
+            data={
+                "ranking": {
+                    "ranking_id": ranking_info.ranking_id,
+                    "name": ranking_info.name,
+                    "update_frequency": ranking_info.frequency.value
+                },
+                "books": [book.model_dump() for book in books_in_ranking],
+                "total": len(books_in_ranking),  # TODO: 获取实际总数
+                "page": offset // limit + 1,
+                "limit": limit,
+                "date": date,
+                "actual_snapshot_time": actual_snapshot_time
+            },
+            message="获取榜单书籍成功"
         )
     finally:
         ranking_service.close()
 
 
-@router.get("/{ranking_id}/history", response_model=RankingHistoryResponse)
+@router.get("/{ranking_id}/history", response_model=BaseResponse[dict])
 async def get_ranking_history(
     ranking_id: str = Path(..., description="榜单ID"),
     days: int = Query(7, ge=1, le=30, description="历史天数"),
@@ -269,16 +307,25 @@ async def get_ranking_history(
         ranking_info, summaries = ranking_service.get_ranking_history_summary(ranking_id, days)
         
         if not ranking_info:
-            raise HTTPException(status_code=404, detail=f"榜单 {ranking_id} 不存在")
+            raise HTTPException(
+                status_code=404, 
+                detail=error_response(
+                    message="榜单不存在",
+                    error_code="RANKING_NOT_FOUND"
+                ).model_dump()
+            )
         
-        return RankingHistoryResponse(
-            ranking=RankingConfig(
-                ranking_id=ranking_info.ranking_id,
-                name=ranking_info.name,
-                update_frequency=ranking_info.frequency.value
-            ),
-            days=days,
-            snapshots=[summary.model_dump() for summary in summaries]
+        return success_response(
+            data={
+                "ranking": {
+                    "ranking_id": ranking_info.ranking_id,
+                    "name": ranking_info.name,
+                    "update_frequency": ranking_info.frequency.value
+                },
+                "days": days,
+                "snapshots": [summary.model_dump() for summary in summaries]
+            },
+            message="获取榜单历史成功"
         )
     finally:
         ranking_service.close()

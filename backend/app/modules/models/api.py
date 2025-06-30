@@ -103,57 +103,9 @@ class RankingConfig(BaseModel):
     update_frequency: str = Field(description="更新频率")
 
 
-class PagesResponse(BaseModel):
-    """页面配置响应"""
-    pages: List[PageConfig] = Field(description="页面列表")
-    total_pages: int = Field(description="页面总数")
-    total_rankings: int = Field(description="榜单总数")
-
-
-class RankingBooksResponse(BaseModel):
-    """榜单书籍列表响应"""
-    ranking: RankingConfig = Field(description="榜单信息")
-    books: List[dict] = Field(description="书籍列表")
-    total: int = Field(description="书籍总数")
-    page: int = Field(description="当前页码")
-    limit: int = Field(description="每页数量")
-
-
-class RankingHistoryResponse(BaseModel):
-    """榜单历史响应"""
-    ranking: RankingConfig = Field(description="榜单信息")
-    snapshots: List[dict] = Field(description="历史快照")
-    days: int = Field(description="查询天数")
-
-
-class BookRankingsResponse(BaseModel):
-    """书籍榜单历史响应"""
-    book: dict = Field(description="书籍信息")
-    current_rankings: List[dict] = Field(description="当前榜单")
-    history: List[dict] = Field(description="历史榜单")
-    total_records: int = Field(description="总记录数")
-
-
-class BookTrendsResponse(BaseModel):
-    """书籍趋势响应"""
-    book_id: str = Field(description="书籍ID")
-    title: str = Field(description="书籍标题")
-    trends: List[dict] = Field(description="趋势数据")
-    days: int = Field(description="查询天数")
-
-
-class BookSearchResponse(BaseModel):
-    """书籍搜索响应"""
-    books: List[dict] = Field(description="书籍列表")
-    total: int = Field(description="总数")
-
-
-class RankingSearchResponse(BaseModel):
-    """榜单搜索响应"""
-    rankings: List[dict] = Field(description="榜单列表")
-    total: int = Field(description="总数")
-    query: Optional[str] = Field(default=None, description="搜索关键词")
-    has_next: bool = Field(description="是否有下一页")
+# 以下响应模型已被统一响应模型替代，保留作为历史参考
+# class PagesResponse, RankingBooksResponse, 等等...
+# 现在都使用 BaseResponse[dict] 或 PaginatedResponse[dict]
 
 
 class CrawlJiaziRequest(BaseModel):
@@ -168,15 +120,9 @@ class CrawlRankingRequest(BaseModel):
     immediate: bool = Field(default=True, description="是否立即执行")
 
 
-class TaskCreateResponse(BaseModel):
-    """任务创建响应"""
-    task_id: str = Field(description="任务ID")
-    message: str = Field(description="创建消息")
-    status: str = Field(description="任务状态")
-
-
+# TaskInfo 仍然保留，用于内部数据转换
 class TaskInfo(BaseModel):
-    """任务信息"""
+    """任务信息 - 保留用于内部数据处理"""
     task_id: str = Field(description="任务ID")
     task_type: str = Field(description="任务类型")
     status: str = Field(description="任务状态")
@@ -187,66 +133,17 @@ class TaskInfo(BaseModel):
     items_crawled: int = Field(default=0, description="已爬取项目数")
     ranking_id: Optional[str] = Field(default=None, description="榜单ID")
 
-
-class TasksResponse(BaseModel):
-    """任务列表响应"""
-    current_tasks: List[TaskInfo] = Field(description="当前任务")
-    completed_tasks: List[TaskInfo] = Field(description="已完成任务")
-    total_current: int = Field(description="当前任务总数")
-    total_completed: int = Field(description="已完成任务总数")
+# TaskCreateResponse 和 TasksResponse 已被统一响应模型替代
 
 
-# ==================== 新增统计和热门榜单API模型 ====================
-class OverviewStats(BaseModel):
-    """首页概览统计"""
-    total_books: int = Field(description="书籍总数")
-    total_rankings: int = Field(description="榜单总数")
-    recent_snapshots: int = Field(description="最近24小时快照数")
-    active_rankings: int = Field(description="活跃榜单数")
-    last_updated: datetime = Field(description="最后更新时间")
+# ==================== 保留的数据模型 ====================
+# 以下模型保留用于内部数据结构，不用于API响应
+
+# 统计和榜单项模型已被统一响应模型替代
+# 现在都直接使用字典格式返回数据
 
 
-class HotRankingItem(BaseModel):
-    """热门榜单项"""
-    ranking_id: str = Field(description="榜单ID")
-    name: str = Field(description="榜单名称")
-    update_frequency: str = Field(description="更新频率")
-    recent_activity: int = Field(description="最近活跃度")
-    total_books: int = Field(description="榜单书籍总数")
-    last_updated: Optional[datetime] = Field(default=None, description="最后更新时间")
-
-
-class RankingListItem(BaseModel):
-    """榜单列表项"""
-    ranking_id: str = Field(description="榜单ID")
-    name: str = Field(description="榜单名称")
-    update_frequency: str = Field(description="更新频率")
-    total_books: int = Field(description="榜单书籍总数")
-    last_updated: Optional[datetime] = Field(default=None, description="最后更新时间")
-    parent_id: Optional[str] = Field(default=None, description="父级榜单ID")
-
-
-class OverviewResponse(BaseModel):
-    """首页概览响应"""
-    stats: OverviewStats = Field(description="统计数据")
-    status: str = Field(default="ok", description="状态")
-
-
-class HotRankingsResponse(BaseModel):
-    """热门榜单响应"""
-    rankings: List[HotRankingItem] = Field(description="热门榜单列表")
-    total: int = Field(description="总数")
-
-
-class RankingsListResponse(BaseModel):
-    """榜单列表响应"""
-    rankings: List[RankingListItem] = Field(description="榜单列表")
-    total: int = Field(description="总数")
-    page: int = Field(description="当前页码")
-    limit: int = Field(description="每页数量")
-    has_next: bool = Field(description="是否有下一页")
-
-
-# 更新模型引用
-PageConfig.model_rebuild()
-SubPageConfig.model_rebuild()
+# 更新模型引用 - 保留的模型重建
+# PageConfig.model_rebuild()
+# SubPageConfig.model_rebuild()
+# 这些模型不再用于API响应，不需要重建

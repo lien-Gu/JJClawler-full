@@ -8,11 +8,12 @@ from typing import List, Dict, Any
 from fastapi import APIRouter
 
 from app.utils.service_utils import handle_api_error
+from app.utils.response_utils import BaseResponse, success_response, error_response
 
 router = APIRouter(prefix="/user", tags=["用户信息"])
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=BaseResponse[dict])
 async def get_user_stats():
     """
     获取用户统计信息
@@ -42,13 +43,16 @@ async def get_user_stats():
             }
         }
         
-        return fake_user_stats
+        return success_response(
+            data=fake_user_stats,
+            message="获取用户统计成功"
+        )
         
     except Exception as e:
         handle_api_error(e, "获取用户统计")
 
 
-@router.get("/follows")
+@router.get("/follows", response_model=BaseResponse[dict])
 async def get_user_follows():
     """
     获取用户关注列表
@@ -114,7 +118,7 @@ async def get_user_follows():
             }
         ]
         
-        return {
+        follow_data = {
             "follows": fake_follows,
             "total_count": len(fake_follows),
             "rankings_count": len([f for f in fake_follows if f["type"] == "ranking"]),
@@ -126,11 +130,16 @@ async def get_user_follows():
             }
         }
         
+        return success_response(
+            data=follow_data,
+            message="获取用户关注列表成功"
+        )
+        
     except Exception as e:
         handle_api_error(e, "获取用户关注列表")
 
 
-@router.post("/follows")
+@router.post("/follows", response_model=BaseResponse[dict])
 async def add_user_follow():
     """
     添加用户关注
@@ -139,10 +148,9 @@ async def add_user_follow():
     """
     try:
         # 模拟添加关注操作
-        return {
-            "success": True,
-            "message": "添加关注成功",
+        follow_result = {
             "follow_id": f"follow_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "operation": "add_follow",
             "meta": {
                 "fake": True,
                 "message": "This is fake operation for development",
@@ -150,11 +158,16 @@ async def add_user_follow():
             }
         }
         
+        return success_response(
+            data=follow_result,
+            message="添加关注成功"
+        )
+        
     except Exception as e:
         handle_api_error(e, "添加用户关注")
 
 
-@router.delete("/follows/{follow_id}")
+@router.delete("/follows/{follow_id}", response_model=BaseResponse[dict])
 async def remove_user_follow(follow_id: str):
     """
     取消用户关注
@@ -163,10 +176,9 @@ async def remove_user_follow(follow_id: str):
     """
     try:
         # 模拟取消关注操作
-        return {
-            "success": True,
-            "message": f"已取消关注 {follow_id}",
+        remove_result = {
             "removed_id": follow_id,
+            "operation": "remove_follow",
             "meta": {
                 "fake": True,
                 "message": "This is fake operation for development", 
@@ -174,11 +186,16 @@ async def remove_user_follow(follow_id: str):
             }
         }
         
+        return success_response(
+            data=remove_result,
+            message=f"已取消关注 {follow_id}"
+        )
+        
     except Exception as e:
         handle_api_error(e, "取消用户关注")
 
 
-@router.get("/profile")
+@router.get("/profile", response_model=BaseResponse[dict])
 async def get_user_profile():
     """
     获取用户基本信息
@@ -214,7 +231,10 @@ async def get_user_profile():
             }
         }
         
-        return fake_profile
+        return success_response(
+            data=fake_profile,
+            message="获取用户档案成功"
+        )
         
     except Exception as e:
         handle_api_error(e, "获取用户档案")
