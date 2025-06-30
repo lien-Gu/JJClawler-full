@@ -9,13 +9,13 @@ from fastapi import APIRouter, Query, Path, HTTPException
 from app.modules.service import BookService
 from app.modules.models import BookDetail
 from app.utils.service_utils import service_context, handle_api_error, to_api_response
-from app.utils.response_utils import BaseResponse, success_response, error_response, paginated_response
-from app.utils.error_codes import ErrorCodes
+from app.utils.response_utils import ApiResponse, success_response, error_response, paginated_response
+from app.utils.error_codes import StatusCode
 
 router = APIRouter(prefix="/books", tags=["书籍信息"])
 
 
-@router.get("/{book_id}", response_model=BaseResponse[BookDetail])
+@router.get("/{book_id}", response_model=ApiResponse[BookDetail])
 async def get_book_detail(
     book_id: str = Path(..., description="书籍ID")
 ):
@@ -29,7 +29,7 @@ async def get_book_detail(
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
                 error_resp = error_response(
-                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    code=StatusCode.BOOK_NOT_FOUND,
                     message="书籍不存在"
                 )
                 raise HTTPException(
@@ -46,7 +46,7 @@ async def get_book_detail(
         handle_api_error(e, "获取书籍详情")
 
 
-@router.get("/{book_id}/rankings", response_model=BaseResponse[dict])
+@router.get("/{book_id}/rankings", response_model=ApiResponse[dict])
 async def get_book_rankings(
     book_id: str = Path(..., description="书籍ID"),
     days: int = Query(30, ge=1, le=365, description="历史天数")
@@ -63,7 +63,7 @@ async def get_book_rankings(
             
             if not book_detail:
                 error_resp = error_response(
-                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    code=StatusCode.BOOK_NOT_FOUND,
                     message="书籍不存在"
                 )
                 raise HTTPException(
@@ -87,7 +87,7 @@ async def get_book_rankings(
         handle_api_error(e, "获取书籍榜单历史")
 
 
-@router.get("/{book_id}/trends", response_model=BaseResponse[dict]) 
+@router.get("/{book_id}/trends", response_model=ApiResponse[dict]) 
 async def get_book_trends(
     book_id: str = Path(..., description="书籍ID"),
     days: int = Query(30, ge=1, le=365, description="趋势天数")
@@ -104,7 +104,7 @@ async def get_book_trends(
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
                 error_resp = error_response(
-                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    code=StatusCode.BOOK_NOT_FOUND,
                     message="书籍不存在"
                 )
                 raise HTTPException(
@@ -130,7 +130,7 @@ async def get_book_trends(
         handle_api_error(e, "获取书籍趋势数据")
 
 
-@router.get("", response_model=BaseResponse[dict])
+@router.get("", response_model=ApiResponse[dict])
 async def search_books(
     author: Optional[str] = Query(None, description="作者名筛选"),
     title: Optional[str] = Query(None, description="书名筛选"),

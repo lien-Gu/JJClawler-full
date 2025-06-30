@@ -1,22 +1,18 @@
 """
-页面服务模块 - T4.2数据服务模块
+页面服务模块 - 重构版本
 
-负责页面配置管理和数据服务：
-- 页面配置生成和缓存
-- 层级关系管理
-- 分页和过滤服务
-- 统一的数据访问接口
-
+简化的页面配置管理，支持扁平化的任务导向配置格式。
 设计原则：
-1. 高效缓存：静态配置数据缓存优化
-2. 层级清晰：页面父子关系管理
-3. 接口统一：提供标准化的数据服务
-4. 易于扩展：支持新增页面类型
+1. 扁平化结构：避免深层嵌套，数据结构清晰
+2. 任务导向：以爬取任务为中心的配置方式
+3. 模板化URL：统一的URL模板和参数管理
+4. 高效查询：支持快速的任务查找和层级构建
 """
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
+from dataclasses import dataclass
 
 from app.config import get_settings
 from app.utils.file_utils import read_json_file
@@ -25,15 +21,55 @@ from app.utils.log_utils import get_logger
 logger = get_logger(__name__)
 
 
+@dataclass
+class CrawlTask:
+    """爬取任务数据类"""
+    id: str
+    name: str
+    type: str
+    template: str
+    params: Dict[str, Any]
+    frequency: str
+    interval: int
+    parent: Optional[str]
+    level: int
+    display_order: int
+    
+    def build_url(self, templates: Dict[str, str], global_params: Dict[str, Any]) -> str:
+        """构建完整的爬取URL"""
+        if self.template not in templates:
+            raise ValueError(f"URL模板不存在: {self.template}")
+        
+        # 合并全局参数和任务参数
+        url_params = {**global_params, **self.params}
+        
+        # 获取模板并格式化
+        template = templates[self.template]
+        try:
+            return template.format(**url_params)
+        except KeyError as e:
+            raise ValueError(f"缺少URL参数 {e} for task {self.id}")
+
+
+@dataclass
+class Category:
+    """分类数据类"""
+    id: str
+    name: str
+    level: int
+    parent: Optional[str]
+    display_order: int
+
+
 class PageService:
     """
-    页面服务类
+    重构的页面服务类
     
-    提供完整的页面配置和数据服务：
-    - 配置文件管理
-    - 页面层级关系
-    - 数据转换和格式化
-    - 缓存管理
+    提供基于新配置格式的页面管理功能：
+    - 扁平化的任务配置管理
+    - 高效的URL构建
+    - 简化的层级关系处理
+    - 缓存优化
     """
     
     def __init__(self, config_path: str = None):
@@ -43,7 +79,6 @@ class PageService:
         Args:
             config_path: 配置文件路径
         """
-        # 如果没有指定路径，从settings读取
         if config_path is None:
             settings = get_settings()
             config_path = settings.URLS_CONFIG_FILE
@@ -51,22 +86,19 @@ class PageService:
         self.config_path = Path(config_path)
         self._config_cache = None
         self._cache_timestamp = None
-        self._cache_ttl = timedelta(minutes=30)  # 缓存30分钟
+        self._cache_ttl = timedelta(minutes=30)
         
-        # 确保配置文件存在
+        # 内部缓存
+        self._tasks_cache: List[CrawlTask] = []
+        self._categories_cache: List[Category] = []
+        self._tasks_by_id: Dict[str, CrawlTask] = {}
+        self._tasks_by_parent: Dict[str, List[CrawlTask]] = {}
+        
         if not self.config_path.exists():
             raise FileNotFoundError(f"配置文件不存在: {config_path}")
     
     def _load_config(self, force_refresh: bool = False) -> Dict[str, Any]:
-        """
-        加载配置文件
-        
-        Args:
-            force_refresh: 强制刷新缓存
-            
-        Returns:
-            配置数据字典
-        """
+        """加载并缓存配置文件"""
         current_time = datetime.now()
         
         # 检查缓存是否有效
@@ -76,12 +108,14 @@ class PageService:
             current_time - self._cache_timestamp < self._cache_ttl):
             return self._config_cache
         
-        # 使用utils中的文件读取函数
+        # 读取配置文件
         config = read_json_file(self.config_path)
-        
         if config is None:
             logger.error("页面配置加载失败")
             raise FileNotFoundError(f"无法读取配置文件: {self.config_path}")
+        
+        # 解析配置并构建缓存
+        self._parse_config(config)
         
         # 更新缓存
         self._config_cache = config
@@ -90,68 +124,138 @@ class PageService:
         logger.debug("页面配置加载成功")
         return config
     
+    def _parse_config(self, config: Dict[str, Any]):
+        """解析配置文件并构建内部缓存"""
+        # 解析爬取任务
+        self._tasks_cache = []
+        self._tasks_by_id = {}
+        self._tasks_by_parent = {}
+        
+        for task_data in config.get('crawl_tasks', []):
+            task = CrawlTask(
+                id=task_data['id'],
+                name=task_data['name'],
+                type=task_data['type'],
+                template=task_data['template'],
+                params=task_data['params'],
+                frequency=task_data['schedule']['frequency'],
+                interval=task_data['schedule']['interval'],
+                parent=task_data['category']['parent'],
+                level=task_data['category']['level'],
+                display_order=task_data['category']['display_order']
+            )
+            
+            self._tasks_cache.append(task)
+            self._tasks_by_id[task.id] = task
+            
+            # 按父类分组
+            if task.parent not in self._tasks_by_parent:
+                self._tasks_by_parent[task.parent] = []
+            self._tasks_by_parent[task.parent].append(task)
+        
+        # 从任务中提取分类信息（level=1的任务作为分类）
+        self._categories_cache = []
+        category_tasks = [task for task in self._tasks_cache if task.level == 1]
+        for task in category_tasks:
+            category = Category(
+                id=task.id,
+                name=task.name,
+                level=task.level,
+                parent=task.parent,
+                display_order=task.display_order
+            )
+            self._categories_cache.append(category)
+    
+    def get_all_crawl_tasks(self) -> List[CrawlTask]:
+        """获取所有爬取任务"""
+        self._load_config()
+        return self._tasks_cache.copy()
+    
+    def get_task_by_id(self, task_id: str) -> Optional[CrawlTask]:
+        """根据ID获取任务"""
+        self._load_config()
+        return self._tasks_by_id.get(task_id)
+    
+    def get_tasks_by_parent(self, parent_id: Optional[str]) -> List[CrawlTask]:
+        """获取指定父级的所有子任务"""
+        self._load_config()
+        tasks = self._tasks_by_parent.get(parent_id, [])
+        return sorted(tasks, key=lambda t: t.display_order)
+    
+    def get_all_categories(self) -> List[Category]:
+        """获取所有分类"""
+        self._load_config()
+        return sorted(self._categories_cache, key=lambda c: c.display_order)
+    
+    def build_task_url(self, task_id: str) -> str:
+        """构建任务的爬取URL"""
+        config = self._load_config()
+        task = self.get_task_by_id(task_id)
+        
+        if not task:
+            raise ValueError(f"任务不存在: {task_id}")
+        
+        global_config = config.get('global', {})
+        templates = global_config.get('templates', {})
+        base_params = global_config.get('base_params', {})
+        
+        return task.build_url(templates, base_params)
+    
+    def get_scheduled_tasks(self) -> List[CrawlTask]:
+        """获取所有有调度配置的任务"""
+        return [task for task in self.get_all_crawl_tasks() if task.interval > 0]
+    
+    def get_tasks_by_frequency(self, frequency: str) -> List[CrawlTask]:
+        """根据频率获取任务"""
+        return [task for task in self.get_all_crawl_tasks() if task.frequency == frequency]
+    
+    # ==================== 兼容旧API的方法 ====================
+    
     def get_all_pages(self) -> List[Dict[str, Any]]:
         """
-        获取所有页面配置
+        兼容旧API：获取页面配置列表
         
-        Returns:
-            页面配置列表
+        将新的任务结构转换为旧的页面格式
         """
         try:
-            config = self._load_config()
+            categories = self.get_all_categories()
+            all_tasks = self.get_all_crawl_tasks()
             pages = []
             
-            # 添加夹子榜
-            jiazi_config = config['content']['jiazi']
-            pages.append({
-                'page_id': jiazi_config['short_name'],
-                'name': jiazi_config['zh_name'],
-                'type': jiazi_config['type'],
-                'frequency': jiazi_config['frequency'],
-                'rankings': [{
-                    'ranking_id': jiazi_config['short_name'],
-                    'name': jiazi_config['zh_name'],
-                    'update_frequency': jiazi_config['frequency']
-                }],
-                'parent_id': None
-            })
+            # 添加根级别的任务（如jiazi）
+            root_tasks = self.get_tasks_by_parent(None)
+            for task in root_tasks:
+                pages.append({
+                    'page_id': task.id,
+                    'name': task.name,
+                    'type': task.type,
+                    'frequency': task.frequency,
+                    'rankings': [{
+                        'ranking_id': task.id,
+                        'name': task.name,
+                        'update_frequency': task.frequency
+                    }],
+                    'parent_id': None
+                })
             
             # 添加分类页面
-            pages_config = config['content']['pages']
-            for page_key, page_info in pages_config.items():
-                if not isinstance(page_info, dict):
-                    continue
-                
-                # 主页面
+            for category in categories:
+                child_tasks = self.get_tasks_by_parent(category.id)
                 rankings = []
-                sub_pages = []
                 
-                # 添加子页面
-                if 'sub_pages' in page_info:
-                    for sub_key, sub_info in page_info['sub_pages'].items():
-                        if isinstance(sub_info, dict):
-                            sub_page_id = f"{page_info['short_name']}.{sub_info['short_name']}"
-                            rankings.append({
-                                'ranking_id': sub_page_id,
-                                'name': sub_info['zh_name'],
-                                'update_frequency': sub_info['frequency']
-                            })
-                            sub_pages.append({
-                                'page_id': sub_page_id,
-                                'name': sub_info['zh_name'],
-                                'type': sub_info.get('type', 'daily'),
-                                'frequency': sub_info['frequency'],
-                                'parent_id': page_info['short_name']
-                            })
+                for task in child_tasks:
+                    rankings.append({
+                        'ranking_id': task.id,
+                        'name': task.name,
+                        'update_frequency': task.frequency
+                    })
                 
-                # 主页面配置
                 pages.append({
-                    'page_id': page_info['short_name'],
-                    'name': page_info['zh_name'],
-                    'type': page_info.get('type', 'daily'),
-                    'frequency': page_info['frequency'],
+                    'page_id': category.id,
+                    'name': category.name,
+                    'type': 'category',
+                    'frequency': 'daily',  # 分类页面默认频率
                     'rankings': rankings,
-                    'sub_pages': sub_pages,
                     'parent_id': None
                 })
             
@@ -162,82 +266,21 @@ class PageService:
             logger.error(f"获取页面配置失败: {e}")
             return []
     
-    def get_page_by_id(self, page_id: str) -> Optional[Dict[str, Any]]:
-        """
-        根据ID获取页面配置
-        
-        Args:
-            page_id: 页面ID
-            
-        Returns:
-            页面配置或None
-        """
-        try:
-            all_pages = self.get_all_pages()
-            
-            for page in all_pages:
-                if page['page_id'] == page_id:
-                    return page
-                
-                # 检查子页面
-                for sub_page in page.get('sub_pages', []):
-                    if sub_page['page_id'] == page_id:
-                        return sub_page
-            
-            logger.warning(f"未找到页面: {page_id}")
-            return None
-            
-        except Exception as e:
-            logger.error(f"获取页面失败: {e}")
-            return None
-    
-    def get_page_hierarchy(self) -> Dict[str, Any]:
-        """
-        获取页面层级结构
-        
-        Returns:
-            层级结构字典
-        """
-        try:
-            all_pages = self.get_all_pages()
-            
-            # 构建层级结构
-            hierarchy = {
-                'root_pages': [],
-                'total_pages': len(all_pages),
-                'total_rankings': 0
-            }
-            
-            for page in all_pages:
-                if page.get('parent_id') is None:
-                    hierarchy['root_pages'].append(page)
-                    hierarchy['total_rankings'] += len(page.get('rankings', []))
-            
-            return hierarchy
-            
-        except Exception as e:
-            logger.error(f"获取页面层级失败: {e}")
-            return {'root_pages': [], 'total_pages': 0, 'total_rankings': 0}
-    
     def get_ranking_channels(self) -> List[Dict[str, str]]:
         """
-        获取所有可用的排行榜频道
-        
-        Returns:
-            频道信息列表
+        兼容旧API：获取排行榜频道列表
         """
         try:
-            all_pages = self.get_all_pages()
+            tasks = self.get_all_crawl_tasks()
             channels = []
             
-            for page in all_pages:
-                for ranking in page.get('rankings', []):
-                    channels.append({
-                        'channel': ranking['ranking_id'],
-                        'name': ranking['name'],
-                        'frequency': ranking['update_frequency'],
-                        'page_name': page['name']
-                    })
+            for task in tasks:
+                channels.append({
+                    'channel': task.id,
+                    'name': task.name,
+                    'frequency': task.frequency,
+                    'page_name': self._get_category_name(task.parent) if task.parent else '根页面'
+                })
             
             logger.info(f"频道列表获取成功: {len(channels)} 个频道")
             return channels
@@ -246,37 +289,27 @@ class PageService:
             logger.error(f"获取频道列表失败: {e}")
             return []
     
-    def refresh_config(self):
-        """强制刷新配置缓存"""
-        try:
-            self._load_config(force_refresh=True)
-            logger.info("页面配置缓存已刷新")
-        except Exception as e:
-            logger.error(f"刷新配置缓存失败: {e}")
-            raise
+    def _get_category_name(self, category_id: str) -> str:
+        """获取分类名称"""
+        for category in self._categories_cache:
+            if category.id == category_id:
+                return category.name
+        return category_id
     
     def get_page_statistics(self) -> Dict[str, Any]:
         """
-        获取页面统计信息
-        
-        Returns:
-            统计信息字典
+        兼容旧API：获取页面统计信息
         """
         try:
-            hierarchy = self.get_page_hierarchy()
-            
-            # 计算详细统计
-            root_count = len(hierarchy['root_pages'])
-            sub_page_count = sum(
-                len(page.get('sub_pages', [])) 
-                for page in hierarchy['root_pages']
-            )
+            categories = self.get_all_categories()
+            tasks = self.get_all_crawl_tasks()
+            root_tasks = self.get_tasks_by_parent(None)
             
             return {
-                'total_pages': hierarchy['total_pages'],
-                'root_pages': root_count,
-                'sub_pages': sub_page_count,
-                'total_rankings': hierarchy['total_rankings'],
+                'total_pages': len(categories) + len(root_tasks),
+                'root_pages': len(categories) + len(root_tasks),
+                'sub_pages': len(tasks) - len(root_tasks),
+                'total_rankings': len(tasks),
                 'config_path': str(self.config_path),
                 'cache_valid': self._cache_timestamp is not None,
                 'last_updated': self._cache_timestamp.isoformat() if self._cache_timestamp else None
@@ -291,6 +324,15 @@ class PageService:
                 'total_rankings': 0,
                 'error': str(e)
             }
+    
+    def refresh_config(self):
+        """强制刷新配置缓存"""
+        try:
+            self._load_config(force_refresh=True)
+            logger.info("页面配置缓存已刷新")
+        except Exception as e:
+            logger.error(f"刷新配置缓存失败: {e}")
+            raise
 
 
 # 全局页面服务实例
@@ -298,47 +340,40 @@ _page_service: Optional[PageService] = None
 
 
 def get_page_service() -> PageService:
-    """
-    获取全局页面服务实例
-    
-    Returns:
-        PageService: 页面服务实例
-    """
+    """获取全局页面服务实例"""
     global _page_service
     if _page_service is None:
         _page_service = PageService()
     return _page_service
 
 
-# 便捷函数
+# 新的便捷函数
+def get_all_crawl_tasks() -> List[CrawlTask]:
+    """获取所有爬取任务"""
+    return get_page_service().get_all_crawl_tasks()
+
+
+def get_task_by_id(task_id: str) -> Optional[CrawlTask]:
+    """根据ID获取任务"""
+    return get_page_service().get_task_by_id(task_id)
+
+
+def build_task_url(task_id: str) -> str:
+    """构建任务URL"""
+    return get_page_service().build_task_url(task_id)
+
+
+def get_scheduled_tasks() -> List[CrawlTask]:
+    """获取所有调度任务"""
+    return get_page_service().get_scheduled_tasks()
+
+
+# 兼容旧API的便捷函数
 def get_all_pages() -> List[Dict[str, Any]]:
-    """
-    便捷函数：获取所有页面配置
-    
-    Returns:
-        页面配置列表
-    """
+    """便捷函数：获取所有页面配置（兼容旧API）"""
     return get_page_service().get_all_pages()
 
 
-def get_page_by_id(page_id: str) -> Optional[Dict[str, Any]]:
-    """
-    便捷函数：根据ID获取页面配置
-    
-    Args:
-        page_id: 页面ID
-        
-    Returns:
-        页面配置或None
-    """
-    return get_page_service().get_page_by_id(page_id)
-
-
 def get_ranking_channels() -> List[Dict[str, str]]:
-    """
-    便捷函数：获取所有排行榜频道
-    
-    Returns:
-        频道信息列表
-    """
+    """便捷函数：获取所有排行榜频道（兼容旧API）"""
     return get_page_service().get_ranking_channels()

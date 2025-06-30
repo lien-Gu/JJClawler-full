@@ -8,12 +8,12 @@ from fastapi import APIRouter
 
 from app.modules.service import BookService, RankingService
 from app.utils.service_utils import service_context, handle_api_error
-from app.utils.response_utils import BaseResponse, success_response, error_response
+from app.utils.response_utils import ApiResponse, success_response, error_response
 
 router = APIRouter(prefix="/stats", tags=["统计数据"])
 
 
-@router.get("/overview", response_model=BaseResponse[dict])
+@router.get("/overview", response_model=ApiResponse[dict])
 async def get_overview_stats():
     """
     获取首页概览统计数据

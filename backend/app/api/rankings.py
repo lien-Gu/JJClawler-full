@@ -9,8 +9,8 @@ from fastapi import APIRouter, Query, Path, HTTPException, Depends
 from app.modules.service import RankingService
 from app.modules.service.page_service import get_page_service
 from app.modules.models import RankingConfig
-from app.utils.response_utils import BaseResponse, PaginatedResponse, success_response, error_response, paginated_response
-from app.utils.error_codes import ErrorCodes
+from app.utils.response_utils import ApiResponse, success_response, error_response, paginated_response
+from app.utils.error_codes import StatusCode
 
 router = APIRouter(prefix="/rankings", tags=["榜单数据"])
 
@@ -20,7 +20,7 @@ def get_ranking_service() -> RankingService:
     return RankingService()
 
 
-@router.get("", response_model=PaginatedResponse[dict])
+@router.get("", response_model=ApiResponse[dict])
 async def get_rankings_list(
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
@@ -75,7 +75,7 @@ async def get_rankings_list(
         
     except Exception as e:
         error_resp = error_response(
-            code=ErrorCodes.INTERNAL_ERROR,
+            code=StatusCode.INTERNAL_ERROR,
             message="获取榜单列表失败"
         )
         raise HTTPException(
@@ -86,7 +86,7 @@ async def get_rankings_list(
         ranking_service.close()
 
 
-@router.get("/hot", response_model=BaseResponse[dict])
+@router.get("/hot", response_model=ApiResponse[dict])
 async def get_hot_rankings(
     limit: int = Query(10, ge=1, le=50, description="返回数量"),
     ranking_service: RankingService = Depends(get_ranking_service)
@@ -156,7 +156,7 @@ async def get_hot_rankings(
         )
         
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取热门榜单失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取热门榜单失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
@@ -165,7 +165,7 @@ async def get_hot_rankings(
         ranking_service.close()
 
 
-@router.get("/search", response_model=BaseResponse[dict])
+@router.get("/search", response_model=ApiResponse[dict])
 async def search_rankings(
     name: Optional[str] = Query(None, description="榜单名称搜索关键词（支持模糊匹配）"),
     limit: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -218,14 +218,14 @@ async def search_rankings(
         )
         
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="搜索榜单失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="搜索榜单失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/{ranking_id}/books", response_model=BaseResponse[dict])
+@router.get("/{ranking_id}/books", response_model=ApiResponse[dict])
 async def get_ranking_books(
     ranking_id: str = Path(..., description="榜单ID"),
     date: str = Query(None, description="指定日期 YYYY-MM-DD"),
@@ -246,7 +246,7 @@ async def get_ranking_books(
             try:
                 snapshot_time = datetime.strptime(date, "%Y-%m-%d")
             except ValueError:
-                error_resp = error_response(code=ErrorCodes.PARAMETER_INVALID, message="日期格式错误，请使用 YYYY-MM-DD")
+                error_resp = error_response(code=StatusCode.PARAMETER_INVALID, message="日期格式错误，请使用 YYYY-MM-DD")
                 raise HTTPException(
                     status_code=400, 
                     detail=error_resp.model_dump()
@@ -256,7 +256,7 @@ async def get_ranking_books(
         ranking_info, books_in_ranking, actual_snapshot_time = ranking_service.get_ranking_books(ranking_id, snapshot_time, limit, offset)
         
         if not ranking_info:
-            error_resp = error_response(code=ErrorCodes.RANKING_NOT_FOUND, message="榜单不存在")
+            error_resp = error_response(code=StatusCode.RANKING_NOT_FOUND, message="榜单不存在")
             raise HTTPException(
                 status_code=404, 
                 detail=error_resp.model_dump()
@@ -270,7 +270,7 @@ async def get_ranking_books(
                     "update_frequency": ranking_info.frequency.value
                 },
                 "books": [book.model_dump() for book in books_in_ranking],
-                "total": len(books_in_ranking),  # TODO: 获取实际总数
+                "total": len(books_in_ranking),
                 "page": offset // limit + 1,
                 "limit": limit,
                 "date": date,
@@ -282,7 +282,7 @@ async def get_ranking_books(
         ranking_service.close()
 
 
-@router.get("/{ranking_id}/history", response_model=BaseResponse[dict])
+@router.get("/{ranking_id}/history", response_model=ApiResponse[dict])
 async def get_ranking_history(
     ranking_id: str = Path(..., description="榜单ID"),
     days: int = Query(7, ge=1, le=30, description="历史天数"),
@@ -298,7 +298,7 @@ async def get_ranking_history(
         ranking_info, summaries = ranking_service.get_ranking_history_summary(ranking_id, days)
         
         if not ranking_info:
-            error_resp = error_response(code=ErrorCodes.RANKING_NOT_FOUND, message="榜单不存在")
+            error_resp = error_response(code=StatusCode.RANKING_NOT_FOUND, message="榜单不存在")
             raise HTTPException(
                 status_code=404, 
                 detail=error_resp.model_dump()

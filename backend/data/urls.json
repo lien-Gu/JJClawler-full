@@ -1,234 +1,537 @@
 {
-  "version": 20,
-  "base_url": "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={}&version={}",
-  "novel_url": "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId={}",
-  "content": {
-    "api":"bookstore",
-    "jiazi": {
-      "api":"favObservationByDate",
-      "params":{
-        "day":"today",
-        "use_cdn":"1"
-      },
-      "short_name": "jiazi",
-      "zh_name": "夹子",
-      "url": "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day=today&use_cdn=1&version=19",
-      "frequency": "hourly",
-      "update_interval": 1,
-      "type": "hourly"
+  "global": {
+    "base_params": {
+      "version": 20,
+      "use_cdn": "1"
     },
-    "pages": {
-      "api": "getFullPageV1",
-      "index": {
-        "short_name": "index",
-        "channel": "index",
-        "zh_name": "首页",
-        "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily"
+    "templates": {
+      "novel_detail": "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId={novel_id}",
+      "jiazi_ranking": "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day={day}&use_cdn={use_cdn}&version={version}",
+      "page_ranking": "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={channel}&version={version}"
+    }
+  },
+  "crawl_tasks": [
+    {
+      "id": "jiazi",
+      "name": "夹子榜",
+      "type": "jiazi",
+      "template": "jiazi_ranking",
+      "params": {
+        "day": "today"
       },
-      "yq": {
-        "short_name": "yq",
-        "channel": "yq",
-        "zh_name": "言情",
-        "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily",
-        "sub_pages": {
-          "gy": {
-            "short_name": "gy",
-            "channel": "gywx",
-            "zh_name": "古言",
-            "frequency": "hourly",
-            "update_interval": 2
-          },
-          "xy": {
-            "short_name": "xy",
-            "channel": "dsyq",
-            "zh_name": "现言",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "hy": {
-            "short_name": "hy",
-            "channel": "qqyq",
-            "zh_name": "幻言",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "gc": {
-            "short_name": "gc",
-            "channel": "gdcy",
-            "zh_name": "古穿",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "qh": {
-            "short_name": "qh",
-            "channel": "xhqh",
-            "zh_name": "奇幻",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "wl": {
-            "short_name": "wl",
-            "channel": "xywy",
-            "zh_name": "未来",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "ysyq": {
-            "short_name": "ysyq",
-            "channel": "trys",
-            "zh_name": "衍生言情",
-            "frequency": "hourly",
-            "update_interval": 3
-          },
-          "ecy": {
-            "short_name": "ecy",
-            "channel": "trmd",
-            "zh_name": "二次元",
-            "frequency": "hourly",
-            "update_interval": 4
-          }
-        }
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 1
       },
-      "ca": {
-        "short_name": "ca",
-        "channel": "noyq",
-        "zh_name": "纯爱",
-        "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily",
-        "sub_pages": {
-          "ds": {
-            "short_name": "ds",
-            "channel": "xddm",
-            "zh_name": "都市",
-            "frequency": "hourly",
-            "update_interval": 2
-          },
-          "xdca": {
-            "short_name": "xdca",
-            "channel": "xddm",
-            "zh_name": "现代幻想",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "gd": {
-            "short_name": "gd",
-            "channel": "gddm",
-            "zh_name": "古代",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "wlhx": {
-            "short_name": "wlhx",
-            "channel": "wlhxca",
-            "zh_name": "未来幻想",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "ysca": {
-            "short_name": "ysca",
-            "channel": "trdm",
-            "zh_name": "衍生纯爱",
-            "frequency": "hourly",
-            "update_interval": 3
-          }
-        }
+      "category": {
+        "parent": null,
+        "level": 0,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "index",
+      "name": "首页",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "index"
       },
-      "ys": {
-        "short_name": "ys",
-        "channel": "ys",
-        "zh_name": "衍生",
+      "schedule": {
         "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily",
-        "sub_pages": {
-          "nocp": {
-            "short_name": "nocp",
-            "channel": "=nocp_plus,yw",
-            "zh_name": "无CP",
-            "frequency": "hourly",
-            "update_interval": 4
-          },
-          "ca": {
-            "short_name": "ca",
-            "channel": "=ca,ysca",
-            "zh_name": "纯爱",
-            "frequency": "hourly",
-            "update_interval": 3
-          },
-          "yq": {
-            "short_name": "yq",
-            "channel": "=yq,ysyq",
-            "zh_name": "言情",
-            "frequency": "hourly",
-            "update_interval": 3
-          },
-          "ecy": {
-            "short_name": "ecy",
-            "channel": "=yq,ecy",
-            "zh_name": "二次元",
-            "frequency": "hourly",
-            "update_interval": 4
-          }
-        }
+        "interval": 24
       },
-      "nocp_plus": {
-        "short_name": "nocp_plus",
-        "channel": "nocp_plus",
-        "zh_name": "无CP+",
-        "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily",
-        "sub_pages": {
-          "nocp": {
-            "short_name": "nocp",
-            "channel": "nocp",
-            "zh_name": "无CP",
-            "frequency": "hourly",
-            "update_interval": 4
-          },
-          "yw": {
-            "short_name": "yw",
-            "channel": "ysnocp",
-            "zh_name": "衍无",
-            "frequency": "hourly",
-            "update_interval": 4
-          },
-          "male": {
-            "short_name": "male",
-            "channel": "nocp_male",
-            "zh_name": "男主",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "female": {
-            "short_name": "female",
-            "channel": "nocp_female",
-            "zh_name": "女主",
-            "frequency": "daily",
-            "update_interval": 24
-          },
-          "dy": {
-            "short_name": "dy",
-            "channel": "dy",
-            "zh_name": "多元",
-            "frequency": "daily",
-            "update_interval": 24
-          }
-        }
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "yq",
+      "name": "言情",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "yq"
       },
-      "bh": {
-        "short_name": "bh",
-        "channel": "bh",
-        "zh_name": "百合",
+      "schedule": {
         "frequency": "daily",
-        "update_interval": 24,
-        "type": "daily"
+        "interval": 24
+      },
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "ca",
+      "name": "纯爱",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "noyq"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 4
+      }
+    },
+    {
+      "id": "ys",
+      "name": "衍生",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "ys"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 5
+      }
+    },
+    {
+      "id": "nocp_plus",
+      "name": "无CP+",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "nocp_plus"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 6
+      }
+    },
+    {
+      "id": "bh",
+      "name": "百合",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "bh"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": null,
+        "level": 1,
+        "display_order": 7
+      }
+    },
+    {
+      "id": "yq.gy",
+      "name": "古言",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "gywx"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 2
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "yq.xy",
+      "name": "现言",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "dsyq"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "yq.hy",
+      "name": "幻言",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "qqyq"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "yq.gc",
+      "name": "古穿",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "gdcy"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 4
+      }
+    },
+    {
+      "id": "yq.qh",
+      "name": "奇幻",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "xhqh"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 5
+      }
+    },
+    {
+      "id": "yq.wl",
+      "name": "未来",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "xywy"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 6
+      }
+    },
+    {
+      "id": "yq.ysyq",
+      "name": "衍生言情",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "trys"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 7
+      }
+    },
+    {
+      "id": "yq.ecy",
+      "name": "二次元",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "trmd"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "yq",
+        "level": 2,
+        "display_order": 8
+      }
+    },
+    {
+      "id": "ca.ds",
+      "name": "都市",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "xddm"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 2
+      },
+      "category": {
+        "parent": "ca",
+        "level": 2,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "ca.xdca",
+      "name": "现代幻想",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "xddm"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "ca",
+        "level": 2,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "ca.gd",
+      "name": "古代",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "gddm"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "ca",
+        "level": 2,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "ca.wlhx",
+      "name": "未来幻想",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "wlhxca"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "ca",
+        "level": 2,
+        "display_order": 4
+      }
+    },
+    {
+      "id": "ca.ysca",
+      "name": "衍生纯爱",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "trdm"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "ca",
+        "level": 2,
+        "display_order": 5
+      }
+    },
+    {
+      "id": "ys.nocp",
+      "name": "无CP(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=nocp_plus,yw"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "ys.ca",
+      "name": "纯爱(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=ca,ysca"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "ys.yq",
+      "name": "言情(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=yq,ysyq"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "ys.ecy",
+      "name": "二次元(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=yq,ecy"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 4
+      }
+    },
+    {
+      "id": "nocp_plus.nocp",
+      "name": "无CP",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "nocp"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "nocp_plus",
+        "level": 2,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "nocp_plus.yw",
+      "name": "衍无",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "ysnocp"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "nocp_plus",
+        "level": 2,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "nocp_plus.male",
+      "name": "男主",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "nocp_male"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "nocp_plus",
+        "level": 2,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "nocp_plus.female",
+      "name": "女主",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "nocp_female"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "nocp_plus",
+        "level": 2,
+        "display_order": 4
+      }
+    },
+    {
+      "id": "nocp_plus.dy",
+      "name": "多元",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "dy"
+      },
+      "schedule": {
+        "frequency": "daily",
+        "interval": 24
+      },
+      "category": {
+        "parent": "nocp_plus",
+        "level": 2,
+        "display_order": 5
       }
     }
-  }
+  ]
 }

@@ -1,11 +1,13 @@
 """
 错误码定义
 
-定义系统中所有的错误码，用于标准化错误处理
+使用枚举类定义系统中所有的错误码，确保类型安全和标准化错误处理
 """
+from enum import IntEnum
 
-class ErrorCodes:
-    """错误码常量定义"""
+
+class StatusCode(IntEnum):
+    """状态码枚举定义 - 确保只能使用预定义的状态码"""
     
     # 成功状态码
     SUCCESS = 200
@@ -53,64 +55,66 @@ class ErrorCodes:
     CACHE_ERROR = 6003        # 缓存错误
 
 
+
+
 class ErrorMessages:
     """错误消息映射"""
     
     MESSAGES = {
         # 成功
-        200: "操作成功",
+        StatusCode.SUCCESS: "操作成功",
         
         # 4xx 客户端错误
-        400: "请求参数错误",
-        401: "身份验证失败",
-        403: "权限不足",
-        404: "资源不存在",
-        405: "请求方法不被允许",
-        422: "数据验证失败",
+        StatusCode.BAD_REQUEST: "请求参数错误",
+        StatusCode.UNAUTHORIZED: "身份验证失败",
+        StatusCode.FORBIDDEN: "权限不足",
+        StatusCode.NOT_FOUND: "资源不存在",
+        StatusCode.METHOD_NOT_ALLOWED: "请求方法不被允许",
+        StatusCode.VALIDATION_ERROR: "数据验证失败",
         
         # 5xx 服务器错误
-        500: "内部服务器错误",
-        503: "服务暂时不可用",
+        StatusCode.INTERNAL_ERROR: "内部服务器错误",
+        StatusCode.SERVICE_UNAVAILABLE: "服务暂时不可用",
         
         # 1xxx 通用业务错误
-        1001: "操作失败",
-        1002: "参数无效",
-        1003: "数据不存在",
-        1004: "数据重复",
+        StatusCode.OPERATION_FAILED: "操作失败",
+        StatusCode.PARAMETER_INVALID: "参数无效",
+        StatusCode.DATA_NOT_FOUND: "数据不存在",
+        StatusCode.DUPLICATE_DATA: "数据重复",
         
         # 2xxx 书籍相关错误
-        2001: "书籍不存在",
-        2002: "书籍数据无效",
+        StatusCode.BOOK_NOT_FOUND: "书籍不存在",
+        StatusCode.BOOK_DATA_INVALID: "书籍数据无效",
         
         # 3xxx 榜单相关错误
-        3001: "榜单不存在",
-        3002: "榜单数据无效",
+        StatusCode.RANKING_NOT_FOUND: "榜单不存在",
+        StatusCode.RANKING_DATA_INVALID: "榜单数据无效",
         
         # 4xxx 爬虫相关错误
-        4001: "爬虫执行失败",
-        4002: "任务不存在",
-        4003: "任务创建失败",
-        4004: "无效的爬取频道",
-        4005: "调度器错误",
+        StatusCode.CRAWLER_FAILED: "爬虫执行失败",
+        StatusCode.TASK_NOT_FOUND: "任务不存在",
+        StatusCode.TASK_CREATE_FAILED: "任务创建失败",
+        StatusCode.INVALID_CHANNEL: "无效的爬取频道",
+        StatusCode.SCHEDULER_ERROR: "调度器错误",
         
         # 5xxx 用户相关错误
-        5001: "用户不存在",
-        5002: "用户数据无效",
+        StatusCode.USER_NOT_FOUND: "用户不存在",
+        StatusCode.USER_DATA_INVALID: "用户数据无效",
         
         # 6xxx 系统相关错误
-        6001: "配置错误",
-        6002: "数据库错误",
-        6003: "缓存错误",
+        StatusCode.CONFIG_ERROR: "配置错误",
+        StatusCode.DATABASE_ERROR: "数据库错误",
+        StatusCode.CACHE_ERROR: "缓存错误",
     }
     
     @classmethod
-    def get_message(cls, code: int) -> str:
+    def get_message(cls, code: StatusCode) -> str:
         """根据错误码获取错误消息"""
         return cls.MESSAGES.get(code, "未知错误")
 
 
 # 便捷的错误响应构建函数
-def get_error_response(code: int, custom_message: str = None):
+def get_error_response(code: StatusCode, custom_message: str = None):
     """根据错误码构建错误响应"""
     from .response_utils import error_response
     

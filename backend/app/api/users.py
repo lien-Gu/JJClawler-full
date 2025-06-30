@@ -8,12 +8,12 @@ from typing import List, Dict, Any
 from fastapi import APIRouter
 
 from app.utils.service_utils import handle_api_error
-from app.utils.response_utils import BaseResponse, success_response, error_response
+from app.utils.response_utils import ApiResponse, success_response, error_response
 
 router = APIRouter(prefix="/user", tags=["用户信息"])
 
 
-@router.get("/stats", response_model=BaseResponse[dict])
+@router.get("/stats", response_model=ApiResponse[dict])
 async def get_user_stats():
     """
     获取用户统计信息
@@ -52,7 +52,7 @@ async def get_user_stats():
         handle_api_error(e, "获取用户统计")
 
 
-@router.get("/follows", response_model=BaseResponse[dict])
+@router.get("/follows", response_model=ApiResponse[dict])
 async def get_user_follows():
     """
     获取用户关注列表
@@ -139,7 +139,7 @@ async def get_user_follows():
         handle_api_error(e, "获取用户关注列表")
 
 
-@router.post("/follows", response_model=BaseResponse[dict])
+@router.post("/follows", response_model=ApiResponse[dict])
 async def add_user_follow():
     """
     添加用户关注
@@ -167,7 +167,7 @@ async def add_user_follow():
         handle_api_error(e, "添加用户关注")
 
 
-@router.delete("/follows/{follow_id}", response_model=BaseResponse[dict])
+@router.delete("/follows/{follow_id}", response_model=ApiResponse[dict])
 async def remove_user_follow(follow_id: str):
     """
     取消用户关注
@@ -195,7 +195,7 @@ async def remove_user_follow(follow_id: str):
         handle_api_error(e, "取消用户关注")
 
 
-@router.get("/profile", response_model=BaseResponse[dict])
+@router.get("/profile", response_model=ApiResponse[dict])
 async def get_user_profile():
     """
     获取用户基本信息

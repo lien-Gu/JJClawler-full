@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     
     # API配置
     API_V1_STR: str = "/api/v1"
+
     
     # 数据库配置
     DATABASE_URL: str = "sqlite:///./data/jjcrawler.db"

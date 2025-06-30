@@ -36,7 +36,6 @@ def read_json_file(file_path: Union[str, Path], default: Any = None) -> Any:
     Args:
         file_path: 文件路径
         default: 文件不存在或读取失败时的默认值
-        
     Returns:
         Any: JSON数据
     """

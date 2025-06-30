@@ -10,8 +10,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.modules.models import CrawlJiaziRequest, CrawlRankingRequest
-from app.utils.response_utils import BaseResponse, success_response, error_response
-from app.utils.error_codes import ErrorCodes
+from app.utils.response_utils import ApiResponse, success_response, error_response
+from app.utils.error_codes import StatusCode
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
     trigger_manual_crawl
@@ -22,7 +22,7 @@ from app.modules.service.task_service import (create_jiazi_task, create_page_tas
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
 
-@router.post("/jiazi", response_model=BaseResponse[dict])
+@router.post("/jiazi", response_model=ApiResponse[dict])
 async def trigger_jiazi_crawl(
         request: CrawlJiaziRequest = CrawlJiaziRequest()
 ):
@@ -54,14 +54,14 @@ async def trigger_jiazi_crawl(
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.TASK_CREATE_FAILED, message="创建任务失败")
+        error_resp = error_response(code=StatusCode.TASK_CREATE_FAILED, message="创建任务失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.post("/page/{channel}", response_model=BaseResponse[dict])
+@router.post("/page/{channel}", response_model=ApiResponse[dict])
 async def trigger_page_crawl(
         channel: str,
         request: CrawlRankingRequest = CrawlRankingRequest()
@@ -81,7 +81,7 @@ async def trigger_page_crawl(
         valid_channels = [c['channel'] for c in available_channels]
         if channel not in valid_channels:
             error_resp = error_response(
-                code=ErrorCodes.PARAMETER_INVALID,
+                code=StatusCode.PARAMETER_INVALID,
                 message=f"无效频道: {channel}"
             )
             raise HTTPException(
@@ -112,14 +112,14 @@ async def trigger_page_crawl(
     except HTTPException:
         raise
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.TASK_CREATE_FAILED, message="创建任务失败")
+        error_resp = error_response(code=StatusCode.TASK_CREATE_FAILED, message="创建任务失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/tasks", response_model=BaseResponse[dict])
+@router.get("/tasks", response_model=ApiResponse[dict])
 async def get_tasks(
         status: Optional[str] = Query(None, description="状态筛选 (pending/running/completed/failed)"),
         task_type: Optional[str] = Query(None, description="类型筛选 (jiazi/page/book_detail)"),
@@ -196,14 +196,14 @@ async def get_tasks(
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取任务列表失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取任务列表失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/tasks/{task_id}", response_model=BaseResponse[dict])
+@router.get("/tasks/{task_id}", response_model=ApiResponse[dict])
 async def get_task_detail(task_id: str):
     """
     获取特定任务详情
@@ -215,7 +215,7 @@ async def get_task_detail(task_id: str):
         task = task_manager.get_task_status(task_id)
 
         if not task:
-            error_resp = error_response(code=ErrorCodes.TASK_NOT_FOUND, message="任务不存在")
+            error_resp = error_response(code=StatusCode.TASK_NOT_FOUND, message="任务不存在")
             raise HTTPException(
                 status_code=404, 
                 detail=error_resp.model_dump()
@@ -240,14 +240,14 @@ async def get_task_detail(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取任务详情失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取任务详情失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/channels", response_model=BaseResponse[dict])
+@router.get("/channels", response_model=ApiResponse[dict])
 async def get_available_channels():
     """
     获取可用的爬取频道列表
@@ -268,14 +268,14 @@ async def get_available_channels():
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取频道列表失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取频道列表失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/scheduler/status", response_model=BaseResponse[dict])
+@router.get("/scheduler/status", response_model=ApiResponse[dict])
 async def get_scheduler_status():
     """
     获取调度器状态信息
@@ -297,14 +297,14 @@ async def get_scheduler_status():
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取调度器状态失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取调度器状态失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/scheduler/jobs", response_model=BaseResponse[dict])
+@router.get("/scheduler/jobs", response_model=ApiResponse[dict])
 async def get_scheduled_jobs():
     """
     获取所有定时任务信息
@@ -324,14 +324,14 @@ async def get_scheduled_jobs():
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取定时任务失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取定时任务失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.post("/scheduler/trigger/{target}", response_model=BaseResponse[dict])
+@router.post("/scheduler/trigger/{target}", response_model=ApiResponse[dict])
 async def trigger_scheduled_job(target: str):
     """
     手动触发调度任务
@@ -351,14 +351,14 @@ async def trigger_scheduled_job(target: str):
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="触发任务失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="触发任务失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.get("/monitor/status", response_model=BaseResponse[dict])
+@router.get("/monitor/status", response_model=ApiResponse[dict])
 async def get_monitor_status():
     """
     获取任务监控状态
@@ -376,14 +376,14 @@ async def get_monitor_status():
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取监控状态失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取监控状态失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
         )
 
 
-@router.post("/monitor/check", response_model=BaseResponse[dict])
+@router.post("/monitor/check", response_model=ApiResponse[dict])
 async def manual_check_missing_tasks():
     """
     手动检查缺失任务
@@ -405,7 +405,7 @@ async def manual_check_missing_tasks():
         )
 
     except Exception as e:
-        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="手动检查失败")
+        error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="手动检查失败")
         raise HTTPException(
             status_code=500, 
             detail=error_resp.model_dump()
