@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.modules.models import CrawlJiaziRequest, CrawlRankingRequest
 from app.utils.response_utils import BaseResponse, success_response, error_response
+from app.utils.error_codes import ErrorCodes
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
     trigger_manual_crawl
@@ -53,13 +54,10 @@ async def trigger_jiazi_crawl(
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.TASK_CREATE_FAILED, message="创建任务失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="创建任务失败",
-                error_code="TASK_CREATE_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -82,12 +80,13 @@ async def trigger_page_crawl(
 
         valid_channels = [c['channel'] for c in available_channels]
         if channel not in valid_channels:
+            error_resp = error_response(
+                code=ErrorCodes.PARAMETER_INVALID,
+                message=f"无效频道: {channel}"
+            )
             raise HTTPException(
                 status_code=400, 
-                detail=error_response(
-                    message=f"无效频道: {channel}",
-                    error_code="INVALID_CHANNEL"
-                ).model_dump()
+                detail=error_resp.model_dump()
             )
 
         if request.immediate:
@@ -113,13 +112,10 @@ async def trigger_page_crawl(
     except HTTPException:
         raise
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.TASK_CREATE_FAILED, message="创建任务失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="创建任务失败",
-                error_code="TASK_CREATE_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -200,13 +196,10 @@ async def get_tasks(
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取任务列表失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取任务列表失败",
-                error_code="TASK_LIST_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -222,12 +215,10 @@ async def get_task_detail(task_id: str):
         task = task_manager.get_task_status(task_id)
 
         if not task:
+            error_resp = error_response(code=ErrorCodes.TASK_NOT_FOUND, message="任务不存在")
             raise HTTPException(
                 status_code=404, 
-                detail=error_response(
-                    message="任务不存在",
-                    error_code="TASK_NOT_FOUND"
-                ).model_dump()
+                detail=error_resp.model_dump()
             )
 
         return success_response(
@@ -249,13 +240,10 @@ async def get_task_detail(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取任务详情失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取任务详情失败",
-                error_code="TASK_DETAIL_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -280,13 +268,10 @@ async def get_available_channels():
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取频道列表失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取频道列表失败",
-                error_code="CHANNEL_LIST_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -312,13 +297,10 @@ async def get_scheduler_status():
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取调度器状态失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取调度器状态失败",
-                error_code="SCHEDULER_STATUS_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -342,13 +324,10 @@ async def get_scheduled_jobs():
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取定时任务失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取定时任务失败",
-                error_code="SCHEDULED_JOBS_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -372,13 +351,10 @@ async def trigger_scheduled_job(target: str):
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="触发任务失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="触发任务失败",
-                error_code="TRIGGER_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -400,13 +376,10 @@ async def get_monitor_status():
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="获取监控状态失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取监控状态失败",
-                error_code="MONITOR_STATUS_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -432,11 +405,8 @@ async def manual_check_missing_tasks():
         )
 
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.INTERNAL_ERROR, message="手动检查失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="手动检查失败",
-                error_code="MANUAL_CHECK_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )

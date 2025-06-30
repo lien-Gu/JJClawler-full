@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.modules.service.page_service import get_page_service
 from app.utils.response_utils import BaseResponse, success_response, error_response
+from app.utils.error_codes import ErrorCodes
 
 router = APIRouter(prefix="/pages", tags=["页面配置"])
 
@@ -107,13 +108,10 @@ async def get_pages():
         )
         
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.CONFIG_ERROR, message="获取页面配置失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="获取页面配置失败",
-                error_code="PAGE_CONFIG_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )
 
 
@@ -184,11 +182,8 @@ async def refresh_page_config():
             message="页面配置缓存已刷新"
         )
     except Exception as e:
+        error_resp = error_response(code=ErrorCodes.CONFIG_ERROR, message="刷新配置失败")
         raise HTTPException(
             status_code=500, 
-            detail=error_response(
-                message="刷新配置失败",
-                error_code="CONFIG_REFRESH_ERROR",
-                details=str(e)
-            ).model_dump()
+            detail=error_resp.model_dump()
         )

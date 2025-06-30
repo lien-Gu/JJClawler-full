@@ -10,6 +10,7 @@ from app.modules.service import BookService
 from app.modules.models import BookDetail
 from app.utils.service_utils import service_context, handle_api_error, to_api_response
 from app.utils.response_utils import BaseResponse, success_response, error_response, paginated_response
+from app.utils.error_codes import ErrorCodes
 
 router = APIRouter(prefix="/books", tags=["书籍信息"])
 
@@ -27,12 +28,13 @@ async def get_book_detail(
         with service_context(BookService) as book_service:
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
+                error_resp = error_response(
+                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    message="书籍不存在"
+                )
                 raise HTTPException(
-                    status_code=404, 
-                    detail=error_response(
-                        message="书籍不存在",
-                        error_code="BOOK_NOT_FOUND"
-                    ).model_dump()
+                    status_code=404,
+                    detail=error_resp.model_dump()
                 )
             return success_response(
                 data=book_detail,
@@ -60,12 +62,13 @@ async def get_book_rankings(
             book_detail, current_rankings, history_rankings = book_service.get_book_ranking_history(book_id, days)
             
             if not book_detail:
+                error_resp = error_response(
+                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    message="书籍不存在"
+                )
                 raise HTTPException(
-                    status_code=404, 
-                    detail=error_response(
-                        message="书籍不存在",
-                        error_code="BOOK_NOT_FOUND"
-                    ).model_dump()
+                    status_code=404,
+                    detail=error_resp.model_dump()
                 )
             
             return success_response(
@@ -100,12 +103,13 @@ async def get_book_trends(
             # 先检查书籍是否存在
             book_detail = book_service.get_book_detail(book_id)
             if not book_detail:
+                error_resp = error_response(
+                    code=ErrorCodes.BOOK_NOT_FOUND,
+                    message="书籍不存在"
+                )
                 raise HTTPException(
-                    status_code=404, 
-                    detail=error_response(
-                        message="书籍不存在",
-                        error_code="BOOK_NOT_FOUND"
-                    ).model_dump()
+                    status_code=404,
+                    detail=error_resp.model_dump()
                 )
             
             # 获取趋势数据
