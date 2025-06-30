@@ -4,34 +4,26 @@
 提供爬虫任务触发、状态查询和监控的API端点
 集成调度器功能，支持手动触发和定时任务管理
 """
-import asyncio
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
-from app.modules.models import (
-    TasksResponse,
-    TaskCreateResponse,
-    CrawlJiaziRequest,
-    CrawlRankingRequest,
-    TaskInfo as ApiTaskInfo
-)
-from app.modules.service.task_service import (
-    get_task_manager,
-    create_jiazi_task,
-    create_page_task
-)
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
+
+from app.modules.models import (CrawlJiaziRequest, CrawlRankingRequest, TaskCreateResponse, TaskInfo as ApiTaskInfo,
+                                TasksResponse)
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
     trigger_manual_crawl
 )
 from app.modules.service.task_monitor_service import get_task_monitor_service
+from app.modules.service.task_service import (create_jiazi_task, create_page_task, get_task_manager)
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
 
 @router.post("/jiazi", response_model=TaskCreateResponse)
 async def trigger_jiazi_crawl(
-    request: CrawlJiaziRequest = CrawlJiaziRequest()
+        request: CrawlJiaziRequest = CrawlJiaziRequest()
 ):
     """
     触发夹子榜单爬取
@@ -49,21 +41,21 @@ async def trigger_jiazi_crawl(
             task_id = create_jiazi_task()
             # 这里可以添加到后台任务队列
             message = "夹子榜单爬取任务已创建"
-        
+
         return TaskCreateResponse(
             task_id=task_id,
             message=message + (" (强制模式)" if request.force else ""),
             status="pending"
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}")
 
 
 @router.post("/page/{channel}", response_model=TaskCreateResponse)
 async def trigger_page_crawl(
-    channel: str,
-    request: CrawlRankingRequest = CrawlRankingRequest()
+        channel: str,
+        request: CrawlRankingRequest = CrawlRankingRequest()
 ):
     """
     触发特定分类页面爬取
@@ -76,11 +68,11 @@ async def trigger_page_crawl(
         from app.modules.service.page_service import get_page_service
         page_service = get_page_service()
         available_channels = page_service.get_ranking_channels()
-        
+
         valid_channels = [c['channel'] for c in available_channels]
         if channel not in valid_channels:
             raise HTTPException(status_code=400, detail=f"无效频道: {channel}")
-        
+
         if request.immediate:
             # 立即通过调度器执行
             task_id = trigger_manual_crawl(channel)
@@ -89,13 +81,13 @@ async def trigger_page_crawl(
             # 传统方式创建任务
             task_id = create_page_task(channel)
             message = f"分类页面 {channel} 爬取任务已创建"
-        
+
         return TaskCreateResponse(
             task_id=task_id,
             message=message + (" (强制模式)" if request.force else ""),
             status="pending"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -104,10 +96,10 @@ async def trigger_page_crawl(
 
 @router.get("/tasks", response_model=TasksResponse)
 async def get_tasks(
-    status: Optional[str] = Query(None, description="状态筛选 (pending/running/completed/failed)"),
-    task_type: Optional[str] = Query(None, description="类型筛选 (jiazi/page/book_detail)"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    offset: int = Query(0, ge=0, description="偏移量")
+        status: Optional[str] = Query(None, description="状态筛选 (pending/running/completed/failed)"),
+        task_type: Optional[str] = Query(None, description="类型筛选 (jiazi/page/book_detail)"),
+        limit: int = Query(20, ge=1, le=100, description="每页数量"),
+        offset: int = Query(0, ge=0, description="偏移量")
 ):
     """
     获取爬取任务列表
@@ -117,11 +109,11 @@ async def get_tasks(
     try:
         task_manager = get_task_manager()
         all_tasks = task_manager.get_all_tasks()
-        
+
         current_tasks = []
         completed_tasks = []
         failed_tasks = []
-        
+
         # 转换任务信息格式
         for task in all_tasks["current"]:
             current_tasks.append(ApiTaskInfo(
@@ -135,7 +127,7 @@ async def get_tasks(
                 items_crawled=task.items_crawled,
                 ranking_id=task.metadata.get('channel') if task.metadata else None
             ))
-        
+
         for task in all_tasks["completed"]:
             completed_tasks.append(ApiTaskInfo(
                 task_id=task.task_id,
@@ -148,7 +140,7 @@ async def get_tasks(
                 items_crawled=task.items_crawled,
                 ranking_id=task.metadata.get('channel') if task.metadata else None
             ))
-        
+
         for task in all_tasks["failed"]:
             failed_tasks.append(ApiTaskInfo(
                 task_id=task.task_id,
@@ -161,29 +153,29 @@ async def get_tasks(
                 items_crawled=task.items_crawled,
                 ranking_id=task.metadata.get('channel') if task.metadata else None
             ))
-        
+
         # 合并完成和失败的任务
         all_completed = completed_tasks + failed_tasks
-        
+
         # 根据筛选条件过滤
         if status:
             current_tasks = [t for t in current_tasks if t.status == status]
             all_completed = [t for t in all_completed if t.status == status]
-        
+
         if task_type:
             current_tasks = [t for t in current_tasks if t.task_type == task_type]
             all_completed = [t for t in all_completed if t.task_type == task_type]
-        
+
         # 分页
         paginated_completed = all_completed[offset:offset + limit]
-        
+
         return TasksResponse(
             current_tasks=current_tasks,
             completed_tasks=paginated_completed,
             total_current=len(current_tasks),
             total_completed=len(all_completed)
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
 
@@ -198,10 +190,10 @@ async def get_task_detail(task_id: str):
     try:
         task_manager = get_task_manager()
         task = task_manager.get_task_status(task_id)
-        
+
         if not task:
             raise HTTPException(status_code=404, detail=f"任务 {task_id} 不存在")
-        
+
         return ApiTaskInfo(
             task_id=task.task_id,
             task_type=task.task_type,
@@ -213,7 +205,7 @@ async def get_task_detail(task_id: str):
             items_crawled=task.items_crawled,
             ranking_id=task.metadata.get('channel') if task.metadata else None
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -231,12 +223,12 @@ async def get_available_channels():
         from app.modules.service.page_service import get_page_service
         page_service = get_page_service()
         channels = page_service.get_ranking_channels()
-        
+
         return {
             "channels": channels,
             "total": len(channels)
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取频道列表失败: {str(e)}")
 
@@ -252,13 +244,13 @@ async def get_scheduler_status():
         scheduler_service = get_scheduler_service()
         status_info = scheduler_service.get_status()
         scheduled_jobs = scheduler_service.get_scheduled_jobs()
-        
+
         return {
             "status": "running" if status_info['is_running'] else "stopped",
             "statistics": status_info,
             "scheduled_jobs": scheduled_jobs
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取调度器状态失败: {str(e)}")
 
@@ -273,12 +265,12 @@ async def get_scheduled_jobs():
     try:
         scheduler_service = get_scheduler_service()
         jobs = scheduler_service.get_scheduled_jobs()
-        
+
         return {
             "jobs": jobs,
             "total": len(jobs)
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取定时任务失败: {str(e)}")
 
@@ -292,13 +284,13 @@ async def trigger_scheduled_job(target: str):
     """
     try:
         task_id = trigger_manual_crawl(target)
-        
+
         return {
             "task_id": task_id,
             "message": f"已手动触发 {target} 爬取任务",
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"触发任务失败: {str(e)}")
 
@@ -314,13 +306,13 @@ async def get_monitor_status():
     try:
         monitor_service = get_task_monitor_service()
         status = monitor_service.get_monitoring_status()
-        
+
         return {
             "status": "success",
             "data": status,
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取监控状态失败: {str(e)}")
 
@@ -335,18 +327,18 @@ async def manual_check_missing_tasks():
     """
     try:
         monitor_service = get_task_monitor_service()
-        
+
         # 手动触发一次检查
         await monitor_service._check_missing_tasks()
-        
+
         status = monitor_service.get_monitoring_status()
-        
+
         return {
             "status": "success",
             "message": "手动检查已完成",
             "data": status,
             "timestamp": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"手动检查失败: {str(e)}")
