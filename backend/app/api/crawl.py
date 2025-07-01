@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.modules.models import CrawlJiaziRequest, CrawlRankingRequest
+from app.modules.models import CrawlPageRequest
 from app.utils.response_utils import ApiResponse, success_response, error_response
 from app.utils.error_codes import StatusCode
 from app.modules.service.scheduler_service import (
@@ -17,54 +17,15 @@ from app.modules.service.scheduler_service import (
     trigger_manual_crawl
 )
 from app.modules.service.task_monitor_service import get_task_monitor_service
-from app.modules.service.task_service import (create_jiazi_task, create_page_task, get_task_manager)
+from app.modules.service.crawl_service import get_crawl_service
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
 
-@router.post("/jiazi", response_model=ApiResponse[dict])
-async def trigger_jiazi_crawl(
-        request: CrawlJiaziRequest = CrawlJiaziRequest()
-):
-    """
-    触发夹子榜单爬取
-    
-    启动夹子榜单的爬取任务，夹子榜单是热度最高的榜单，
-    需要频繁更新。支持立即执行和调度器触发两种方式。
-    """
-    try:
-        if request.immediate:
-            # 立即通过调度器执行
-            task_id = trigger_manual_crawl("jiazi")
-            message = "夹子榜单爬取任务已立即触发"
-        else:
-            # 传统方式创建任务
-            task_id = create_jiazi_task()
-            # 这里可以添加到后台任务队列
-            message = "夹子榜单爬取任务已创建"
-
-        return success_response(
-            data={
-                "task_id": task_id,
-                "status": "pending",
-                "force": request.force,
-                "immediate": request.immediate
-            },
-            message=message + (" (强制模式)" if request.force else "")
-        )
-
-    except Exception as e:
-        error_resp = error_response(code=StatusCode.TASK_CREATE_FAILED, message="创建任务失败")
-        raise HTTPException(
-            status_code=500, 
-            detail=error_resp.model_dump()
-        )
-
-
-@router.post("/page/{channel}", response_model=ApiResponse[dict])
+@router.post("/page/{id}", response_model=ApiResponse[dict])
 async def trigger_page_crawl(
-        channel: str,
-        request: CrawlRankingRequest = CrawlRankingRequest()
+        id: str,
+        request: CrawlPageRequest = CrawlPageRequest()
 ):
     """
     触发特定分类页面爬取
@@ -74,15 +35,14 @@ async def trigger_page_crawl(
     """
     try:
         # 验证频道是否有效
-        from app.modules.service.page_service import get_page_service
-        page_service = get_page_service()
-        available_channels = page_service.get_ranking_channels()
+        crawl_service = get_crawl_service()
+        all_tasks = crawl_service.get_all_task_configs()
+        valid_ids = [task.id for task in all_tasks]
 
-        valid_channels = [c['channel'] for c in available_channels]
-        if channel not in valid_channels:
+        if id not in valid_ids:
             error_resp = error_response(
                 code=StatusCode.PARAMETER_INVALID,
-                message=f"无效频道: {channel}"
+                message=f"无效ID: {id}"
             )
             raise HTTPException(
                 status_code=400, 
@@ -91,17 +51,17 @@ async def trigger_page_crawl(
 
         if request.immediate:
             # 立即通过调度器执行
-            task_id = trigger_manual_crawl(channel)
-            message = f"分类页面 {channel} 爬取任务已立即触发"
+            task_id = trigger_manual_crawl(id)
+            message = f"分类页面 {id} 爬取任务已立即触发"
         else:
-            # 传统方式创建任务
-            task_id = create_page_task(channel)
-            message = f"分类页面 {channel} 爬取任务已创建"
+            # 创建执行任务
+            task_id = crawl_service.create_execution_task(id)
+            message = f"分类页面 {id} 爬取任务已创建"
 
         return success_response(
             data={
                 "task_id": task_id,
-                "channel": channel,
+                "channel": id,
                 "status": "pending",
                 "force": request.force,
                 "immediate": request.immediate
@@ -132,8 +92,8 @@ async def get_tasks(
     查询当前和历史爬取任务的状态，支持按状态和类型筛选
     """
     try:
-        task_manager = get_task_manager()
-        all_tasks = task_manager.get_all_tasks()
+        crawl_service = get_crawl_service()
+        all_tasks = crawl_service.get_all_tasks()
 
         current_tasks = []
         completed_tasks = []

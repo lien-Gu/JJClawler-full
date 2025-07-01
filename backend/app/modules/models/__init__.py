@@ -17,7 +17,7 @@ from .api import (
     # Ranking相关 - 保留用于内部数据处理 
     RankingInfo, RankingSnapshotSummary,
     # 请求模型 - 仍然需要
-    CrawlJiaziRequest, CrawlRankingRequest,
+    CrawlPageRequest,
     # 内部任务信息模型 - 用于数据转换
     TaskInfo,
     # 页面配置相关 - rankings.py 仍在使用
@@ -36,7 +36,7 @@ __all__ = [
     "RankingInfo", "RankingSnapshotSummary",
     
     # 请求模型
-    "CrawlJiaziRequest", "CrawlRankingRequest",
+    "CrawlPageRequest",
     # 内部数据模型
     "TaskInfo", "RankingConfig"
 ]

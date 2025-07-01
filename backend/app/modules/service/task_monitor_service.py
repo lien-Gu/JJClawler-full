@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from enum import Enum
 
-from app.modules.service.task_service import get_task_manager
+from app.modules.service.crawl_service import get_crawl_service
 from app.modules.database.connection import get_session_sync
 from app.modules.models import Ranking, BookSnapshot, RankingSnapshot
 

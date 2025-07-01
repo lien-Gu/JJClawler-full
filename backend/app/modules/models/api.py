@@ -108,13 +108,7 @@ class RankingConfig(BaseModel):
 # 现在都使用 BaseResponse[dict] 或 PaginatedResponse[dict]
 
 
-class CrawlJiaziRequest(BaseModel):
-    """夹子爬取请求"""
-    force: bool = Field(default=False, description="是否强制爬取")
-    immediate: bool = Field(default=True, description="是否立即执行")
-
-
-class CrawlRankingRequest(BaseModel):
+class CrawlPageRequest(BaseModel):
     """榜单爬取请求"""
     force: bool = Field(default=False, description="是否强制爬取")
     immediate: bool = Field(default=True, description="是否立即执行")
@@ -133,17 +127,6 @@ class TaskInfo(BaseModel):
     items_crawled: int = Field(default=0, description="已爬取项目数")
     ranking_id: Optional[str] = Field(default=None, description="榜单ID")
 
-# TaskCreateResponse 和 TasksResponse 已被统一响应模型替代
 
 
-# ==================== 保留的数据模型 ====================
-# 以下模型保留用于内部数据结构，不用于API响应
 
-# 统计和榜单项模型已被统一响应模型替代
-# 现在都直接使用字典格式返回数据
-
-
-# 更新模型引用 - 保留的模型重建
-# PageConfig.model_rebuild()
-# SubPageConfig.model_rebuild()
-# 这些模型不再用于API响应，不需要重建
