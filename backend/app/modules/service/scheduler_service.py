@@ -12,7 +12,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from pytz import utc
 
-from app.modules.service.crawler_service import CrawlerService
 from app.modules.service.crawl_service import get_crawl_service
 from app.modules.service.task_monitor_service import get_task_monitor_service
 from app.utils.log_utils import get_logger
@@ -101,15 +100,9 @@ class SchedulerService:
         try:
             logger.info(f"开始执行定时爬取: {task_id}")
 
+            # 统一的爬取函数，无论是夹子榜还是其他页面
             async def crawl_func():
-                crawler_service = CrawlerService()
-                try:
-                    if task_id == "jiazi":
-                        return await crawler_service.crawl_and_save_jiazi()
-                    else:
-                        return await crawler_service.crawl_and_save_page(task_id)
-                finally:
-                    crawler_service.close()
+                return await self.crawl_service.crawl_and_save(task_id)
 
             await self.crawl_service.execute_task(
                 task_id, 

@@ -213,12 +213,7 @@ class TaskMonitorService:
     async def _retry_jiazi_task(self) -> bool:
         """重试夹子榜任务"""
         try:
-            from app.modules.service.crawler_service import CrawlerService
-            
-            crawler_service = CrawlerService()
-            result = await crawler_service.crawl_and_save_jiazi()
-            crawler_service.close()
-            
+            result = await get_crawl_service().crawl_and_save("jiazi")
             return result is not None and result.get('success', False)
             
         except Exception as e:
@@ -228,12 +223,7 @@ class TaskMonitorService:
     async def _retry_page_task(self, channel: str) -> bool:
         """重试页面任务"""
         try:
-            from app.modules.service.crawler_service import CrawlerService
-            
-            crawler_service = CrawlerService()
-            result = await crawler_service.crawl_and_save_page(channel)
-            crawler_service.close()
-            
+            result = await get_crawl_service().crawl_and_save(channel)
             return result is not None and result.get('success', False)
             
         except Exception as e:

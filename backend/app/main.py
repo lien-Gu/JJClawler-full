@@ -144,27 +144,27 @@ def setup_routes(app: FastAPI):
         获取系统统计信息.
         此端点中的异常将由 ErrorHandlingMiddleware 统一处理.
         """
-        # 局部导入以避免循环依赖，这是可接受的模式
-        from app.modules.service.crawler_service import CrawlerService
-        from app.modules.service.task_service import get_task_manager
+        # 使用新的统一服务
+        from app.modules.service.crawl_service import get_crawl_service
         from app.modules.service.scheduler_service import get_scheduler_stats
 
-        # CrawlerService 可能需要资源管理，如果它支持 async context manager 会更好
-        # 例如: async with CrawlerService() as crawler_service:
-        # 这里我们遵循现有模式
-        crawler_service = CrawlerService()
-        stats = await crawler_service.get_crawl_statistics()
-        crawler_service.close()  # 确保资源被关闭
-
-        task_manager = get_task_manager()
-        task_summary = task_manager.get_task_summary()
+        crawl_service = get_crawl_service()
+        
+        # 获取任务统计
+        all_tasks = crawl_service.get_all_tasks()
+        task_summary = {
+            "current_tasks": len(all_tasks["current"]),
+            "completed_tasks": len(all_tasks["completed"]),
+            "failed_tasks": len(all_tasks["failed"]),
+            "total_configs": len(crawl_service.get_all_task_configs()),
+            "scheduled_tasks": len(crawl_service.get_scheduled_tasks())
+        }
 
         scheduler_stats = get_scheduler_stats()
 
         return {
             "status": "ok",
             "timestamp": datetime.now().isoformat(),
-            "crawler_stats": stats,
             "task_stats": task_summary,
             "scheduler_stats": scheduler_stats
         }

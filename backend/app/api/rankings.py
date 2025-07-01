@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Query, Path, HTTPException, Depends
 from app.modules.service import RankingService
-from app.modules.service.page_service import get_page_service
+from app.modules.service.crawl_service import get_crawl_service
 from app.modules.models import RankingConfig
 from app.utils.response_utils import ApiResponse, success_response, error_response, paginated_response
 from app.utils.error_codes import StatusCode
@@ -177,18 +177,18 @@ async def search_rankings(
     根据榜单名称进行模糊搜索，返回匹配的榜单列表
     """
     try:
-        page_service = get_page_service()
-        all_pages = page_service.get_all_pages()
+        crawl_service = get_crawl_service()
+        all_task_configs = crawl_service.get_all_task_configs()
         
-        # 收集所有榜单
+        # 收集所有榜单（基于爬取任务配置）
         all_rankings = []
-        for page in all_pages:
-            for ranking in page.get('rankings', []):
-                all_rankings.append({
-                    'ranking_id': ranking['ranking_id'],
-                    'name': ranking['name'],
-                    'update_frequency': ranking['update_frequency'],
-                    'page_name': page['name']
+        for task in all_task_configs:
+            all_rankings.append({
+                'ranking_id': task.id,
+                'name': task.name,
+                'update_frequency': task.frequency,
+                'interval': task.interval,
+                'page_name': task.parent_id or 'root'
                 })
         
         # 如果有搜索关键词，进行模糊匹配
