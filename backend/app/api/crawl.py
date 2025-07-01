@@ -10,14 +10,14 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.modules.models import CrawlPageRequest
-from app.utils.response_utils import ApiResponse, success_response, error_response
-from app.utils.error_codes import StatusCode
+from app.modules.service.crawl_service import get_crawl_service
 from app.modules.service.scheduler_service import (
     get_scheduler_service,
     trigger_manual_crawl
 )
 from app.modules.service.task_monitor_service import get_task_monitor_service
-from app.modules.service.crawl_service import get_crawl_service
+from app.utils.error_codes import StatusCode
+from app.utils.response_utils import ApiResponse, success_response, error_response
 
 router = APIRouter(prefix="/crawl", tags=["爬虫管理"])
 
@@ -45,7 +45,7 @@ async def trigger_page_crawl(
                 message=f"无效ID: {id}"
             )
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=error_resp.model_dump()
             )
 
@@ -74,7 +74,7 @@ async def trigger_page_crawl(
     except Exception as e:
         error_resp = error_response(code=StatusCode.TASK_CREATE_FAILED, message="创建任务失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -103,8 +103,8 @@ async def get_tasks(
         def task_to_dict(task):
             return {
                 "task_id": task.task_id,
-                "task_type": task.task_type,
-                "status": task.status,
+                "task_type": task.id,  # 使用配置ID作为任务类型
+                "status": task.status.value if hasattr(task.status, 'value') else task.status,
                 "created_at": task.created_at,  # 已经是ISO格式字符串
                 "started_at": task.started_at,
                 "completed_at": getattr(task, 'completed_at', None),
@@ -158,7 +158,7 @@ async def get_tasks(
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取任务列表失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -171,21 +171,21 @@ async def get_task_detail(task_id: str):
     查询指定任务ID的详细信息和状态
     """
     try:
-        task_manager = get_task_manager()
-        task = task_manager.get_task_status(task_id)
+        crawl_service = get_crawl_service()
+        task = crawl_service.get_task_status(task_id)
 
         if not task:
             error_resp = error_response(code=StatusCode.TASK_NOT_FOUND, message="任务不存在")
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=error_resp.model_dump()
             )
 
         return success_response(
             data={
                 "task_id": task.task_id,
-                "task_type": task.task_type,
-                "status": task.status,
+                "task_type": task.id,  # 使用配置ID作为任务类型
+                "status": task.status.value if hasattr(task.status, 'value') else task.status,
                 "created_at": task.created_at,
                 "started_at": task.started_at,
                 "completed_at": getattr(task, 'completed_at', None),
@@ -202,7 +202,7 @@ async def get_task_detail(task_id: str):
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取任务详情失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -215,9 +215,28 @@ async def get_available_channels():
     返回所有可以爬取的频道信息，包括夹子榜和各个分类页面
     """
     try:
-        from app.modules.service.page_service import get_page_service
-        page_service = get_page_service()
-        channels = page_service.get_ranking_channels()
+        crawl_service = get_crawl_service()
+        pages = crawl_service.get_pages_hierarchy()
+        
+        # 转换为频道格式
+        channels = []
+        for root_page in pages["root"]:
+            channels.append({
+                "id": root_page.id,
+                "name": root_page.name,
+                "frequency": root_page.frequency,
+                "interval": root_page.interval
+            })
+        
+        for parent_id, child_pages in pages["children"].items():
+            for child_page in child_pages:
+                channels.append({
+                    "id": child_page.id,
+                    "name": child_page.name,
+                    "frequency": child_page.frequency,
+                    "interval": child_page.interval,
+                    "parent_id": child_page.parent_id
+                })
 
         return success_response(
             data={
@@ -230,7 +249,7 @@ async def get_available_channels():
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取频道列表失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -259,7 +278,7 @@ async def get_scheduler_status():
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取调度器状态失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -286,7 +305,7 @@ async def get_scheduled_jobs():
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取定时任务失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -313,7 +332,7 @@ async def trigger_scheduled_job(target: str):
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="触发任务失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -338,7 +357,7 @@ async def get_monitor_status():
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="获取监控状态失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )
 
@@ -367,6 +386,6 @@ async def manual_check_missing_tasks():
     except Exception as e:
         error_resp = error_response(code=StatusCode.INTERNAL_ERROR, message="手动检查失败")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=error_resp.model_dump()
         )

@@ -16,7 +16,7 @@ from app.utils.time_utils import to_iso_string
 class TaskStatus(Enum):
     """任务状态枚举"""
     PENDING = "pending"
-    RUNNING = "running" 
+    RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -24,7 +24,7 @@ class TaskStatus(Enum):
 @dataclass
 class CrawlTask:
     """统一的爬取任务模型 - 包含配置和状态"""
-    
+
     # 配置属性（来自urls.json）
     id: str
     name: str
@@ -32,7 +32,7 @@ class CrawlTask:
     frequency: str
     interval: int
     parent_id: Optional[str] = None
-    
+
     # 运行时属性（执行状态）
     status: TaskStatus = TaskStatus.PENDING
     task_id: Optional[str] = None  # 运行时生成的唯一ID
@@ -43,11 +43,11 @@ class CrawlTask:
     items_crawled: int = 0
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = None
-    
+
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
-    
+
     @classmethod
     def from_config(cls, task_data: Dict[str, Any], url: str) -> 'CrawlTask':
         """从配置数据创建任务实例"""
@@ -59,7 +59,7 @@ class CrawlTask:
             interval=task_data['schedule']['interval'],
             parent_id=task_data['category'].get('parent', None)
         )
-    
+
     def create_execution_instance(self, metadata: Dict[str, Any] = None) -> 'CrawlTask':
         """创建执行实例（生成运行时ID和状态）"""
         execution_task = CrawlTask(
@@ -70,7 +70,7 @@ class CrawlTask:
             frequency=self.frequency,
             interval=self.interval,
             parent_id=self.parent_id,
-            
+
             # 设置运行时属性
             task_id=f"{self.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}",
             status=TaskStatus.PENDING,
@@ -78,12 +78,12 @@ class CrawlTask:
             metadata=metadata or {}
         )
         return execution_task
-    
+
     def start(self):
         """开始执行"""
         self.status = TaskStatus.RUNNING
         self.started_at = to_iso_string(datetime.now())
-    
+
     def complete(self, items_crawled: int = 0, metadata: Dict[str, Any] = None):
         """完成执行"""
         self.status = TaskStatus.COMPLETED
@@ -92,13 +92,13 @@ class CrawlTask:
         self.items_crawled = items_crawled
         if metadata:
             self.metadata.update(metadata)
-    
+
     def fail(self, error_message: str):
         """标记失败"""
         self.status = TaskStatus.FAILED
         self.completed_at = to_iso_string(datetime.now())
         self.error_message = error_message
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典（用于JSON序列化）"""
         data = asdict(self)
@@ -106,14 +106,14 @@ class CrawlTask:
         if isinstance(data['status'], TaskStatus):
             data['status'] = data['status'].value
         return data
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'CrawlTask':
         """从字典创建实例"""
         # 处理枚举字段
         if isinstance(data.get('status'), str):
             data['status'] = TaskStatus(data['status'])
-        
+
         # 为缺失的必需字段提供默认值
         defaults = {
             'id': data.get('id', ''),
@@ -132,22 +132,26 @@ class CrawlTask:
             'error_message': data.get('error_message'),
             'metadata': data.get('metadata', {})
         }
-        
+
         return cls(**defaults)
-    
+
     def is_scheduled_task(self) -> bool:
         """是否为调度任务"""
         return self.interval > 0
-    
-    def get_cron_config(self) -> Dict[str, Any]:
-        """获取Cron配置"""
+
+    def get_trigger_config(self) -> Dict[str, Any]:
+        """获取调度触发器配置 - 统一使用CronTrigger"""
         if self.frequency == "hourly":
-            return {"minute": 0}
+            # hourly任务：每小时的5分执行（避免整点延迟）
+            return {
+                "minute": 5
+            }
+
         elif self.frequency == "daily":
-            # 根据ID散列分配执行时间，避免集中执行
-            hash_val = abs(hash(self.id))
-            hour = 1 + (hash_val % 6)  # 1-6点分散执行
-            minute = (hash_val % 60)   # 分钟随机化
-            return {"hour": hour, "minute": minute}
+            # daily任务：每天0点5分执行（避免0点整延迟）
+            return {
+                "hour": 0,
+                "minute": 5
+            }
         else:
             raise ValueError(f"不支持的频率: {self.frequency}")

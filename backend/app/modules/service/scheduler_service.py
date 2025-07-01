@@ -75,25 +75,23 @@ class SchedulerService:
             logger.error(f"停止调度器失败: {e}")
 
     def _setup_scheduled_jobs(self):
-        """配置定时任务"""
+        """配置定时任务 - 统一使用CronTrigger + 5分钟偏移"""
         try:
             scheduled_tasks = self.crawl_service.get_scheduled_tasks()
             
             for task in scheduled_tasks:
-                cron_config = task.get_cron_config()
-                
                 self.scheduler.add_job(
                     func=self._execute_crawl,
-                    trigger=CronTrigger(**cron_config),
+                    trigger=CronTrigger(timezone=utc, **task.get_trigger_config()),
                     args=[task.id],
                     id=f"scheduled_{task.id}",
                     max_instances=1,
                     replace_existing=True
                 )
                 
-                logger.info(f"配置定时任务: {task.id} ({task.frequency})")
+                logger.info(f"配置定时任务: {task.id} ({task.frequency}, interval={task.interval})")
 
-            logger.info(f"配置了 {len(scheduled_tasks)} 个定时任务")
+            logger.info(f"配置了 {len(scheduled_tasks)} 个定时任务 (统一CronTrigger + 5分钟偏移)")
 
         except Exception as e:
             logger.error(f"配置定时任务失败: {e}")

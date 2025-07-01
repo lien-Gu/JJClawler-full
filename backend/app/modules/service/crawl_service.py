@@ -108,7 +108,7 @@ class CrawlService:
         self._task_configs = tasks
         return self._task_configs
 
-    def get_task_config(self, task_id: str) -> CrawlTask:
+    def get_task_config_by_id(self, task_id: str) -> CrawlTask:
         """根据ID获取任务配置"""
         tasks = self.get_all_task_configs()
         for task in tasks:
@@ -124,7 +124,7 @@ class CrawlService:
 
     def create_execution_task(self, task_id: str, metadata: Dict[str, Any] = None) -> str:
         """创建执行任务实例"""
-        config_task = self.get_task_config(task_id)
+        config_task = self.get_task_config_by_id(task_id)
         execution_task = config_task.create_execution_instance(metadata)
         
         data = self._read_tasks()
