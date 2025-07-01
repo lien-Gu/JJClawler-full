@@ -72,7 +72,7 @@ def create_db_and_tables():
     """创建数据库表"""
     try:
         # 导入所有模型以确保表被注册
-        from app.modules.models import Ranking, Book, BookSnapshot, RankingSnapshot
+        from app.modules.models import Ranking, Book, BookSnapshot, RankingSnapshot, TaskExecution
         
         engine = get_engine()
         SQLModel.metadata.create_all(engine)

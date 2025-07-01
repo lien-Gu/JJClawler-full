@@ -9,6 +9,7 @@ from .base import UpdateFrequency
 # 数据库模型
 from .book import Book, BookSnapshot
 from .ranking import Ranking, RankingSnapshot
+from .task_execution import TaskExecution
 
 # API模型
 from .api import (
@@ -29,7 +30,7 @@ __all__ = [
     "UpdateFrequency",
     
     # 数据库模型
-    "Book", "BookSnapshot", "Ranking", "RankingSnapshot",
+    "Book", "BookSnapshot", "Ranking", "RankingSnapshot", "TaskExecution",
     
     # API模型
     "BookDetail", "BookInRanking", "BookRankingHistory", "BookTrendData",

@@ -10,11 +10,13 @@ from typing import Dict, List, Optional, Any
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from pytz import utc
 
 from app.modules.service.crawl_service import get_crawl_service
 from app.modules.service.task_monitor_service import get_task_monitor_service
 from app.utils.log_utils import get_logger
+from app.config import get_settings
 
 logger = get_logger(__name__)
 
@@ -38,10 +40,19 @@ class SchedulerService:
         try:
             logger.info("启动调度器服务...")
 
-            self.scheduler = AsyncIOScheduler(timezone=utc)
+            # 配置SQL JobStore
+            settings = get_settings()
+            jobstore = SQLAlchemyJobStore(url=settings.DATABASE_URL, tablename='apscheduler_jobs')
+            
+            self.scheduler = AsyncIOScheduler(
+                jobstores={'default': jobstore},
+                timezone=utc
+            )
             self.scheduler.add_listener(self._on_job_executed, EVENT_JOB_EXECUTED)
             self.scheduler.add_listener(self._on_job_error, EVENT_JOB_ERROR)
             self.scheduler.start()
+            
+            logger.info(f"调度器使用SQL JobStore: {settings.DATABASE_URL}")
 
             self._setup_scheduled_jobs()
             await self.task_monitor.start_monitoring()
@@ -100,7 +111,8 @@ class SchedulerService:
         try:
             logger.info(f"开始执行定时爬取: {task_id}")
 
-            # 统一的爬取函数，无论是夹子榜还是其他页面
+            # 方案A：使用execute_task包装器（提供统一的任务生命周期管理）
+            # 包括：创建执行实例 → 开始 → 执行 → 完成/失败 → 状态跟踪
             async def crawl_func():
                 return await self.crawl_service.crawl_and_save(task_id)
 
@@ -109,6 +121,10 @@ class SchedulerService:
                 crawl_func, 
                 {"trigger_source": "scheduled"}
             )
+            
+            # 方案B：直接调用（如果您希望简化）
+            # 缺点：失去统一的任务状态管理、错误处理、进度跟踪
+            # await self.crawl_service.crawl_and_save(task_id)
 
         except Exception as e:
             logger.error(f"定时爬取失败 ({task_id}): {e}")

@@ -10,11 +10,14 @@ from datetime import datetime
 import httpx
 import asyncio
 
+from sqlmodel import select, and_
+
 from app.config import get_settings
-from app.utils.file_utils import read_json_file, write_json_file
+from app.utils.file_utils import read_json_file
 from app.utils.log_utils import get_logger
-from app.utils.time_utils import to_iso_string
 from app.modules.service.crawl_models import CrawlTask, TaskStatus
+from app.modules.models import TaskExecution
+from app.modules.database.connection import get_session_sync
 
 logger = get_logger(__name__)
 
@@ -32,26 +35,12 @@ class CrawlService:
         self._config = None
         self._task_config: List[CrawlTask] = []
 
-        # 状态管理
-        settings = get_settings()
-        self.tasks_file = Path(f"{settings.DATA_DIR}/tasks/tasks.json")
-        self._ensure_tasks_file()
-
         if not self.config_path.exists():
             raise FileNotFoundError(f"配置文件不存在: {config_path}")
+            
+        logger.info("使用数据库存储任务执行状态 (替代 tasks.json)")
 
-    def _ensure_tasks_file(self):
-        """确保任务文件存在"""
-        default_data = {
-            "current_tasks": [],
-            "completed_tasks": [],
-            "failed_tasks": [],
-            "last_updated": to_iso_string(datetime.now())
-        }
-        if not self.tasks_file.exists():
-            self.tasks_file.parent.mkdir(parents=True, exist_ok=True)
-            write_json_file(self.tasks_file, default_data)
-            logger.info("任务文件初始化完成")
+    # 删除：不再需要JSON文件管理
 
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
@@ -79,18 +68,47 @@ class CrawlService:
         except KeyError as e:
             raise ValueError(f"缺少URL参数 {e} for task {task_data['id']}")
 
-    def _read_tasks(self) -> Dict[str, Any]:
-        """读取任务数据"""
-        return read_json_file(self.tasks_file, default={
-            "current_tasks": [],
-            "completed_tasks": [],
-            "failed_tasks": []
-        })
-
-    def _write_tasks(self, data: Dict[str, Any]):
-        """写入任务数据"""
-        data["last_updated"] = to_iso_string(datetime.now())
-        write_json_file(self.tasks_file, data)
+    # ============ 数据库任务状态管理 ============
+    
+    def _create_task_execution(self, crawl_task: CrawlTask) -> TaskExecution:
+        """创建任务执行记录"""
+        with get_session_sync() as session:
+            task_execution = TaskExecution.from_crawl_task(crawl_task)
+            session.add(task_execution)
+            session.commit()
+            session.refresh(task_execution)
+            logger.info(f"创建任务执行记录: {task_execution.task_id}")
+            return task_execution
+    
+    def _update_task_execution(self, task_id: str, **updates) -> bool:
+        """更新任务执行状态"""
+        with get_session_sync() as session:
+            stmt = select(TaskExecution).where(TaskExecution.task_id == task_id)
+            task_execution = session.exec(stmt).first()
+            
+            if not task_execution:
+                logger.warning(f"任务执行记录不存在: {task_id}")
+                return False
+            
+            for key, value in updates.items():
+                if hasattr(task_execution, key):
+                    setattr(task_execution, key, value)
+            
+            session.commit()
+            logger.info(f"更新任务执行状态: {task_id}")
+            return True
+    
+    def _get_task_executions_by_status(self, status: str) -> List[TaskExecution]:
+        """根据状态获取任务执行记录"""
+        with get_session_sync() as session:
+            stmt = select(TaskExecution).where(TaskExecution.status == status)
+            return list(session.exec(stmt).all())
+    
+    def _get_task_execution(self, task_id: str) -> Optional[TaskExecution]:
+        """获取单个任务执行记录"""
+        with get_session_sync() as session:
+            stmt = select(TaskExecution).where(TaskExecution.task_id == task_id)
+            return session.exec(stmt).first()
 
     # ============ 配置管理方法 ============
 
@@ -129,89 +147,126 @@ class CrawlService:
         config_task = self.get_task_config_by_id(task_id)
         execution_task = config_task.create_execution_instance(metadata)
         
-        data = self._read_tasks()
-        data["current_tasks"].append(execution_task.to_dict())
-        self._write_tasks(data)
+        # 保存到数据库
+        self._create_task_execution(execution_task)
         
         logger.info(f"创建执行任务: {execution_task.task_id} (配置ID: {task_id})")
         return execution_task.task_id
 
     def start_task(self, execution_task_id: str) -> bool:
         """开始任务"""
-        data = self._read_tasks()
-        for task_data in data["current_tasks"]:
-            if task_data["task_id"] == execution_task_id:
-                task = CrawlTask.from_dict(task_data)
-                task.start()
-                
-                # 更新数据
-                task_data.update(task.to_dict())
-                self._write_tasks(data)
-                
-                logger.info(f"开始任务: {execution_task_id}")
-                return True
-        return False
+        return self._update_task_execution(
+            execution_task_id,
+            status=TaskStatus.RUNNING.value,
+            started_at=datetime.now()
+        )
 
     def complete_task(self, execution_task_id: str, items_crawled: int = 0, metadata: Dict[str, Any] = None) -> bool:
         """完成任务"""
-        data = self._read_tasks()
+        updates = {
+            "status": TaskStatus.COMPLETED.value,
+            "completed_at": datetime.now(),
+            "progress": 100,
+            "items_crawled": items_crawled
+        }
         
-        for i, task_data in enumerate(data["current_tasks"]):
-            if task_data["task_id"] == execution_task_id:
-                task = CrawlTask.from_dict(task_data)
-                task.complete(items_crawled, metadata)
-                
-                # 移动到完成列表
-                data["completed_tasks"].append(task.to_dict())
-                data["current_tasks"].pop(i)
-                self._write_tasks(data)
-                
-                logger.info(f"完成任务: {execution_task_id} (抓取 {items_crawled} 条)")
-                return True
-        return False
+        if metadata:
+            # 需要先获取现有的task_metadata，然后合并
+            task_execution = self._get_task_execution(execution_task_id)
+            if task_execution:
+                merged_metadata = task_execution.task_metadata.copy()
+                merged_metadata.update(metadata)
+                updates["task_metadata"] = merged_metadata
+        
+        success = self._update_task_execution(execution_task_id, **updates)
+        if success:
+            logger.info(f"完成任务: {execution_task_id} (抓取 {items_crawled} 条)")
+        return success
 
     def fail_task(self, execution_task_id: str, error_message: str) -> bool:
         """标记任务失败"""
-        data = self._read_tasks()
-        
-        for i, task_data in enumerate(data["current_tasks"]):
-            if task_data["task_id"] == execution_task_id:
-                task = CrawlTask.from_dict(task_data)
-                task.fail(error_message)
-                
-                # 移动到失败列表
-                data["failed_tasks"].append(task.to_dict())
-                data["current_tasks"].pop(i)
-                self._write_tasks(data)
-                
-                logger.warning(f"任务失败: {execution_task_id} - {error_message}")
-                return True
-        return False
+        success = self._update_task_execution(
+            execution_task_id,
+            status=TaskStatus.FAILED.value,
+            completed_at=datetime.now(),
+            error_message=error_message
+        )
+        if success:
+            logger.warning(f"任务失败: {execution_task_id} - {error_message}")
+        return success
 
     def get_task_status(self, execution_task_id: str) -> Optional[CrawlTask]:
         """获取任务状态"""
-        data = self._read_tasks()
-        all_tasks = data.get("current_tasks", []) + data.get("completed_tasks", []) + data.get("failed_tasks", [])
+        task_execution = self._get_task_execution(execution_task_id)
+        if not task_execution:
+            return None
         
-        for task_data in all_tasks:
-            if task_data.get("task_id") == execution_task_id:
-                return CrawlTask.from_dict(task_data)
-        return None
+        # 转换为CrawlTask格式
+        task_dict = task_execution.to_crawl_task_dict()
+        
+        # 获取配置信息
+        try:
+            config_task = self.get_task_config_by_id(task_execution.config_id)
+            # 合并配置信息
+            task_dict.update({
+                "name": config_task.name,
+                "url": config_task.url,
+                "frequency": config_task.frequency,
+                "interval": config_task.interval,
+                "parent_id": config_task.parent_id
+            })
+        except ValueError:
+            # 如果配置不存在，使用默认值
+            pass
+        
+        return CrawlTask.from_dict(task_dict)
 
     def get_current_tasks(self) -> List[CrawlTask]:
         """获取当前执行中的任务"""
-        data = self._read_tasks()
-        return [CrawlTask.from_dict(task_data) for task_data in data["current_tasks"]]
+        return self._get_tasks_by_status([TaskStatus.PENDING.value, TaskStatus.RUNNING.value])
 
     def get_all_tasks(self) -> Dict[str, List[CrawlTask]]:
         """获取所有任务"""
-        data = self._read_tasks()
-        
         return {
-            "current": [CrawlTask.from_dict(task_data) for task_data in data.get("current_tasks", [])],
-            "completed": [CrawlTask.from_dict(task_data) for task_data in data.get("completed_tasks", [])],
-            "failed": [CrawlTask.from_dict(task_data) for task_data in data.get("failed_tasks", [])]
+            "current": self._get_tasks_by_status([TaskStatus.PENDING.value, TaskStatus.RUNNING.value]),
+            "completed": self._get_tasks_by_status([TaskStatus.COMPLETED.value]),
+            "failed": self._get_tasks_by_status([TaskStatus.FAILED.value])
         }
+    
+    def _get_tasks_by_status(self, statuses: List[str]) -> List[CrawlTask]:
+        """根据状态列表获取任务"""
+        tasks = []
+        with get_session_sync() as session:
+            for status in statuses:
+                stmt = select(TaskExecution).where(TaskExecution.status == status)
+                task_executions = session.exec(stmt).all()
+                
+                for task_execution in task_executions:
+                    task_dict = task_execution.to_crawl_task_dict()
+                    
+                    # 尝试获取配置信息
+                    try:
+                        config_task = self.get_task_config_by_id(task_execution.config_id)
+                        task_dict.update({
+                            "name": config_task.name,
+                            "url": config_task.url,
+                            "frequency": config_task.frequency,
+                            "interval": config_task.interval,
+                            "parent_id": config_task.parent_id
+                        })
+                    except ValueError:
+                        # 配置不存在时使用默认值
+                        task_dict.update({
+                            "name": f"Unknown Task ({task_execution.config_id})",
+                            "url": "",
+                            "frequency": "daily",
+                            "interval": 24,
+                            "parent_id": None
+                        })
+                    
+                    tasks.append(CrawlTask.from_dict(task_dict))
+        
+        return tasks
 
     # ============ 任务执行器 ============
 
