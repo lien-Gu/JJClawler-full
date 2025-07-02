@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
+    # 时间格式配置
+    DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+    DATE_FORMAT: str = "%Y-%m-%d"
+    
     # 任务调度配置
     SCHEDULER_TIMEZONE: str = "Asia/Shanghai"
     JIAZI_SCHEDULE: str = "0 */1 * * *"  # 每小时执行
@@ -40,7 +44,6 @@ class Settings(BaseSettings):
     
     # 文件路径配置
     DATA_DIR: str = "./data"
-    TASKS_FILE: str = "./data/tasks/tasks.json"
     URLS_CONFIG_FILE: str = "./data/urls.json"
     
     model_config = {
@@ -62,8 +65,6 @@ def ensure_directories():
     """确保必要的目录存在"""
     directories = [
         settings.DATA_DIR,
-        os.path.dirname(settings.TASKS_FILE),
-        f"{settings.DATA_DIR}/tasks/history",
     ]
     
     for directory in directories:

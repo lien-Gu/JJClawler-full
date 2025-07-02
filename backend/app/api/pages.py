@@ -48,32 +48,6 @@ async def get_pages():
             detail=error_resp.model_dump()
         )
 
-
-@router.post("/ids", response_model=ApiResponse[dict])
-async def refresh_page_config():
-    """
-    查看当前集成了哪些页面
-
-    Returns:
-        操作结果
-    """
-    try:
-        from datetime import datetime
-        crawl_service = get_crawl_service()
-        all_tasks = crawl_service.get_all_task_configs()
-        ids = [task.id for task in all_tasks]
-        return success_response(
-            data={ids},
-            message="获取所有页面的id"
-        )
-    except Exception as e:
-        error_resp = error_response(code=StatusCode.CONFIG_ERROR, message="刷新配置失败")
-        raise HTTPException(
-            status_code=500,
-            detail=error_resp.model_dump()
-        )
-
-
 @router.post("/refresh", response_model=ApiResponse[dict])
 async def refresh_page_config():
     """

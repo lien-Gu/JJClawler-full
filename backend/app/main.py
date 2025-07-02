@@ -174,9 +174,10 @@ def setup_routes(app: FastAPI):
     
     settings = get_settings()
     app.include_router(pages.router, prefix=settings.API_V1_STR)
+    app.include_router(crawl.router, prefix=settings.API_V1_STR)
     app.include_router(rankings.router, prefix=settings.API_V1_STR)
     app.include_router(books.router, prefix=settings.API_V1_STR)
-    app.include_router(crawl.router, prefix=settings.API_V1_STR)
+
     app.include_router(stats.router, prefix=settings.API_V1_STR)
     app.include_router(users.router, prefix=settings.API_V1_STR)
 
