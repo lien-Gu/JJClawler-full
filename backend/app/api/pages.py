@@ -4,6 +4,7 @@
 提供动态页面结构配置信息的API端点
 使用PageService从配置文件获取页面信息
 """
+
 from fastapi import APIRouter, HTTPException
 
 from app.modules.task import get_task_manager
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/pages", tags=["页面配置"])
 async def get_pages():
     """
     获取页面配置
-    
+
     从配置文件动态获取页面结构配置，
     用于生成导航和页面布局
     """
@@ -36,39 +37,36 @@ async def get_pages():
             data={
                 "pages": pages,
                 "total_pages": len(pages),
-                "total_rankings": total_rankings
+                "total_rankings": total_rankings,
             },
-            message="获取页面配置成功"
+            message="获取页面配置成功",
         )
 
     except Exception as e:
-        error_resp = error_response(code=StatusCode.CONFIG_ERROR, message="获取页面配置失败")
-        raise HTTPException(
-            status_code=500,
-            detail=error_resp.model_dump()
+        error_resp = error_response(
+            code=StatusCode.CONFIG_ERROR, message="获取页面配置失败"
         )
+        raise HTTPException(status_code=500, detail=error_resp.model_dump())
+
 
 @router.post("/refresh", response_model=ApiResponse[dict])
 async def refresh_page_config():
     """
     刷新页面配置缓存
-    
+
     Returns:
         操作结果
     """
     try:
         from datetime import datetime
+
         task_manager = get_task_manager()
         task_manager.refresh_config()
         return success_response(
-            data={
-                "config_reloaded": True
-            },
-            message="页面配置缓存已刷新"
+            data={"config_reloaded": True}, message="页面配置缓存已刷新"
         )
     except Exception as e:
-        error_resp = error_response(code=StatusCode.CONFIG_ERROR, message="刷新配置失败")
-        raise HTTPException(
-            status_code=500,
-            detail=error_resp.model_dump()
+        error_resp = error_response(
+            code=StatusCode.CONFIG_ERROR, message="刷新配置失败"
         )
+        raise HTTPException(status_code=500, detail=error_resp.model_dump())

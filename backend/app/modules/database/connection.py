@@ -3,6 +3,7 @@
 
 提供SQLite数据库的连接、会话管理和表创建
 """
+
 from typing import Generator, Optional
 from sqlmodel import SQLModel, create_engine, Session, select
 from app.config import get_settings
@@ -19,28 +20,28 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
-        
+
         # SQLite优化配置
         connect_args = {
             "check_same_thread": False,  # 允许多线程
         }
-        
+
         _engine = create_engine(
             settings.DATABASE_URL,
             echo=settings.DEBUG,  # 调试模式下打印SQL
-            connect_args=connect_args
+            connect_args=connect_args,
         )
-        
+
         # 设置SQLite PRAGMA优化
         _set_sqlite_pragma(_engine)
-    
+
     return _engine
 
 
 def _set_sqlite_pragma(engine):
     """设置SQLite优化参数"""
     from sqlalchemy import event
-    
+
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
@@ -72,14 +73,20 @@ def create_db_and_tables():
     """创建数据库表"""
     try:
         # 导入所有模型以确保表被注册
-        from app.modules.models import Ranking, Book, BookSnapshot, RankingSnapshot, TaskExecution
-        
+        from app.modules.models import (
+            Ranking,
+            Book,
+            BookSnapshot,
+            RankingSnapshot,
+            TaskExecution,
+        )
+
         engine = get_engine()
         SQLModel.metadata.create_all(engine)
         logger.info("数据库表创建成功")
-        
+
         # 注意：榜单数据需要通过爬虫获取，不在此初始化
-        
+
     except Exception as e:
         logger.error(f"创建数据库表失败: {e}")
         raise

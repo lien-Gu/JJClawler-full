@@ -9,35 +9,45 @@ from .base import UpdateFrequency
 # 数据库模型
 from .book import Book, BookSnapshot
 from .ranking import Ranking, RankingSnapshot
-from .task_execution import TaskExecution
+
+# TaskExecution 已移动到 task 模块中
 
 # API模型
 from .api import (
     # Book相关 - 保留用于内部数据处理
-    BookDetail, BookInRanking, BookRankingHistory, BookTrendData,
-    # Ranking相关 - 保留用于内部数据处理 
-    RankingInfo, RankingSnapshotSummary,
+    BookDetail,
+    BookInRanking,
+    BookRankingHistory,
+    BookTrendData,
+    # Ranking相关 - 保留用于内部数据处理
+    RankingInfo,
+    RankingSnapshotSummary,
     # 请求模型 - 仍然需要
     CrawlPageRequest,
     # 内部任务信息模型 - 用于数据转换
     TaskInfo,
     # 页面配置相关 - rankings.py 仍在使用
-    RankingConfig
+    RankingConfig,
 )
 
 __all__ = [
     # 基础类型
     "UpdateFrequency",
-    
     # 数据库模型
-    "Book", "BookSnapshot", "Ranking", "RankingSnapshot", "TaskExecution",
-    
+    "Book",
+    "BookSnapshot",
+    "Ranking",
+    "RankingSnapshot",
     # API模型
-    "BookDetail", "BookInRanking", "BookRankingHistory", "BookTrendData",
-    "RankingInfo", "RankingSnapshotSummary",
-    
+    "BookDetail",
+    "BookInRanking",
+    "BookRankingHistory",
+    "BookTrendData",
+    "RankingInfo",
+    "RankingSnapshotSummary",
     # 请求模型
     "CrawlPageRequest",
     # 内部数据模型
-    "TaskInfo", "RankingConfig"
+    "TaskInfo",
+    "RankingConfig",
 ]

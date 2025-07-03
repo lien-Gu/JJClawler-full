@@ -3,6 +3,7 @@
 
 提供通用的中间件功能
 """
+
 import traceback
 from typing import Callable
 from fastapi import Request, HTTPException
@@ -32,25 +33,19 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=500,
-                content={
-                    "detail": "内部服务器错误",
-                    "error_type": type(e).__name__
-                }
+                content={"detail": "内部服务器错误", "error_type": type(e).__name__},
             )
 
 
 def create_api_error_response(message: str, status_code: int = 500) -> HTTPException:
     """创建标准化的API错误响应"""
-    return HTTPException(
-        status_code=status_code,
-        detail=message
-    )
+    return HTTPException(status_code=status_code, detail=message)
 
 
 async def handle_service_cleanup(service_obj):
     """统一的服务清理处理"""
     try:
-        if hasattr(service_obj, 'close'):
+        if hasattr(service_obj, "close"):
             service_obj.close()
     except Exception as e:
         logger.warning(f"服务清理时发生警告: {e}")

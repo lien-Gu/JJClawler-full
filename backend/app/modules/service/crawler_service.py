@@ -3,6 +3,7 @@
 
 集成新的爬虫管理器，提供统一的爬取接口
 """
+
 from typing import Dict, Any
 from datetime import datetime
 
@@ -15,21 +16,21 @@ logger = get_logger(__name__)
 
 class CrawlerService:
     """爬虫服务 - 提供统一的爬取接口"""
-    
+
     def __init__(self):
         self.crawler_manager = get_crawler_manager()
-    
+
     async def crawl_and_save(self, task_id: str) -> Dict[str, Any]:
         """执行爬取和保存"""
         try:
             logger.info(f"开始执行爬取任务: {task_id}")
-            
+
             # 使用爬虫管理器执行爬取
             result = await self.crawler_manager.crawl_task(task_id)
-            
+
             logger.info(f"爬取任务完成 {task_id}: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"爬取任务失败 {task_id}: {e}")
             return {
@@ -37,17 +38,17 @@ class CrawlerService:
                 "error": str(e),
                 "books_new": 0,
                 "books_updated": 0,
-                "total_books": 0
+                "total_books": 0,
             }
-    
+
     async def crawl_jiazi(self) -> Dict[str, Any]:
         """爬取夹子榜"""
         return await self.crawl_and_save("jiazi")
-    
+
     async def crawl_page(self, page_id: str) -> Dict[str, Any]:
         """爬取分类页面"""
         return await self.crawl_and_save(page_id)
-    
+
     async def close(self):
         """关闭资源"""
         await self.crawler_manager.close()

@@ -3,6 +3,7 @@
 
 整合了任务配置和执行状态管理，提供完整的任务生命周期支持
 """
+
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from enum import Enum
@@ -14,6 +15,7 @@ from app.config import get_settings
 
 class TaskStatus(Enum):
     """任务状态"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -23,6 +25,7 @@ class TaskStatus(Enum):
 @dataclass
 class TaskConfig:
     """任务配置 - 来自urls.json的静态配置"""
+
     id: str
     name: str
     url: str
@@ -31,15 +34,15 @@ class TaskConfig:
     parent_id: Optional[str] = None
 
     @classmethod
-    def from_config_data(cls, data: Dict[str, Any], url: str) -> 'TaskConfig':
+    def from_config_data(cls, data: Dict[str, Any], url: str) -> "TaskConfig":
         """从配置数据创建"""
         return cls(
-            id=data['id'],
-            name=data['name'],
+            id=data["id"],
+            name=data["name"],
             url=url,
-            frequency=data['schedule']['frequency'],
-            interval=data['schedule']['interval'],
-            parent_id=data['category'].get('parent')
+            frequency=data["schedule"]["frequency"],
+            interval=data["schedule"]["interval"],
+            parent_id=data["category"].get("parent"),
         )
 
     def is_scheduled(self) -> bool:
@@ -55,7 +58,7 @@ class TaskConfig:
         else:
             raise ValueError(f"不支持的频率: {self.frequency}")
 
-    def create_execution(self) -> 'TaskExecution':
+    def create_execution(self) -> "TaskExecution":
         """创建执行实例"""
         return TaskExecution.create_from_config(self)
 
@@ -63,6 +66,7 @@ class TaskConfig:
 @dataclass
 class TaskExecution:
     """任务执行实例 - 运行时状态"""
+
     task_id: str
     config_id: str
     status: TaskStatus = TaskStatus.PENDING
@@ -74,14 +78,12 @@ class TaskExecution:
     error_message: Optional[str] = None
 
     @classmethod
-    def create_from_config(cls, config: TaskConfig) -> 'TaskExecution':
+    def create_from_config(cls, config: TaskConfig) -> "TaskExecution":
         """从配置创建执行实例"""
-        task_id = f"{config.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
-        return cls(
-            task_id=task_id,
-            config_id=config.id,
-            created_at=datetime.now()
+        task_id = (
+            f"{config.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
         )
+        return cls(task_id=task_id, config_id=config.id, created_at=datetime.now())
 
     def start(self):
         """开始执行"""
@@ -107,10 +109,10 @@ class TaskExecution:
         settings = get_settings()
 
         # 转换枚举
-        data['status'] = self.status.value
+        data["status"] = self.status.value
 
         # 转换时间
-        for field in ['created_at', 'started_at', 'completed_at']:
+        for field in ["created_at", "started_at", "completed_at"]:
             if data.get(field):
                 data[field] = data[field].strftime(settings.DATETIME_FORMAT)
 
@@ -128,13 +130,10 @@ class CrawlTask:
     execution: TaskExecution = None
 
     @classmethod
-    def from_config(cls, task_data: Dict[str, Any], url: str) -> 'CrawlTask':
+    def from_config(cls, task_data: Dict[str, Any], url: str) -> "CrawlTask":
         """从配置数据创建任务实例"""
         config = TaskConfig.from_config_data(task_data, url)
-        return cls(
-            config=config,
-            execution=TaskExecution.create_from_config(config)
-        )
+        return cls(config=config, execution=TaskExecution.create_from_config(config))
 
     def start(self):
         """开始执行"""
