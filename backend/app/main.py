@@ -145,28 +145,23 @@ def setup_routes(app: FastAPI):
         此端点中的异常将由 ErrorHandlingMiddleware 统一处理.
         """
         # 使用新的统一服务
-        from app.modules.service.crawl_service import get_crawl_service
-        from app.modules.service.scheduler_service import get_scheduler_stats
-
-        crawl_service = get_crawl_service()
+        from app.modules.service.crawler_service import get_crawler_service
+        # 使用任务管理器获取配置统计
+        from app.modules.task import get_task_manager
+        task_manager = get_task_manager()
         
-        # 获取任务统计
-        all_tasks = crawl_service.get_all_tasks()
+        # 获取任务配置统计（简化版）
+        task_configs = task_manager.get_all_task_configs()
         task_summary = {
-            "current_tasks": len(all_tasks["current"]),
-            "completed_tasks": len(all_tasks["completed"]),
-            "failed_tasks": len(all_tasks["failed"]),
-            "total_configs": len(crawl_service.get_all_task_configs()),
-            "scheduled_tasks": len(crawl_service.get_scheduled_tasks())
+            "total_configs": len(task_configs),
+            "jiazi_config": 1 if any(t.id == "jiazi" for t in task_configs) else 0,
+            "page_configs": len([t for t in task_configs if t.id != "jiazi"]),
         }
-
-        scheduler_stats = get_scheduler_stats()
 
         return {
             "status": "ok",
             "timestamp": datetime.now().isoformat(),
-            "task_stats": task_summary,
-            "scheduler_stats": scheduler_stats
+            "task_stats": task_summary
         }
     
     # 注册API v1路由

@@ -44,14 +44,9 @@ async def trigger_page_crawl(
                 detail=error_resp.model_dump()
             )
 
-        if request.immediate:
-            # 立即通过调度器执行
-            task_id = trigger_manual_crawl(page_id)
-            message = f"分类页面 {page_id} 爬取任务已立即触发"
-        else:
-            # 通过调度器添加任务
-            task_id = trigger_manual_crawl(page_id)
-            message = f"分类页面 {page_id} 爬取任务已添加到队列"
+
+        task_id = trigger_manual_crawl(page_id)
+        message = f"分类页面 {page_id} 爬取任务已立即触发"
 
         return success_response(
             data={

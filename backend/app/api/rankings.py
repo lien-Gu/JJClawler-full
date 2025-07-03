@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Query, Path, HTTPException, Depends
 from app.modules.service import RankingService
-from app.modules.service.crawl_service import get_crawl_service
+from app.modules.service.crawler_service import get_crawler_service
 from app.modules.models import RankingConfig
 from app.utils.response_utils import ApiResponse, success_response, error_response, paginated_response
 from app.utils.error_codes import StatusCode
@@ -177,8 +177,9 @@ async def search_rankings(
     根据榜单名称进行模糊搜索，返回匹配的榜单列表
     """
     try:
-        crawl_service = get_crawl_service()
-        all_task_configs = crawl_service.get_all_task_configs()
+        from app.modules.task import get_task_manager
+        task_manager = get_task_manager()
+        all_task_configs = task_manager.get_all_task_configs()
         
         # 收集所有榜单（基于爬取任务配置）
         all_rankings = []

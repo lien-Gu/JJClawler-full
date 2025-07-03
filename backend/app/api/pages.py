@@ -6,7 +6,7 @@
 """
 from fastapi import APIRouter, HTTPException
 
-from app.modules.service.crawl_service import get_crawl_service
+from app.modules.task import get_task_manager
 from app.utils.response_utils import ApiResponse, success_response, error_response
 from app.utils.error_codes import StatusCode
 
@@ -22,8 +22,8 @@ async def get_pages():
     用于生成导航和页面布局
     """
     try:
-        crawl_service = get_crawl_service()
-        crawl_pages = crawl_service.get_pages_hierarchy()
+        task_manager = get_task_manager()
+        crawl_pages = task_manager.get_pages_hierarchy()
 
         # 转换为API响应格式
         pages = {}
@@ -58,8 +58,8 @@ async def refresh_page_config():
     """
     try:
         from datetime import datetime
-        crawl_service = get_crawl_service()
-        crawl_service.refresh_config()
+        task_manager = get_task_manager()
+        task_manager.refresh_config()
         return success_response(
             data={
                 "config_reloaded": True

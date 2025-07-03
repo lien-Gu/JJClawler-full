@@ -1,209 +1,311 @@
 """
-分类页面爬虫模块
+页面爬虫模块
 
-负责抓取晋江文学城各分类页面的榜单数据：
-- 分类页面数据抓取
-- 多种页面结构支持
-- 频道配置管理
+专门负责晋江文学城分类页面的数据抓取和解析
 """
-
 import json
-import logging
-import os
+from typing import Dict, Any, Tuple, List
 from datetime import datetime
-from typing import List, Tuple, Dict, Any
 
 from app.utils.http_client import HTTPClient
-from .parser import DataParser
-from .book_detail_crawler import BookDetailCrawler
-from app.modules.models import Book, BookSnapshot
+from app.utils.log_utils import get_logger
+from app.modules.models import Book, BookSnapshot, Ranking, RankingSnapshot
+from app.modules.dao import BookDAO, RankingDAO
+from app.modules.database.connection import get_session
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PageCrawler:
-    """
-    分类页面爬虫
+    """分类页面爬虫"""
     
-    处理各种分类页面的数据抓取：
-    - 言情、纯爱、衍生等分类
-    - 动态URL构建
-    - 多种数据结构支持
-    """
-    
-    def __init__(self, http_client: HTTPClient = None):
-        """
-        初始化分类页面爬虫
-        
-        Args:
-            http_client: HTTP客户端实例，如果未提供则创建新实例
-        """
-        self.http_client = http_client or HTTPClient(
-            timeout=30,
+    def __init__(self):
+        self.http_client = HTTPClient(
+            timeout=30.0,
             rate_limit_delay=1.0
         )
-        self.parser = DataParser()
-        self.book_detail_crawler = BookDetailCrawler(self.http_client)
-        self.url_config = self._load_url_config()
     
-    def _load_url_config(self) -> Dict[str, Any]:
-        """
-        加载URL配置
-        
-        Returns:
-            URL配置字典
-        """
+    async def crawl(self, task_id: str) -> Dict[str, Any]:
+        """执行分类页面爬取"""
         try:
-            config_path = os.path.join(os.getcwd(), 'data', 'urls.json')
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                logger.debug("分类页面URL配置加载成功")
-                return config
-        except Exception as e:
-            logger.error(f"分类页面URL配置加载失败: {e}")
-            raise
-    
-    async def crawl(self, channel: str) -> Tuple[List[Book], List[BookSnapshot]]:
-        """
-        抓取指定分类页面数据
-        
-        Args:
-            channel: 分类频道标识
+            logger.info(f"开始爬取分类页面: {task_id}")
             
-        Returns:
-            (books, book_snapshots): 书籍信息和快照数据
-        """
-        logger.info(f"开始抓取分类页面数据: {channel}")
-        
-        try:
-            # 构建URL
-            url = self._build_url(channel)
-            if not url:
-                raise ValueError(f"无法构建频道URL: {channel}")
+            # 构建URL（这里需要根据task_id构建实际的URL）
+            url = self._build_url(task_id)
             
-            # 发送请求
+            # 获取数据
             response = await self.http_client.get(url)
-            
-            # 检查响应状态
             response.raise_for_status()
             
-            # 提取JSON数据
-            raw_data = response.json()
+            # 解析JSON响应
+            data = response.json()
             
-            # 解析基础数据
-            try:
-                books, base_snapshots = self.parser.parse_page_data(raw_data)
-            except Exception as parse_error:
-                # 解析失败，但爬取成功，抛出特定异常
-                from app.utils.failure_storage import get_failure_storage
-                task_id = f"page_{channel}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                get_failure_storage().store_parse_failure(
-                    task_id=task_id,
-                    task_type="page",
-                    error_message=f"分类页面数据解析失败: {str(parse_error)}",
-                    raw_data=raw_data,
-                    url=url,
-                    channel=channel
-                )
-                logger.error(f"分类页面数据解析失败，原始数据已保存: {parse_error}")
-                raise parse_error
+            # 解析书籍数据和排行榜数据
+            books, snapshots, rankings = self._parse_page_data(data, task_id)
             
-            # 获取书籍详情数据（包含统计信息）
-            book_ids = [book.book_id for book in books]
+            # 保存到数据库
+            saved_books, saved_snapshots, saved_rankings = await self._save_data(books, snapshots, rankings, task_id)
+            
+            result = {
+                "success": True,
+                "books_new": len([b for b in saved_books if b]),
+                "books_updated": len(saved_books) - len([b for b in saved_books if b]),
+                "total_books": len(books),
+                "snapshots_created": len(saved_snapshots),
+                "rankings_created": len(saved_rankings)
+            }
+            
+            logger.info(f"分类页面爬取完成 {task_id}: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"分类页面爬取失败 {task_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "books_new": 0,
+                "books_updated": 0,
+                "total_books": 0
+            }
+    
+    def _build_url(self, task_id: str) -> str:
+        """根据task_id构建页面URL"""
+        # 基础URL模板
+        base_url = "https://app-cdn.jjwxc.com/bookstore/getFullPageV1"
+        
+        # 根据不同的task_id构建不同的参数
+        if task_id == "index":
+            return f"{base_url}?channel=index&version=19"
+        else:
+            # 其他分类页面
+            return f"{base_url}?channel={task_id}&version=19"
+    
+    def _parse_page_data(self, data: Dict[str, Any], task_id: str) -> Tuple[List[Book], List[BookSnapshot], List[RankingSnapshot]]:
+        """解析分类页面API响应数据"""
+        books = []
+        snapshots = []
+        rankings = []
+        
+        try:
+            # 检查API响应状态
+            if data.get('code') != '200':
+                raise ValueError(f"API响应错误: {data.get('message', '未知错误')}")
+            
+            data_sections = data.get('data', [])
             current_time = datetime.now()
             
-            logger.info(f"开始获取分类页面 {channel} 中 {len(book_ids)} 本书籍的详细统计数据...")
-            detailed_snapshots = await self.book_detail_crawler.fetch_book_details(book_ids, current_time)
-            
-            # 如果详情获取失败，使用基础快照（虽然统计数据为0）
-            snapshots = detailed_snapshots if detailed_snapshots else base_snapshots
-            
-            # 验证结果
-            if not books or not snapshots:
-                logger.warning(f"分类页面抓取结果为空: {channel}")
-                return [], []
-            
-            if len(books) != len(snapshots):
-                logger.warning(f"数据不一致 ({channel}): 书籍 {len(books)} 本, 快照 {len(snapshots)} 条")
-            
-            logger.info(f"分类页面抓取完成 ({channel}): {len(books)} 本书籍")
-            return books, snapshots
-            
+            # 处理不同的数据结构
+            for section in data_sections:
+                ranking_id = section.get('rankid', '')
+                ranking_name = section.get('channelName', '')
+                section_books = section.get('data', [])
+                
+                # 处理每个排行榜的书籍
+                for position, item in enumerate(section_books, 1):
+                    try:
+                        # 解析书籍基本信息
+                        book = self._parse_book_info(item)
+                        books.append(book)
+                        
+                        # 解析书籍快照数据
+                        snapshot = self._parse_book_snapshot(item, current_time)
+                        snapshots.append(snapshot)
+                        
+                        # 创建排行榜快照
+                        if ranking_id:
+                            ranking_snapshot = RankingSnapshot(
+                                ranking_id=ranking_id,
+                                book_id=book.book_id,
+                                position=position,
+                                snapshot_time=current_time
+                            )
+                            rankings.append(ranking_snapshot)
+                        
+                    except Exception as e:
+                        logger.warning(f"解析单本书籍失败: {e}, 书籍数据: {item.get('novelId', 'unknown')}")
+                        continue
+                        
         except Exception as e:
-            logger.error(f"分类页面抓取失败 ({channel}): {e}")
+            logger.error(f"分类页面数据解析失败 {task_id}: {e}")
             raise
+        
+        logger.info(f"分类页面数据解析完成 {task_id}: {len(books)} 本书籍, {len(rankings)} 个排名")
+        return books, snapshots, rankings
     
-    def _build_url(self, channel: str) -> str:
-        """
-        根据频道构建URL
+    def _parse_book_info(self, item: Dict[str, Any]) -> Book:
+        """解析单本书籍的基本信息"""
+        # 处理字段名的多种变体（API返回可能不一致）
+        book_id = str(item.get('novelId') or item.get('novelid', ''))
+        title = item.get('novelName') or item.get('novelname', '')
+        author_id = str(item.get('authorId') or item.get('authorid', ''))
+        author_name = item.get('authorName') or item.get('authorname', '')
+        novel_class = item.get('novelClass') or item.get('novelclass', '')
+        tags = item.get('tags', '')
         
-        Args:
-            channel: 频道标识
-            
-        Returns:
-            构建的URL
-        """
-        try:
-            base_url = self.url_config['base_url']
-            version = self.url_config['version']
-            
-            # 使用模板构建URL
-            url = base_url.format(channel, version)
-            logger.debug(f"构建URL成功: {channel} -> {url}")
-            return url
-            
-        except Exception as e:
-            logger.error(f"构建URL失败: {channel} - {e}")
-            return ""
+        # 数据清洗
+        if not book_id or not title:
+            raise ValueError(f"书籍数据不完整: ID={book_id}, Title={title}")
+        
+        return Book(
+            book_id=book_id,
+            title=title.strip(),
+            author_id=author_id,
+            author_name=author_name.strip() if author_name else '',
+            novel_class=novel_class.strip() if novel_class else '',
+            tags=tags.strip() if tags else '',
+            first_seen=datetime.now(),
+            last_updated=datetime.now()
+        )
     
-    async def get_available_channels(self) -> List[Dict[str, str]]:
-        """
-        获取可用的抓取频道列表
+    def _parse_book_snapshot(self, item: Dict[str, Any], snapshot_time: datetime) -> BookSnapshot:
+        """解析书籍快照数据"""
+        book_id = str(item.get('novelId') or item.get('novelid', ''))
         
-        Returns:
-            频道信息列表
-        """
-        channels = []
+        # 解析统计数据
+        total_clicks = self._parse_numeric_field(item, ['novelScore'], 0)
+        total_favorites = self._parse_numeric_field(item, ['favCount', 'totalFavorites'], 0)
+        comment_count = self._parse_numeric_field(item, ['commentCount'], 0)
+        chapter_count = self._parse_numeric_field(item, ['chapterCount'], 0)
+        word_count = self._parse_word_count(item.get('novelSizeformat', ''))
         
-        try:
-            # 添加分类页面
-            pages_config = self.url_config['content']['pages']
-            for page_key, page_info in pages_config.items():
-                if isinstance(page_info, dict):  # 确保是字典类型
-                    channels.append({
-                        'short_name': page_info['short_name'],
-                        'zh_name': page_info['zh_name'],
-                        'type': page_info.get('type', 'daily'),
-                        'frequency': page_info['frequency']
-                    })
+        return BookSnapshot(
+            book_id=book_id,
+            total_clicks=total_clicks,
+            total_favorites=total_favorites,
+            comment_count=comment_count,
+            chapter_count=chapter_count,
+            word_count=word_count,
+            snapshot_time=snapshot_time
+        )
+    
+    def _parse_numeric_field(self, item: Dict[str, Any], field_names: List[str], default: int = 0) -> int:
+        """解析数值字段（处理字符串格式的数字）"""
+        for field_name in field_names:
+            value = item.get(field_name)
+            if value is not None:
+                try:
+                    # 处理字符串格式的数字
+                    if isinstance(value, str):
+                        # 去除逗号
+                        value = value.replace(',', '')
+                        
+                        # 处理"亿"单位
+                        if '亿' in value:
+                            base_num = float(value.replace('亿', ''))
+                            return int(base_num * 100000000)
+                        
+                        # 处理"万"单位
+                        if '万' in value:
+                            base_num = float(value.replace('万', ''))
+                            return int(base_num * 10000)
+                        
+                        # 处理"千"单位  
+                        if '千' in value:
+                            base_num = float(value.replace('千', ''))
+                            return int(base_num * 1000)
                     
-                    # 添加子页面
-                    if 'sub_pages' in page_info:
-                        for sub_key, sub_info in page_info['sub_pages'].items():
-                            if isinstance(sub_info, dict):  # 确保是字典类型
-                                channels.append({
-                                    'short_name': f"{page_info['short_name']}.{sub_info['short_name']}",
-                                    'zh_name': f"{page_info['zh_name']} - {sub_info['zh_name']}",
-                                    'type': sub_info.get('type', 'daily'),
-                                    'frequency': sub_info['frequency']
-                                })
-            
-        except Exception as e:
-            logger.error(f"解析频道配置失败: {e}")
-            # 返回基本的频道列表
-            channels = [{
-                'short_name': 'yq',
-                'zh_name': '言情',
-                'type': 'daily',
-                'frequency': 'daily'
-            }]
+                    return int(float(value))
+                except (ValueError, TypeError):
+                    continue
         
-        return channels
+        return default
+    
+    def _parse_word_count(self, size_format: str) -> int:
+        """解析字数格式，如 '10.14万' -> 101400"""
+        if not size_format:
+            return 0
+        
+        try:
+            # 去除多余空格
+            size_format = size_format.strip()
+            
+            # 处理"万"单位
+            if '万' in size_format:
+                base_num = float(size_format.replace('万', ''))
+                return int(base_num * 10000)
+            
+            # 处理纯数字
+            return int(float(size_format))
+            
+        except (ValueError, TypeError):
+            logger.warning(f"无法解析字数格式: {size_format}")
+            return 0
+    
+    async def _save_data(self, books: List[Book], snapshots: List[BookSnapshot], 
+                        rankings: List[RankingSnapshot], task_id: str) -> Tuple[List[Book], List[BookSnapshot], List[RankingSnapshot]]:
+        """保存数据到数据库"""
+        saved_books = []
+        saved_snapshots = []
+        saved_rankings = []
+        
+        try:
+            async with get_session() as session:
+                book_dao = BookDAO(session)
+                ranking_dao = RankingDAO(session)
+                
+                # 保存或更新书籍信息
+                for book in books:
+                    try:
+                        book_data = {
+                            "book_id": book.book_id,
+                            "title": book.title,
+                            "author_id": book.author_id,
+                            "author_name": book.author_name,
+                            "novel_class": book.novel_class,
+                            "tags": book.tags,
+                            "first_seen": book.first_seen,
+                            "last_updated": book.last_updated
+                        }
+                        saved_book = book_dao.create_or_update(book_data)
+                        saved_books.append(saved_book)
+                    except Exception as e:
+                        logger.error(f"保存书籍失败 {book.book_id}: {e}")
+                        saved_books.append(None)
+                
+                # 批量保存书籍快照
+                try:
+                    snapshots_data = []
+                    for snapshot in snapshots:
+                        snapshot_data = {
+                            "book_id": snapshot.book_id,
+                            "total_clicks": snapshot.total_clicks,
+                            "total_favorites": snapshot.total_favorites,
+                            "comment_count": snapshot.comment_count,
+                            "chapter_count": snapshot.chapter_count,
+                            "word_count": snapshot.word_count,
+                            "snapshot_time": snapshot.snapshot_time
+                        }
+                        snapshots_data.append(snapshot_data)
+                    
+                    saved_snapshots = book_dao.batch_create_snapshots(snapshots_data)
+                except Exception as e:
+                    logger.error(f"批量保存书籍快照失败: {e}")
+                
+                # 批量保存排行榜快照
+                try:
+                    rankings_data = []
+                    for ranking in rankings:
+                        ranking_data = {
+                            "ranking_id": ranking.ranking_id,
+                            "book_id": ranking.book_id,
+                            "position": ranking.position,
+                            "snapshot_time": ranking.snapshot_time
+                        }
+                        rankings_data.append(ranking_data)
+                    
+                    saved_rankings = ranking_dao.batch_create_snapshots(rankings_data)
+                except Exception as e:
+                    logger.error(f"批量保存排行榜快照失败: {e}")
+                
+                session.commit()
+                
+        except Exception as e:
+            logger.error(f"数据保存失败 {task_id}: {e}")
+            raise
+        
+        logger.info(f"数据保存完成 {task_id}: {len(saved_books)} 本书籍, {len(saved_snapshots)} 个书籍快照, {len(saved_rankings)} 个排行榜快照")
+        return saved_books, saved_snapshots, saved_rankings
     
     async def close(self):
-        """关闭爬虫资源"""
-        if self.book_detail_crawler:
-            await self.book_detail_crawler.close()
-        if self.http_client:
-            await self.http_client.close()
-        logger.debug("分类页面爬虫已关闭")
+        """关闭资源"""
+        await self.http_client.close()

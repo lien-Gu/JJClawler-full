@@ -15,7 +15,7 @@ from pytz import utc
 from app.config import get_settings
 from app.utils.log_utils import get_logger
 from app.modules.task.manager import get_task_manager
-from app.modules.crawler.crawler import get_crawl_service
+from app.modules.service.crawler_service import get_crawler_service
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ class TaskScheduler:
     def __init__(self):
         self.scheduler: Optional[AsyncIOScheduler] = None
         self.task_manager = get_task_manager()
-        self.crawl_service = get_crawl_service()
+        self.crawler_service = get_crawler_service()
         self._is_running = False
         self._stats = {"total_executed": 0, "total_failed": 0}
     
@@ -111,7 +111,7 @@ class TaskScheduler:
             logger.info(f"开始执行定时爬取: {task_id}")
             
             # 直接执行爬取 - APScheduler负责调度管理
-            result = await self.crawl_service.crawl_and_save(task_id)
+            result = await self.crawler_service.crawl_and_save(task_id)
             
             if result.get('success'):
                 logger.info(f"定时爬取成功: {task_id}, 抓取 {result.get('total_books', 0)} 条")
