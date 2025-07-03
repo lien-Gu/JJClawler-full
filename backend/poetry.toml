@@ -1,0 +1,3 @@
+# venv setting
+[virtualenvs]
+in-project = true

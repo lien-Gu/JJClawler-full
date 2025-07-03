@@ -24,7 +24,7 @@ JJCrawler 是一个轻量级的晋江文学城数据爬虫后端服务，采用�
 ### 2.1 环境要求
 
 **系统要求：**
-- Python 3.13+
+- Python 3.12+
 - Poetry (推荐) 或 pip
 - Git
 - 操作系统：macOS / Linux / Windows

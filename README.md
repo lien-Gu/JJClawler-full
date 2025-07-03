@@ -35,7 +35,7 @@ JJClawler-full/
 ## 技术栈
 
 ### 后端技术
-- **框架**: FastAPI (Python 3.13+)
+- **框架**: FastAPI (Python 3.12+)
 - **数据库**: SQLite with SQLModel ORM
 - **爬虫**: httpx + Beautiful Soup
 - **调度**: APScheduler
