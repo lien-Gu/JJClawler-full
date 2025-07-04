@@ -31,12 +31,12 @@ class TestHealthAPI:
     
     def test_database_health(self, client: TestClient):
         """测试数据库健康检查API"""
-        response = client.get("/health/database")
+        response = client.get("/health/db")
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
-        assert "database" in data
-        assert "connection" in data["database"]
+        assert "db" in data
+        assert "connection" in data["db"]
     
     def test_scheduler_health(self, client: TestClient):
         """测试调度器健康检查API"""
@@ -117,12 +117,12 @@ class TestHealthAPI:
         timestamp = data["timestamp"]
         datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     
-    @patch('app.database.connection.engine.connect')
+    @patch('app.db.connection.engine.connect')
     def test_database_health_failure(self, mock_connect, client: TestClient):
         """测试数据库健康检查失败"""
         mock_connect.side_effect = Exception("Database connection failed")
         
-        response = client.get("/health/database")
+        response = client.get("/health/db")
         assert response.status_code == 503  # 服务不可用
         data = response.json()
         assert "status" in data

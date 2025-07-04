@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..dao.ranking_dao import RankingDAO, RankingSnapshotDAO
 from ..dao.book_dao import BookDAO
-from ..database.models import Ranking, RankingSnapshot, Book
+from ..db.ranking import Ranking, RankingSnapshot
 
 
 class RankingService:

@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from ..dao.book_dao import BookDAO, BookSnapshotDAO
-from ..database.models import Book, BookSnapshot
+from ..db.book import Book, BookSnapshot
 
 
 class BookService:

@@ -338,7 +338,7 @@ class TestBookService:
         assert result[1].id == 2
         self.mock_book_dao.get_by_ids.assert_called_once_with(book_ids)
     
-    @patch('app.database.service.book_service.logger')
+    @patch('app.db.service.book_service.logger')
     def test_service_error_handling(self, mock_logger):
         """测试服务错误处理"""
         # 模拟DAO抛出异常

@@ -98,7 +98,7 @@ class TestPagesAPI:
     
     def test_get_database_config(self, client: TestClient):
         """测试获取数据库配置API"""
-        response = client.get("/api/v1/pages/database-config")
+        response = client.get("/api/v1/pages/db-config")
         assert response.status_code == 200
         data = response.json()
         assert "config" in data

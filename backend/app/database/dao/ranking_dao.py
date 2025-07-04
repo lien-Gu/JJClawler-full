@@ -8,7 +8,7 @@ from sqlalchemy import select, and_, desc, func, distinct
 from sqlalchemy.orm import Session, joinedload
 
 from .base_dao import BaseDAO
-from ..database.models import Ranking, RankingSnapshot, Book
+from ..db.ranking import Ranking, RankingSnapshot
 
 
 class RankingDAO(BaseDAO[Ranking]):
