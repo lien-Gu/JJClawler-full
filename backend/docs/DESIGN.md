@@ -86,14 +86,6 @@ class Book(Base):
     title: Mapped[str] = mapped_column(String(200), index=True)
     author: Mapped[str] = mapped_column(String(100), index=True)
     
-    # 书籍状态
-    status: Mapped[str] = mapped_column(String(20))  # 连载中/完结
-    tag: Mapped[str] = mapped_column(String(50))     # 分类标签
-    length: Mapped[int] = mapped_column(Integer)     # 字数
-    intro: Mapped[str] = mapped_column(Text)         # 简介
-    
-    # 时间戳
-    last_update: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -108,25 +100,12 @@ class BookSnapshot(Base):
     
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    novel_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.novel_id"))
+    book_id: Mapped[int] = mapped_column(Integer)
     
     # 统计数据
     favorites: Mapped[int] = mapped_column(Integer, default=0)
-    total_clicks: Mapped[int] = mapped_column(Integer, default=0)
-    monthly_clicks: Mapped[int] = mapped_column(Integer, default=0)
-    weekly_clicks: Mapped[int] = mapped_column(Integer, default=0)
-    daily_clicks: Mapped[int] = mapped_column(Integer, default=0)
-    
-    total_comments: Mapped[int] = mapped_column(Integer, default=0)
-    monthly_comments: Mapped[int] = mapped_column(Integer, default=0)
-    weekly_comments: Mapped[int] = mapped_column(Integer, default=0)
-    daily_comments: Mapped[int] = mapped_column(Integer, default=0)
-    
-    total_recs: Mapped[int] = mapped_column(Integer, default=0)
-    monthly_recs: Mapped[int] = mapped_column(Integer, default=0)
-    weekly_recs: Mapped[int] = mapped_column(Integer, default=0)
-    daily_recs: Mapped[int] = mapped_column(Integer, default=0)
-    
+    clicks: Mapped[int] = mapped_column(Integer, default=0)
+    comments: Mapped[int] = mapped_column(Integer, default=0)
     # 时间戳
     snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
     
