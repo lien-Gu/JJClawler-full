@@ -131,19 +131,12 @@ class Ranking(Base):
     
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ranking_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
     
     # 基本信息
+    rank_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100), index=True)
     page_id: Mapped[str] = mapped_column(String(50), index=True)
-    url: Mapped[str] = mapped_column(String(500))
-    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    
-    # 配置信息
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    crawl_frequency: Mapped[int] = mapped_column(Integer, default=60)  # 分钟
-    last_crawl_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    rank_group_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
