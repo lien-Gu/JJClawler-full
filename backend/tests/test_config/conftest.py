@@ -184,39 +184,6 @@ def config_factory():
 
 
 # ==========================================
-# 专用组合Fixtures - MVP常用场景
-# ==========================================
-
-@pytest.fixture
-def dev_environment_setup(mock_env_override):
-    """开发环境设置"""
-    return mock_env_override({
-        'ENV': 'dev',
-        'DEBUG': 'true'
-    })
-
-
-@pytest.fixture
-def test_environment_setup(mock_env_override):
-    """测试环境设置"""
-    return mock_env_override({
-        'ENV': 'test',
-        'DEBUG': 'false',
-        'DATABASE_URL': 'sqlite:///:memory:'
-    })
-
-
-@pytest.fixture
-def prod_environment_setup(mock_env_override):
-    """生产环境设置"""
-    return mock_env_override({
-        'ENV': 'prod',
-        'DEBUG': 'false',
-        'LOG_LEVEL': 'WARNING'
-    })
-
-
-# ==========================================
 # 配置验证辅助函数 - MVP验证工具
 # ==========================================
 

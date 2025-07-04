@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import Field,field_validator
+from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings
 
 
@@ -13,14 +13,14 @@ class DatabaseSettings(BaseSettings):
 
     # 数据库连接配置
     url: str = Field(default="sqlite:///./data/jjcrawler.db", description="数据库连接URL")
-    echo: bool = Field(default=False,description="是否打印SQL语句")
+    echo: bool = Field(default=False, description="是否打印SQL语句")
 
     # 连接池配置
     pool_size: int = Field(default=5, ge=1, le=50, description="连接池大小")
     max_overflow: int = Field(default=10, ge=0, le=100, description="连接池最大溢出连接数")
     pool_timeout: int = Field(default=30, ge=1, le=300, description="连接池获取连接超时时间（秒）")
     pool_recycle: int = Field(default=3600, ge=300, le=86400, description="连接回收时间（秒）")
-    
+
     class Config:
         env_prefix = "DATABASE_"
         env_file_encoding = "utf-8"
@@ -58,7 +58,9 @@ class CrawlerSettings(BaseSettings):
     """爬虫配置"""
 
     # HTTP客户端配置
-    user_agent: str = Field(default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", description="User-Agent字符串")
+    user_agent: str = Field(
+        default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        description="User-Agent字符串")
     timeout: int = Field(default=30, ge=5, le=300, description="请求超时时间（秒）")
     retry_times: int = Field(default=3, ge=1, le=10, description="重试次数")
     retry_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="重试延迟时间（秒）")
@@ -80,7 +82,8 @@ class SchedulerSettings(BaseSettings):
     max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数")
 
     # 任务默认配置
-    job_defaults: Dict[str, Any] = Field(default={"coalesce": False, "max_instances": 1, "misfire_grace_time": 60}, description="任务默认配置")
+    job_defaults: Dict[str, Any] = Field(default={"coalesce": False, "max_instances": 1, "misfire_grace_time": 60},
+                                         description="任务默认配置")
 
     # 任务存储配置
     job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
@@ -94,7 +97,6 @@ class SchedulerSettings(BaseSettings):
 class LoggingSettings(BaseSettings):
     """日志配置"""
 
-   
     level: str = Field(default="INFO", description="日志级别")
     log_format: str = Field(default="%(asctime)s-%(name)s-%(levelname)s-%(message)s", description="日志格式")
     console_enabled: bool = Field(default=True, description="是否启用控制台输出")
@@ -102,7 +104,8 @@ class LoggingSettings(BaseSettings):
 
     # 日志文件配置
     file_path: str = Field(default="./logs/jjcrawler.log", description="日志文件路径")
-    max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024 * 1024, le=100 * 1024 * 1024, description="单个日志文件最大大小（字节）")
+    max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024 * 1024, le=100 * 1024 * 1024,
+                           description="单个日志文件最大大小（字节）")
     backup_count: int = Field(default=5, ge=1, le=20, description="备份日志文件数量")
 
     # 错误日志配置
@@ -113,8 +116,9 @@ class LoggingSettings(BaseSettings):
         env_prefix = "LOG_"
         env_file_encoding = "utf-8"
 
-    @field_validator('level', 'console_level', 'file_level')
-    def validate_log_level(cls, v):
+    @field_validator('level')
+    @classmethod
+    def validate_log_level(cls, v: str):
         """验证日志级别"""
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if v.upper() not in valid_levels:
@@ -130,19 +134,19 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="调试模式")
 
     # 项目信息
-    project_name: str = Field(default="JJCrawler",description="项目名称")
-    project_version: str = Field(default="1.0.0",description="项目版本")
+    project_name: str = Field(default="JJCrawler", description="项目名称")
+    project_version: str = Field(default="1.0.0", description="项目版本")
 
     # 数据目录配置
-    data_dir: str = Field(default="./data",description="数据目录")
-    logs_dir: str = Field(default="./logs",description="日志目录")
+    data_dir: str = Field(default="./data", description="数据目录")
+    logs_dir: str = Field(default="./logs", description="日志目录")
 
     # 子配置
-    database: DatabaseSettings = Field(default_factory=DatabaseSettings,description="数据库配置")
-    api: APISettings = Field(default_factory=APISettings,description="API配置")
-    crawler: CrawlerSettings = Field(default_factory=CrawlerSettings,description="爬虫配置")
-    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings,description="调度器配置")
-    logging: LoggingSettings = Field(default_factory=LoggingSettings,description="日志配置")
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings, description="数据库配置")
+    api: APISettings = Field(default_factory=APISettings, description="API配置")
+    crawler: CrawlerSettings = Field(default_factory=CrawlerSettings, description="爬虫配置")
+    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings, description="调度器配置")
+    logging: LoggingSettings = Field(default_factory=LoggingSettings, description="日志配置")
 
     class Config:
         env_file = ".env"
@@ -213,3 +217,13 @@ def is_debug() -> bool:
 def is_production() -> bool:
     """是否为生产环境"""
     return _settings.is_production()
+
+if __name__ == '__main__':
+    try:
+        # Pydantic-settings 会自动从环境变量或 .env 文件加载
+        # 这里我们直接传入数据进行测试
+        config = get_settings().logging
+        print("有效配置测试通过:")
+        print(f"  log Level: {config.level}")  # 输出: WARNING
+    except ValidationError as e:
+        print("有效配置测试失败:", e)
