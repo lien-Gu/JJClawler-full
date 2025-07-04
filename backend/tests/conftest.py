@@ -14,7 +14,7 @@ import os
 # 导入应用和数据库相关模块
 from app.main import app
 from app.database.connection import get_db, Base
-from app.config import settings
+from app.config import _settings
 
 
 @pytest.fixture(scope="session")

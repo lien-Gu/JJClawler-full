@@ -4,8 +4,8 @@
 import pytest
 import os
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
 from typing import Any, Dict
+from pathlib import Path
 
 
 class TestConfig:
@@ -13,281 +13,284 @@ class TestConfig:
     
     def test_load_default_config(self):
         """测试加载默认配置"""
-        from app.config import settings
+        from app.config import get_settings
         
+        settings = get_settings()
         # 检查默认配置值
-        assert settings.APP_NAME == "JJCrawler"
-        assert settings.VERSION == "1.0.0"
-        assert settings.DEBUG == False
-        assert settings.API_V1_STR == "/api/v1"
-        assert settings.HOST == "0.0.0.0"
-        assert settings.PORT == 8000
+        assert settings.env == "dev"
+        assert settings.project_name == "JJCrawler"
+        assert settings.project_version == "1.0.0"
+        assert settings.debug == False
+        assert Path(settings.data_dir).exists()
+        assert Path(settings.logs_dir).exists()
     
     def test_database_config(self):
         """测试数据库配置"""
-        from app.config import settings
+        from app.config import get_settings
+        
+        settings = get_settings().database
         
         # 检查数据库配置
-        assert settings.DATABASE_URL.startswith("sqlite:///")
-        assert settings.DATABASE_POOL_SIZE >= 5
-        assert settings.DATABASE_POOL_OVERFLOW >= 10
-        assert settings.DATABASE_POOL_TIMEOUT >= 30
+        assert settings.url.startswith("sqlite:///")
+        assert settings.echo == False
+        assert settings.pool_size >= 1
+        assert 0 < settings.max_overflow < 100
+        assert 0 < settings.pool_timeout < 300
+        assert settings.pool_recycle >= 300
     
     def test_scheduler_config(self):
         """测试调度器配置"""
-        from app.config import settings
+        from app.config import get_settings
+        
+        scheduler_settings = get_settings().scheduler
         
         # 检查调度器配置
-        assert settings.SCHEDULER_TIMEZONE == "Asia/Shanghai"
-        assert settings.SCHEDULER_MAX_WORKERS >= 2
-        assert settings.SCHEDULER_COALESCE == True
-        assert settings.SCHEDULER_MISFIRE_GRACE_TIME >= 60
+        assert scheduler_settings.timezone == "Asia/Shanghai"
+        assert scheduler_settings.max_workers >= 1
+        assert scheduler_settings.job_store_type == "SQLAlchemyJobStore"
+        assert scheduler_settings.job_store_url is not None
+        assert isinstance(scheduler_settings.job_defaults, dict)
     
     def test_crawler_config(self):
         """测试爬虫配置"""
-        from app.config import settings
+        from app.config import get_settings
+        
+        crawler_settings = get_settings().crawler
         
         # 检查爬虫配置
-        assert settings.CRAWLER_USER_AGENT is not None
-        assert settings.CRAWLER_TIMEOUT >= 10
-        assert settings.CRAWLER_RETRIES >= 3
-        assert settings.CRAWLER_DELAY >= 1
-        assert settings.CRAWLER_CONCURRENT_LIMIT >= 5
+        assert crawler_settings.user_agent is not None
+        assert crawler_settings.timeout >= 5
+        assert crawler_settings.retry_times >= 1
+        assert crawler_settings.retry_delay >= 0.1
+        assert crawler_settings.request_delay >= 0.1
+        assert crawler_settings.concurrent_requests >= 1
     
     def test_logging_config(self):
         """测试日志配置"""
-        from app.config import settings
+        from app.config import get_settings
+        
+        log_settings = get_settings().logging
         
         # 检查日志配置
-        assert settings.LOG_LEVEL in ["DEBUG", "INFO", "WARNING", "ERROR"]
-        assert settings.LOG_FORMAT is not None
-        assert settings.LOG_FILE_PATH is not None
-        assert settings.LOG_MAX_SIZE >= 10
-        assert settings.LOG_BACKUP_COUNT >= 5
+        assert log_settings.level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        assert log_settings.log_format is not None
+        assert log_settings.console_enabled == True
+        assert log_settings.file_enabled == True
+        assert log_settings.file_path is not None
+        assert log_settings.max_bytes >= 1024 * 1024  # 至少1MB
+        assert log_settings.backup_count >= 1
+        assert log_settings.error_file_enabled == True
+        assert log_settings.error_file_path is not None
     
     def test_api_config(self):
         """测试API配置"""
-        from app.config import settings
+        from app.config import get_settings
+        
+        api_settings = get_settings().api
         
         # 检查API配置
-        assert settings.API_TITLE is not None
-        assert settings.API_DESCRIPTION is not None
-        assert settings.API_VERSION is not None
-        assert settings.API_RATE_LIMIT >= 100
-        assert settings.API_CORS_ORIGINS is not None
+        assert api_settings.title is not None
+        assert api_settings.description is not None
+        assert api_settings.version == "v1"  # 用户修改后的版本
+        assert api_settings.host == "0.0.0.0"
+        assert 1 <= api_settings.port <= 65535
+        assert api_settings.debug == False
+        assert api_settings.cors_enabled == True
+        assert isinstance(api_settings.cors_origins, list)
+        assert isinstance(api_settings.cors_methods, list)
+        assert isinstance(api_settings.cors_headers, list)
+        assert api_settings.default_page_size >= 1
+        assert api_settings.max_page_size >= api_settings.default_page_size
     
-    @patch.dict(os.environ, {
-        'APP_NAME': 'TestApp',
-        'DEBUG': 'true',
-        'PORT': '9000',
-        'DATABASE_URL': 'sqlite:///test.db'
-    })
-    def test_environment_override(self):
+    def test_environment_override(self, mocker):
         """测试环境变量覆盖配置"""
+        # 使用pytest-mock模拟环境变量
+        mocker.patch.dict(os.environ, {
+            'ENV': 'test',
+            'DEBUG': 'true',
+            'API_PORT': '9000',
+            'DATABASE_URL': 'sqlite:///test.db'
+        })
+        
         # 重新加载配置以获取环境变量
         from app.config import Settings
         test_settings = Settings()
         
-        assert test_settings.APP_NAME == "TestApp"
-        assert test_settings.DEBUG == True
-        assert test_settings.PORT == 9000
-        assert test_settings.DATABASE_URL == "sqlite:///test.db"
+        assert test_settings.env == "test"
+        assert test_settings.debug == True
+        assert test_settings.api.port == 9000
+        assert test_settings.database.url == "sqlite:///test.db"
     
     def test_config_validation(self):
         """测试配置验证"""
         from app.config import Settings
         
         # 测试有效配置
-        valid_config = {
-            'APP_NAME': 'TestApp',
-            'PORT': 8080,
-            'DEBUG': False,
-            'DATABASE_URL': 'sqlite:///valid.db'
-        }
+        settings = Settings(
+            env="dev",
+            debug=False,
+            project_name="TestApp"
+        )
         
-        settings = Settings(**valid_config)
-        assert settings.APP_NAME == "TestApp"
-        assert settings.PORT == 8080
-        assert settings.DEBUG == False
+        assert settings.env == "dev"
+        assert settings.debug == False
+        assert settings.project_name == "TestApp"
     
     def test_invalid_config_validation(self):
         """测试无效配置验证"""
         from app.config import Settings
         
-        # 测试无效端口
+        # 测试无效环境
         with pytest.raises(ValueError):
-            Settings(PORT=-1)
+            Settings(env="invalid")
+    
+    def test_environment_methods(self):
+        """测试环境判断方法"""
+        from app.config import get_settings
         
-        # 测试无效数据库URL
+        settings = get_settings()
+        
+        # 根据默认环境dev进行测试
+        assert settings.is_development() == True
+        assert settings.is_testing() == False
+        assert settings.is_production() == False
+    
+    def test_database_url_method(self):
+        """测试数据库URL获取方法"""
+        from app.config import get_settings, get_database_url
+        
+        settings = get_settings()
+        
+        # 测试方法
+        assert settings.get_database_url() == settings.database.url
+        assert get_database_url() == settings.database.url
+        assert get_database_url().startswith("sqlite:///")
+    
+    def test_debug_methods(self):
+        """测试调试模式判断方法"""
+        from app.config import is_debug, is_production
+        
+        # 测试便捷方法
+        assert isinstance(is_debug(), bool)
+        assert isinstance(is_production(), bool)
+    
+    def test_directory_creation(self):
+        """测试目录创建"""
+        from app.config import get_settings
+        
+        settings = get_settings()
+        
+        # 验证目录是否存在
+        assert Path(settings.data_dir).exists()
+        assert Path(settings.logs_dir).exists()
+        assert Path(settings.logging.file_path).parent.exists()
+    
+    def test_log_level_validation(self):
+        """测试日志级别验证"""
+        from app.config import LoggingSettings
+        
+        # 测试有效的日志级别
+        valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        for level in valid_levels:
+            log_settings = LoggingSettings(level=level)
+            assert log_settings.level == level
+        
+        # 测试无效的日志级别
         with pytest.raises(ValueError):
-            Settings(DATABASE_URL="invalid-url")
+            LoggingSettings(level="INVALID")
     
-    def test_jiazi_config(self):
-        """测试夹子榜配置"""
-        from app.config import settings
-        
-        # 检查夹子榜配置
-        assert settings.JIAZI_URL is not None
-        assert settings.JIAZI_INTERVAL >= 3600  # 至少1小时
-        assert settings.JIAZI_PARSER_TYPE == "html"
-        assert settings.JIAZI_MAX_PAGES >= 1
-    
-    def test_category_config(self):
-        """测试分类配置"""
-        from app.config import settings
-        
-        # 检查分类配置
-        assert settings.CATEGORY_CONFIGS is not None
-        assert isinstance(settings.CATEGORY_CONFIGS, dict)
-        assert len(settings.CATEGORY_CONFIGS) > 0
-    
-    def test_file_config(self):
-        """测试文件配置"""
-        from app.config import settings
-        
-        # 检查文件配置
-        assert settings.DATA_DIR is not None
-        assert settings.LOG_DIR is not None
-        assert settings.TEMP_DIR is not None
-        assert settings.BACKUP_DIR is not None
-    
-    def test_security_config(self):
-        """测试安全配置"""
-        from app.config import settings
-        
-        # 检查安全配置
-        assert settings.SECRET_KEY is not None
-        assert len(settings.SECRET_KEY) >= 32
-        assert settings.ACCESS_TOKEN_EXPIRE_MINUTES >= 30
-        assert settings.ALGORITHM == "HS256"
-    
-    def test_config_from_file(self):
-        """测试从文件加载配置"""
-        # 创建临时配置文件
-        config_data = {
-            "APP_NAME": "FileTestApp",
-            "DEBUG": True,
-            "PORT": 7000
-        }
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            import json
-            json.dump(config_data, f)
-            config_file = f.name
-        
-        try:
-            # 测试从文件加载配置
-            from app.config import load_config_from_file
-            loaded_config = load_config_from_file(config_file)
-            
-            assert loaded_config["APP_NAME"] == "FileTestApp"
-            assert loaded_config["DEBUG"] == True
-            assert loaded_config["PORT"] == 7000
-        finally:
-            os.unlink(config_file)
-    
-    def test_config_merge(self):
-        """测试配置合并"""
-        from app.config import merge_configs
-        
-        base_config = {
-            "APP_NAME": "BaseApp",
-            "DEBUG": False,
-            "PORT": 8000
-        }
-        
-        override_config = {
-            "APP_NAME": "OverrideApp",
-            "DEBUG": True
-        }
-        
-        merged = merge_configs(base_config, override_config)
-        
-        assert merged["APP_NAME"] == "OverrideApp"
-        assert merged["DEBUG"] == True
-        assert merged["PORT"] == 8000
-    
-    def test_config_export(self):
-        """测试配置导出"""
-        from app.config import settings
-        
-        # 导出配置
-        exported = settings.dict()
-        
-        # 检查导出的配置
-        assert isinstance(exported, dict)
-        assert "APP_NAME" in exported
-        assert "DATABASE_URL" in exported
-        assert "SECRET_KEY" not in exported  # 敏感信息应被过滤
-    
-    def test_config_reload(self):
-        """测试配置重载"""
-        from app.config import reload_config
-        
-        # 保存原始配置
-        original_app_name = os.environ.get('APP_NAME', 'JJCrawler')
-        
-        try:
-            # 修改环境变量
-            os.environ['APP_NAME'] = 'ReloadedApp'
-            
-            # 重载配置
-            new_settings = reload_config()
-            
-            assert new_settings.APP_NAME == 'ReloadedApp'
-        finally:
-            # 恢复原始配置
-            if original_app_name:
-                os.environ['APP_NAME'] = original_app_name
-            else:
-                os.environ.pop('APP_NAME', None)
-    
-    def test_config_cache(self):
-        """测试配置缓存"""
-        from app.config import get_cached_config, clear_config_cache
-        
-        # 获取缓存配置
-        config1 = get_cached_config()
-        config2 = get_cached_config()
-        
-        # 应该是同一个实例
-        assert config1 is config2
-        
-        # 清理缓存
-        clear_config_cache()
-        
-        config3 = get_cached_config()
-        
-        # 应该是新的实例
-        assert config1 is not config3
-    
-    def test_config_validation_errors(self):
-        """测试配置验证错误"""
-        from app.config import Settings, ValidationError
-        
-        # 测试各种无效配置
-        invalid_configs = [
-            {'PORT': 'invalid'},  # 非数字端口
-            {'CRAWLER_TIMEOUT': -1},  # 负数超时
-            {'LOG_LEVEL': 'INVALID'},  # 无效日志级别
-            {'SCHEDULER_MAX_WORKERS': 0},  # 零工作线程
-        ]
-        
-        for invalid_config in invalid_configs:
-            with pytest.raises(ValidationError):
-                Settings(**invalid_config)
-    
-    def test_config_type_conversion(self):
-        """测试配置类型转换"""
+    def test_field_constraints(self):
+        """测试字段约束"""
         from app.config import Settings
         
-        # 测试字符串到数字的转换
-        settings = Settings(
-            PORT="8080",
-            CRAWLER_TIMEOUT="30",
-            DEBUG="true"
-        )
+        settings = Settings()
         
-        assert settings.PORT == 8080
-        assert settings.CRAWLER_TIMEOUT == 30
-        assert settings.DEBUG == True 
+        # 测试数据库配置约束
+        assert 1 <= settings.database.pool_size <= 50
+        assert 0 <= settings.database.max_overflow <= 100
+        assert 1 <= settings.database.pool_timeout <= 300
+        assert 300 <= settings.database.pool_recycle <= 86400
+        
+        # 测试API配置约束
+        assert 1 <= settings.api.port <= 65535
+        assert 1 <= settings.api.default_page_size <= 100
+        assert 1 <= settings.api.max_page_size <= 1000
+        
+        # 测试爬虫配置约束
+        assert 5 <= settings.crawler.timeout <= 300
+        assert 1 <= settings.crawler.retry_times <= 10
+        assert 0.1 <= settings.crawler.retry_delay <= 10.0
+        assert 0.1 <= settings.crawler.request_delay <= 60.0
+        assert 1 <= settings.crawler.concurrent_requests <= 10
+        
+        # 测试调度器配置约束
+        assert 1 <= settings.scheduler.max_workers <= 20
+        
+        # 测试日志配置约束
+        assert 1024 * 1024 <= settings.logging.max_bytes <= 100 * 1024 * 1024
+        assert 1 <= settings.logging.backup_count <= 20
+    
+    def test_config_dict_fields(self):
+        """测试字典类型配置字段"""
+        from app.config import get_settings
+        
+        settings = get_settings()
+        
+        # 测试调度器默认配置
+        job_defaults = settings.scheduler.job_defaults
+        assert isinstance(job_defaults, dict)
+        assert "coalesce" in job_defaults
+        assert "max_instances" in job_defaults
+        assert "misfire_grace_time" in job_defaults
+    
+    def test_config_list_fields(self):
+        """测试列表类型配置字段"""
+        from app.config import get_settings
+        
+        settings = get_settings()
+        
+        # 测试CORS配置
+        assert isinstance(settings.api.cors_origins, list)
+        assert isinstance(settings.api.cors_methods, list)
+        assert isinstance(settings.api.cors_headers, list)
+        
+        # 检查默认值
+        assert "GET" in settings.api.cors_methods
+        assert "POST" in settings.api.cors_methods
+    
+    def test_config_case_insensitive(self, mocker):
+        """测试配置大小写不敏感"""
+        from app.config import Settings
+        
+        # 测试环境变量大小写不敏感
+        mocker.patch.dict(os.environ, {'env': 'TEST'})
+        settings = Settings()
+        assert settings.env == "test"  # 应该被转换为小写
+    
+    def test_config_file_paths(self):
+        """测试配置文件路径"""
+        from app.config import get_settings
+        
+        settings = get_settings()
+        
+        # 测试日志文件路径
+        assert settings.logging.file_path.endswith('.log')
+        assert settings.logging.error_file_path.endswith('.log')
+        
+        # 测试数据库文件路径
+        assert settings.database.url.endswith('.db')
+        
+        # 测试调度器存储路径
+        if settings.scheduler.job_store_url:
+            assert settings.scheduler.job_store_url.endswith('.db')
+    
+    def test_settings_singleton(self):
+        """测试设置单例"""
+        from app.config import get_settings, _settings
+        
+        # 多次获取应该返回同一个实例
+        settings1 = get_settings()
+        settings2 = get_settings()
+        
+        assert settings1 is settings2
+        assert settings1 is _settings 
