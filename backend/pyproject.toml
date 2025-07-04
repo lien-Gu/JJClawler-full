@@ -21,6 +21,7 @@ apscheduler = "^3.10.4"
 python-dotenv = "^1.0.0"
 pydantic-settings = "^2.6.0"
 pytz = "^2025.2"
+sqlalchemy = "^2.0.41"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

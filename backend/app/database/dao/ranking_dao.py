@@ -23,15 +23,17 @@ class RankingDAO(BaseDAO[Ranking]):
     
     def get_by_page_id(self, db: Session, page_id: str) -> List[Ranking]:
         """根据page_id获取榜单列表"""
-        return db.scalars(
+        result = db.execute(
             select(Ranking).where(Ranking.page_id == page_id)
-        ).all()
+        )
+        return list(result.scalars())
     
     def get_by_group_type(self, db: Session, group_type: str) -> List[Ranking]:
         """根据榜单分组类型获取榜单"""
-        return db.scalars(
+        result = db.execute(
             select(Ranking).where(Ranking.rank_group_type == group_type)
-        ).all()
+        )
+        return list(result.scalars())
     
     def create_or_update_by_rank_id(self, db: Session, obj_in: Dict[str, Any]) -> Ranking:
         """根据rank_id创建或更新榜单"""
@@ -71,7 +73,7 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         if not latest_time:
             return []
         
-        return db.scalars(
+        result = db.execute(
             select(RankingSnapshot)
             .options(joinedload(RankingSnapshot.book))
             .where(
@@ -82,7 +84,8 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
             )
             .order_by(RankingSnapshot.position)
             .limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
     
     def get_by_ranking_and_date(
         self, 

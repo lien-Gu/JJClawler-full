@@ -23,19 +23,21 @@ class BookDAO(BaseDAO[Book]):
 
     def search_by_title(self, db: Session, title: str, limit: int = 20) -> List[Book]:
         """根据标题搜索书籍"""
-        return db.scalars(
+        result = db.execute(
             select(Book)
             .where(Book.title.like(f"%{title}%"))
             .limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
 
     def search_by_author(self, db: Session, author: str, limit: int = 20) -> List[Book]:
         """根据作者搜索书籍"""
-        return db.scalars(
+        result = db.execute(
             select(Book)
             .where(Book.author.like(f"%{author}%"))
             .limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
 
     def create_or_update_by_novel_id(self, db: Session, obj_in: Dict[str, Any]) -> Book:
         """根据novel_id创建或更新书籍"""
@@ -84,9 +86,10 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         if end_time:
             query = query.where(BookSnapshot.snapshot_time <= end_time)
 
-        return db.scalars(
+        result = db.execute(
             query.order_by(desc(BookSnapshot.snapshot_time)).limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
 
     def get_statistics_by_book_id(self, db: Session, book_id: int) -> Dict[str, Any]:
         """获取书籍统计信息"""
@@ -122,12 +125,13 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
     def delete_old_snapshots(self,db: Session,book_id: int,before_time: datetime,keep_count: int = 100) -> int:
         """删除旧快照，保留指定数量的最新记录"""
         # 获取要保留的快照IDs
-        keep_ids = db.scalars(
+        result = db.execute(
             select(BookSnapshot.id)
             .where(BookSnapshot.book_id == book_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(keep_count)
-        ).all()
+        )
+        keep_ids = list(result.scalars())
 
         # 删除旧快照
         deleted = db.execute(
