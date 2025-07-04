@@ -126,14 +126,19 @@ curl http://localhost:8000/health
 
 **测试API：**
 ```bash
-# 获取页面配置
-curl http://localhost:8000/api/v1/pages
+# 触发爬取所有页面
+curl -X POST http://localhost:8000/api/v1/crawl/all
 
-# 触发夹子榜爬取
-curl -X POST http://localhost:8000/api/v1/crawl/jiazi
+# 触发爬取多个页面
+curl -X POST http://localhost:8000/api/v1/crawl/pages \
+  -H "Content-Type: application/json" \
+  -d '{"page_ids": ["jiazi", "nvpin_wcxl"]}'
 
 # 查看任务状态
 curl http://localhost:8000/api/v1/crawl/tasks
+
+# 查看爬虫系统状态
+curl http://localhost:8000/api/v1/crawl/status
 
 # 获取数据分析报告（未来功能）
 curl http://localhost:8000/api/v1/reports/latest
@@ -329,8 +334,7 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── books.py              # 书籍相关接口
 │   │   ├── rankings.py           # 榜单相关接口
-│   │   ├── crawl.py              # 爬虫管理接口
-│   │   ├── pages.py              # 页面配置接口
+│   │   ├── crawl.py              # 爬虫管理接口（手动触发、任务监控）
 │   │   └── reports.py            # 数据分析接口（未来功能）
 │   ├── database/                 # 数据库模块
 │   │   ├── __init__.py
@@ -392,8 +396,7 @@ backend/
 **核心文件：**
 - `books.py`：书籍相关接口（详情、搜索、趋势）
 - `rankings.py`：榜单相关接口（榜单查询、历史数据）
-- `crawl.py`：爬虫管理接口（任务触发、状态监控）
-- `pages.py`：页面配置接口（动态配置服务）
+- `crawl.py`：爬虫管理接口（手动触发所有/单个/多个页面爬取、任务状态监控、系统状态查询）
 - `reports.py`：数据分析接口（定时生成数据分析报告，未来功能）
 
 #### 4.3.2 数据库模块 (app/database/)
@@ -498,10 +501,9 @@ backend/
 本项目提供完整的RESTful API接口，支持书籍查询、榜单管理、爬虫控制等功能。
 
 **核心API分类：**
-- 📄 **页面配置接口**：`GET /api/v1/pages` - 动态配置服务
 - 📊 **榜单数据接口**：`GET /api/v1/rankings/*` - 榜单查询和历史数据
 - 📚 **书籍信息接口**：`GET /api/v1/books/*` - 书籍详情、趋势、排名历史
-- 🕷️ **爬虫管理接口**：`POST /api/v1/crawl/*` - 任务触发和状态监控
+- 🕷️ **爬虫管理接口**：`POST /api/v1/crawl/*` - 手动触发爬取（所有/单个/多个页面）、任务状态监控、系统状态查询
 - 📈 **数据分析接口**：`GET /api/v1/reports/*` - 数据分析报告（未来功能）
 - 🔧 **系统状态接口**：`GET /health` - 健康检查
 
