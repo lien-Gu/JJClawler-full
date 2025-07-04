@@ -86,11 +86,13 @@ class Book(Base):
     title: Mapped[str] = mapped_column(String(200), index=True)
     author: Mapped[str] = mapped_column(String(100), index=True)
     
+    # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # 关系
     snapshots: Mapped[List["BookSnapshot"]] = relationship(back_populates="book")
+    ranking_snapshots: Mapped[List["RankingSnapshot"]] = relationship(back_populates="book")
 ```
 
 #### 3.2.2 书籍快照模型 (BookSnapshot)
@@ -100,17 +102,92 @@ class BookSnapshot(Base):
     
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    book_id: Mapped[int] = mapped_column(Integer)
+    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id"), index=True)
     
     # 统计数据
     favorites: Mapped[int] = mapped_column(Integer, default=0)
     clicks: Mapped[int] = mapped_column(Integer, default=0)
     comments: Mapped[int] = mapped_column(Integer, default=0)
+    recommendations: Mapped[int] = mapped_column(Integer, default=0)
+    word_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
     # 时间戳
     snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
     
     # 关系
     book: Mapped["Book"] = relationship(back_populates="snapshots")
+    
+    # 复合索引
+    __table_args__ = (
+        Index("idx_book_snapshot_time", "book_id", "snapshot_time"),
+    )
+```
+
+#### 3.2.3 榜单模型 (Ranking)
+```python
+class Ranking(Base):
+    __tablename__ = "rankings"
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ranking_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    
+    # 基本信息
+    name: Mapped[str] = mapped_column(String(100), index=True)
+    page_id: Mapped[str] = mapped_column(String(50), index=True)
+    url: Mapped[str] = mapped_column(String(500))
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    # 配置信息
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    crawl_frequency: Mapped[int] = mapped_column(Integer, default=60)  # 分钟
+    last_crawl_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # 时间戳
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # 关系
+    ranking_snapshots: Mapped[List["RankingSnapshot"]] = relationship(back_populates="ranking")
+    
+    # 索引
+    __table_args__ = (
+        Index("idx_ranking_page_id", "page_id"),
+        Index("idx_ranking_category", "category"),
+        Index("idx_ranking_active", "is_active"),
+    )
+```
+
+#### 3.2.4 榜单快照模型 (RankingSnapshot)
+```python
+class RankingSnapshot(Base):
+    __tablename__ = "ranking_snapshots"
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ranking_id: Mapped[int] = mapped_column(Integer, ForeignKey("rankings.id"), index=True)
+    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id"), index=True)
+    
+    # 排名信息
+    position: Mapped[int] = mapped_column(Integer, index=True)
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    
+    # 时间戳
+    snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    
+    # 关系
+    ranking: Mapped["Ranking"] = relationship(back_populates="ranking_snapshots")
+    book: Mapped["Book"] = relationship(back_populates="ranking_snapshots")
+    
+    # 复合索引
+    __table_args__ = (
+        Index("idx_ranking_snapshot_time", "ranking_id", "snapshot_time"),
+        Index("idx_ranking_snapshot_position", "ranking_id", "position", "snapshot_time"),
+        Index("idx_book_ranking_snapshot", "book_id", "ranking_id", "snapshot_time"),
+        UniqueConstraint("ranking_id", "book_id", "snapshot_time", name="uq_ranking_book_snapshot"),
+    )
 ```
 
 ### 3.3 API层设计
