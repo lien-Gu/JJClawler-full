@@ -16,7 +16,7 @@ from ..models.ranking import (
     BookInRanking
 )
 from ..models.base import DataResponse, ListResponse
-from ..database.db.base import get_db
+from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
 
 router = APIRouter()

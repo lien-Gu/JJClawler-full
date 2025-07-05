@@ -2,12 +2,12 @@
 书籍相关API接口
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..database.db.base import get_db
+from ..database.connection import get_db
 from ..database.service.book_service import BookService
 from ..database.service.ranking_service import RankingService
 from ..models.base import DataResponse, ListResponse

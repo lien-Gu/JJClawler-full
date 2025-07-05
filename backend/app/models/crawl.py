@@ -15,6 +15,12 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+class CrawlTaskRequest(BaseModel):
+    """爬虫任务请求"""
+    page_ids: Optional[List[str]] = Field(None, description="指定要爬取的页面ID列表")
+    force: bool = Field(False, description="是否强制爬取（忽略间隔限制）")
+    
+
 class CrawlTaskResponse(BaseModel):
     """爬虫任务响应"""
     task_id: str = Field(..., description="任务ID")
