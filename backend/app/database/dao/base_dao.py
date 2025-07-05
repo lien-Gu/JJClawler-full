@@ -25,7 +25,7 @@ class BaseDAO(Generic[ModelType]):
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+    def get_by_id(self, db: Session, id: Any) -> Optional[ModelType]:
         """根据ID获取对象"""
         return db.get(self.model, id)
 

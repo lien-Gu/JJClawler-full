@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import DateTime, Integer, String, Boolean, Float, ForeignKey, Index, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Integer, String, ForeignKey, Index
+from sqlalchemy.orm import mapped_column, relationship, Mapped
 
 from .base import Base
 
@@ -22,9 +22,8 @@ class Book(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # 关系
-    snapshots: Mapped[List["BookSnapshot"]] = relationship(back_populates="book", cascade="all, delete-orphan")
-    ranking_snapshots: Mapped[List["RankingSnapshot"]] = relationship(back_populates="book",
-                                                                      cascade="all, delete-orphan")
+    snapshots: Mapped[List["BookSnapshot"]] = relationship("BookSnapshot", back_populates="book", cascade="all, delete-orphan")
+    ranking_snapshots: Mapped[List["RankingSnapshot"]] = relationship("RankingSnapshot", back_populates="book", cascade="all, delete-orphan")
 
 
 class BookSnapshot(Base):
@@ -47,7 +46,7 @@ class BookSnapshot(Base):
     snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
     # 关系
-    book: Mapped["Book"] = relationship(back_populates="snapshots")
+    book: Mapped["Book"] = relationship("Book", back_populates="snapshots")
 
     # 复合索引
     __table_args__ = (

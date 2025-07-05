@@ -336,7 +336,7 @@ class TestCrawler:
         mock_response.text = "<html><body>Test</body></html>"
         
         with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
+            mock_client.return_value.__aenter__.return_value.get_by_id.return_value = mock_response
             
             # 执行带代理的爬取
             result = await self.crawler.crawl_page("https://example.com", proxy=proxy_url)

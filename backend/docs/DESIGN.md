@@ -200,83 +200,91 @@ class RankingSnapshot(Base):
 - **权限控制**：预留权限验证扩展点
 
 #### 3.3.1 书籍API (books.py)
+
 ```python
-@router.get("/", response_model=List[BookResponse])
+@router.get_by_id("/", response_model=List[BookResponse])
 async def get_books(
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    tag: Optional[str] = None,
-    status: Optional[str] = None,
-    db: Session = Depends(get_db)
+        page: int = Query(1, ge=1),
+        size: int = Query(20, ge=1, le=100),
+        tag: Optional[str] = None,
+        status: Optional[str] = None,
+        db: Session = Depends(get_db)
 ):
     """获取书籍列表"""
     pass
 
-@router.get("/{novel_id}", response_model=BookDetailResponse)
+
+@router.get_by_id("/{novel_id}", response_model=BookDetailResponse)
 async def get_book_detail(
-    novel_id: int,
-    db: Session = Depends(get_db)
+        novel_id: int,
+        db: Session = Depends(get_db)
 ):
     """获取书籍详情"""
     pass
 
-@router.get("/{novel_id}/trend", response_model=BookTrendResponse)
+
+@router.get_by_id("/{novel_id}/trend", response_model=BookTrendResponse)
 async def get_book_trend(
-    novel_id: int,
-    days: int = Query(7, ge=1, le=365),
-    db: Session = Depends(get_db)
+        novel_id: int,
+        days: int = Query(7, ge=1, le=365),
+        db: Session = Depends(get_db)
 ):
     """获取书籍趋势数据"""
     pass
 
-@router.get("/search", response_model=List[BookResponse])
+
+@router.get_by_id("/search", response_model=List[BookResponse])
 async def search_books(
-    keyword: str = Query(..., min_length=1),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+        keyword: str = Query(..., min_length=1),
+        page: int = Query(1, ge=1),
+        size: int = Query(20, ge=1, le=100),
+        db: Session = Depends(get_db)
 ):
     """搜索书籍"""
     pass
 ```
 
 #### 3.3.2 榜单API (rankings.py)
+
 ```python
-@router.get("/", response_model=List[RankingResponse])
+@router.get_by_id("/", response_model=List[RankingResponse])
 async def get_rankings(
-    type: Optional[str] = None,
-    active_only: bool = True,
-    db: Session = Depends(get_db)
+        type: Optional[str] = None,
+        active_only: bool = True,
+        db: Session = Depends(get_db)
 ):
     """获取榜单列表"""
     pass
 
-@router.get("/{page_id}", response_model=List[RankingResponse])
+
+@router.get_by_id("/{page_id}", response_model=List[RankingResponse])
 async def get_rankings_onpage(
-    page_id: str,
-    type: Optional[str] = None,
-    active_only: bool = True,
-    db: Session = Depends(get_db)
+        page_id: str,
+        type: Optional[str] = None,
+        active_only: bool = True,
+        db: Session = Depends(get_db)
 ):
     """获取榜单列表"""
     pass
 
-@router.get("/{ranking_id}", response_model=RankingDetailResponse)
+
+@router.get_by_id("/{ranking_id}", response_model=RankingDetailResponse)
 async def get_ranking_detail(
-    ranking_id: int,
-    date: Optional[date] = None,
-    limit: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+        ranking_id: int,
+        date: Optional[date] = None,
+        limit: int = Query(50, ge=1, le=200),
+        db: Session = Depends(get_db)
 ):
     """获取榜单详情"""
     pass
 
-@router.get("/{ranking_id}/trend", response_model=List[RankingHistoryResponse])
+
+@router.get_by_id("/{ranking_id}/trend", response_model=List[RankingHistoryResponse])
 async def get_ranking_history(
-    ranking_id: int,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    db: Session = Depends(get_db)
+        ranking_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        db: Session = Depends(get_db)
 ):
     """获取榜单历史数据"""
     pass
@@ -674,23 +682,28 @@ class TaskInfo:
 ```
 
 #### 3.4.5 爬虫错误处理与重试机制
+
 ```python
 # 爬虫专用异常
 class CrawlerException(Exception):
     """爬虫基础异常"""
     pass
 
+
 class NetworkException(CrawlerException):
     """网络异常"""
     pass
+
 
 class ParsingException(CrawlerException):
     """解析异常"""
     pass
 
+
 class RateLimitException(CrawlerException):
     """频率限制异常"""
     pass
+
 
 # 重试策略
 @retry(
@@ -701,15 +714,15 @@ class RateLimitException(CrawlerException):
 async def crawl_with_retry(url: str, headers: dict) -> str:
     """带重试的爬取函数"""
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, timeout=30)
-        
+        response = await client.get_by_id(url, headers=headers, timeout=30)
+
         if response.status_code == 429:  # 频率限制
             raise RateLimitException("请求频率过高")
         elif response.status_code >= 500:  # 服务器错误
             raise NetworkException(f"服务器错误: {response.status_code}")
         elif response.status_code != 200:
             raise NetworkException(f"HTTP错误: {response.status_code}")
-        
+
         return response.text
 ```
 

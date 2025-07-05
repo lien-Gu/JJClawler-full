@@ -64,7 +64,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试API调用
-        response = client.get("/api/v1/books")
+        response = client.get_by_id("/api/v1/books")
         assert response.status_code == 200
         
         books_data = response.json()
@@ -103,7 +103,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试API调用
-        response = client.get(f"/api/v1/books/{sample_book_data['novel_id']}")
+        response = client.get_by_id(f"/api/v1/books/{sample_book_data['novel_id']}")
         assert response.status_code == 200
         
         book_detail = response.json()
@@ -134,7 +134,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试搜索功能
-        response = client.get("/api/v1/books/search?keyword=测试小说")
+        response = client.get_by_id("/api/v1/books/search?keyword=测试小说")
         assert response.status_code == 200
         
         search_results = response.json()
@@ -175,7 +175,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试API调用
-        response = client.get("/api/v1/rankings")
+        response = client.get_by_id("/api/v1/rankings")
         assert response.status_code == 200
         
         rankings_data = response.json()
@@ -235,7 +235,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试API调用
-        response = client.get(f"/api/v1/rankings/{test_ranking.id}")
+        response = client.get_by_id(f"/api/v1/rankings/{test_ranking.id}")
         assert response.status_code == 200
         
         ranking_detail = response.json()
@@ -293,7 +293,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试趋势API
-        response = client.get(f"/api/v1/books/{sample_book_data['novel_id']}/trend?days=7")
+        response = client.get_by_id(f"/api/v1/books/{sample_book_data['novel_id']}/trend?days=7")
         assert response.status_code == 200
         
         trend_data = response.json()
@@ -328,7 +328,7 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 测试第一页
-        response = client.get("/api/v1/books?page=1&size=10")
+        response = client.get_by_id("/api/v1/books?page=1&size=10")
         assert response.status_code == 200
         
         page_data = response.json()
@@ -345,7 +345,7 @@ class TestAPIDBIntegration:
         assert page_data["pages"] == 3
         
         # 测试第二页
-        response = client.get("/api/v1/books?page=2&size=10")
+        response = client.get_by_id("/api/v1/books?page=2&size=10")
         assert response.status_code == 200
         
         page_data = response.json()
@@ -353,7 +353,7 @@ class TestAPIDBIntegration:
         assert page_data["page"] == 2
         
         # 测试最后一页
-        response = client.get("/api/v1/books?page=3&size=10")
+        response = client.get_by_id("/api/v1/books?page=3&size=10")
         assert response.status_code == 200
         
         page_data = response.json()
@@ -365,7 +365,7 @@ class TestAPIDBIntegration:
     def test_api_error_handling_with_database(self, client, test_db):
         """测试API错误处理与数据库的集成"""
         # 测试获取不存在的书籍
-        response = client.get("/api/v1/books/999999")
+        response = client.get_by_id("/api/v1/books/999999")
         assert response.status_code == 404
         
         error_data = response.json()
@@ -373,11 +373,11 @@ class TestAPIDBIntegration:
         assert "not found" in error_data["detail"].lower()
         
         # 测试获取不存在的榜单
-        response = client.get("/api/v1/rankings/999999")
+        response = client.get_by_id("/api/v1/rankings/999999")
         assert response.status_code == 404
         
         # 测试无效的搜索参数
-        response = client.get("/api/v1/books/search?keyword=")
+        response = client.get_by_id("/api/v1/books/search?keyword=")
         assert response.status_code == 422  # 或者其他适当的错误码
     
     def test_concurrent_api_calls_with_database(self, client, test_db, sample_book_data):
@@ -408,7 +408,7 @@ class TestAPIDBIntegration:
         
         def make_api_call():
             try:
-                response = client.get(f"/api/v1/books/{sample_book_data['novel_id']}")
+                response = client.get_by_id(f"/api/v1/books/{sample_book_data['novel_id']}")
                 results.append(response.status_code)
             except Exception as e:
                 errors.append(str(e))
@@ -468,8 +468,8 @@ class TestAPIDBIntegration:
         db.commit()
         
         # 从不同API获取同一书籍信息
-        book_response = client.get(f"/api/v1/books/{sample_book_data['novel_id']}")
-        ranking_response = client.get(f"/api/v1/rankings/{test_ranking.id}")
+        book_response = client.get_by_id(f"/api/v1/books/{sample_book_data['novel_id']}")
+        ranking_response = client.get_by_id(f"/api/v1/rankings/{test_ranking.id}")
         
         assert book_response.status_code == 200
         assert ranking_response.status_code == 200

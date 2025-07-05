@@ -19,7 +19,7 @@ class BookService:
     
     def get_book_by_id(self, db: Session, book_id: int) -> Optional[Book]:
         """根据ID获取书籍"""
-        return self.book_dao.get(db, book_id)
+        return self.book_dao.get_by_id(db, book_id)
     
     def get_book_by_novel_id(self, db: Session, novel_id: int) -> Optional[Book]:
         """根据小说ID获取书籍"""
@@ -59,7 +59,7 @@ class BookService:
         book_id: int
     ) -> Optional[Dict[str, Any]]:
         """获取书籍详情和最新快照数据"""
-        book = self.book_dao.get(db, book_id)
+        book = self.book_dao.get_by_id(db, book_id)
         if not book:
             return None
         
@@ -268,5 +268,5 @@ class BookService:
         """根据ID列表获取书籍"""
         return [
             book for book_id in book_ids 
-            if (book := self.book_dao.get(db, book_id)) is not None
+            if (book := self.book_dao.get_by_id(db, book_id)) is not None
         ]

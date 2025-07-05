@@ -7,8 +7,9 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from app.database.base import Base
-from app.database.models import Book, BookSnapshot, Ranking, RankingSnapshot
+from app.database.db.base import Base
+from app.database.db.book import Book, BookSnapshot
+from app.database.db.ranking import Ranking, RankingSnapshot
 
 
 @pytest.fixture(scope="function")

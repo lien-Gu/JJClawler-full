@@ -4,7 +4,7 @@
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any, Tuple
 
-from sqlalchemy import select, and_, desc, func, distinct
+from sqlalchemy import select, and_, desc, func, distinct, delete
 from sqlalchemy.orm import Session, joinedload
 
 from .base_dao import BaseDAO
@@ -111,7 +111,7 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         if not target_time:
             return []
         
-        return db.scalars(
+        result = db.execute(
             select(RankingSnapshot)
             .options(joinedload(RankingSnapshot.book))
             .where(
@@ -122,7 +122,8 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
             )
             .order_by(RankingSnapshot.position)
             .limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
     
     def get_book_ranking_history(
         self, 
@@ -143,11 +144,12 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         if end_time:
             query = query.where(RankingSnapshot.snapshot_time <= end_time)
         
-        return db.scalars(
+        result = db.execute(
             query.options(joinedload(RankingSnapshot.ranking))
             .order_by(desc(RankingSnapshot.snapshot_time))
             .limit(limit)
-        ).all()
+        )
+        return list(result.scalars())
     
     def get_ranking_statistics(self, db: Session, ranking_id: int) -> Dict[str, Any]:
         """获取榜单统计信息"""
@@ -210,12 +212,13 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
     ) -> int:
         """删除旧快照，保留指定天数的记录"""
         # 获取要保留的快照时间列表
-        keep_times = db.scalars(
+        result = db.execute(
             select(distinct(RankingSnapshot.snapshot_time))
             .where(RankingSnapshot.ranking_id == ranking_id)
             .order_by(desc(RankingSnapshot.snapshot_time))
             .limit(keep_days)
-        ).all()
+        )
+        keep_times = list(result.scalars())
         
         # 删除旧快照
         deleted = db.execute(

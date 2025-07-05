@@ -262,7 +262,7 @@ async def compare_rankings(
         ranking_details = []
         for ranking_info in comparison_result["rankings"]:
             # 获取该榜单的书籍数据
-            ranking_books = comparison_result["ranking_data"].get(ranking_info["ranking_id"], [])
+            ranking_books = comparison_result["ranking_data"].get_by_id(ranking_info["ranking_id"], [])
             books_in_ranking = []
             
             for book_data in ranking_books:

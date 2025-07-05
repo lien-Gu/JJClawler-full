@@ -21,7 +21,7 @@ class RankingService:
     
     def get_ranking_by_id(self, db: Session, ranking_id: int) -> Optional[Ranking]:
         """根据ID获取榜单"""
-        return self.ranking_dao.get(db, ranking_id)
+        return self.ranking_dao.get_by_id(db, ranking_id)
     
     def get_ranking_by_rank_id(self, db: Session, rank_id: int) -> Optional[Ranking]:
         """根据rank_id获取榜单"""
@@ -64,7 +64,7 @@ class RankingService:
         limit: int = 50
     ) -> Optional[Dict[str, Any]]:
         """获取榜单详情"""
-        ranking = self.ranking_dao.get(db, ranking_id)
+        ranking = self.ranking_dao.get_by_id(db, ranking_id)
         if not ranking:
             return None
         
@@ -185,7 +185,7 @@ class RankingService:
             raise ValueError("至少需要2个榜单进行对比")
         
         # 获取榜单基本信息
-        rankings = [self.ranking_dao.get(db, rid) for rid in ranking_ids]
+        rankings = [self.ranking_dao.get_by_id(db, rid) for rid in ranking_ids]
         rankings = [r for r in rankings if r is not None]
         
         if len(rankings) != len(ranking_ids):

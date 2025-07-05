@@ -1,11 +1,9 @@
 """
 数据库基础模型和配置
 """
-from datetime import datetime
-from typing import List, Optional
 
-from sqlalchemy import create_engine, DateTime, Integer, String, Boolean, Float, ForeignKey, Index, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 
 class Base(DeclarativeBase):
