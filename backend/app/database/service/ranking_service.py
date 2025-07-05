@@ -83,7 +83,6 @@ class RankingService:
             book_data = {
                 "book_id": snapshot.book.id,
                 "title": snapshot.book.title,
-                "author": snapshot.book.author,
                 "position": snapshot.position,
                 "score": snapshot.score,
                 "snapshot_time": snapshot.snapshot_time

@@ -107,7 +107,6 @@ async def get_ranking_detail(
             books_in_ranking.append(BookInRanking(
                 book_id=book_data["book_id"],
                 title=book_data["title"],
-                author=book_data["author"],
                 position=book_data["position"],
                 score=book_data["score"],
                 clicks=None,  # 这些数据需要从book_snapshot获取
@@ -172,7 +171,6 @@ async def get_ranking_history(
                 date=trend_point["snapshot_time"].date(),
                 book_id=0,  # 占位符，实际需要更复杂的逻辑
                 title="",
-                author="",
                 position=0,
                 score=None
             ))
@@ -220,7 +218,6 @@ async def get_ranking_stats(
             total_snapshots=stats.get("total_snapshots", 0),
             unique_books=stats.get("unique_books", 0),
             avg_books_per_snapshot=0.0,  # 需要计算
-            most_frequent_author=None,
             most_stable_book=None,
             first_snapshot_time=stats.get("first_snapshot_time"),
             last_snapshot_time=stats.get("last_snapshot_time")
@@ -269,7 +266,6 @@ async def compare_rankings(
                 books_in_ranking.append(BookInRanking(
                     book_id=book_data["book_id"],
                     title=book_data["title"],
-                    author=book_data["author"],
                     position=book_data["position"],
                     score=book_data["score"],
                     clicks=None,
@@ -297,7 +293,6 @@ async def compare_rankings(
             common_books.append(BookInRanking(
                 book_id=book_info["id"],
                 title=book_info["title"],
-                author=book_info["author"],
                 position=0,  # 共同书籍没有位置概念
                 score=None,
                 clicks=None,
@@ -324,90 +319,3 @@ async def compare_rankings(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"榜单对比失败: {str(e)}")
 
-
-@router.get("/trending/books", response_model=ListResponse[dict])
-async def get_trending_books(
-    days: int = Query(7, ge=1, le=30, description="统计天数"),
-    limit: int = Query(20, ge=1, le=100, description="返回数量"),
-    db: Session = Depends(get_db)
-):
-    """
-    获取各榜单趋势书籍
-    
-    分析最近一段时间内在各榜单上升最快的书籍
-    
-    Args:
-        days: 统计最近天数
-        limit: 返回数量
-        
-    Returns:
-        List[dict]: 趋势书籍列表
-    """
-    try:
-        from ..modules.data_service import get_trending_books
-        trending_books = get_trending_books(db, days, limit)
-        
-        # 转换为字典格式
-        result_data = []
-        for trending_book in trending_books:
-            book = trending_book["book"]
-            latest_snapshot = trending_book["latest_snapshot"]
-            
-            result_data.append({
-                "book_id": book.id,
-                "novel_id": book.novel_id,
-                "title": book.title,
-                "author": book.author,
-                "favorites_growth": trending_book["favorites_growth"],
-                "clicks_growth": trending_book["clicks_growth"],
-                "total_growth": trending_book["total_growth"],
-                "current_favorites": latest_snapshot.favorites,
-                "current_clicks": latest_snapshot.clicks
-            })
-        
-        return ListResponse(
-            data=result_data,
-            count=len(result_data),
-            message=f"最近{days}天趋势书籍获取成功"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取趋势书籍失败: {str(e)}")
-
-
-@router.get("/active", response_model=ListResponse[RankingResponse])
-async def get_active_rankings(
-    db: Session = Depends(get_db)
-):
-    """
-    获取所有启用的榜单
-    
-    Returns:
-        List[RankingResponse]: 启用的榜单列表
-    """
-    try:
-        # 获取所有榜单（目前模型中没有is_active字段，返回所有榜单）
-        result = ranking_service.get_all_rankings(db, page=1, size=1000)
-        
-        # 转换为响应模型
-        ranking_responses = []
-        for ranking in result["rankings"]:
-            ranking_responses.append(RankingResponse(
-                ranking_id=ranking.rank_id,
-                name=ranking.name,
-                page_id=ranking.page_id,
-                url="",
-                category=ranking.rank_group_type,
-                description=None,
-                is_active=True,  # 默认都是启用的
-                crawl_frequency=60,
-                last_crawl_time=None,
-                create_time=ranking.created_at
-            ))
-        
-        return ListResponse(
-            data=ranking_responses,
-            count=len(ranking_responses),
-            message="启用榜单列表获取成功"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取启用榜单失败: {str(e)}") 

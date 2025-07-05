@@ -25,7 +25,6 @@ class BookInRanking(BaseModel):
     """榜单中的书籍信息"""
     book_id: int = Field(..., description="书籍ID")
     title: str = Field(..., description="书名")
-    author: str = Field(..., description="作者")
     position: int = Field(..., description="排名位置")
     score: Optional[float] = Field(None, description="得分")
     clicks: Optional[int] = Field(None, description="点击数")
@@ -53,7 +52,6 @@ class RankingHistoryPoint(BaseModel):
     date: Date = Field(..., description="日期")
     book_id: int = Field(..., description="书籍ID")
     title: str = Field(..., description="书名")
-    author: str = Field(..., description="作者")
     position: int = Field(..., description="排名位置")
     score: Optional[float] = Field(None, description="得分")
 
@@ -74,7 +72,6 @@ class RankingStatsResponse(BaseModel):
     total_snapshots: int = Field(0, description="总快照数")
     unique_books: int = Field(0, description="上榜书籍总数")
     avg_books_per_snapshot: float = Field(0.0, description="平均每快照书籍数")
-    most_frequent_author: Optional[str] = Field(None, description="最常上榜作者")
     most_stable_book: Optional[str] = Field(None, description="最稳定上榜书籍")
     first_snapshot_time: Optional[datetime] = Field(None, description="首次快照时间")
     last_snapshot_time: Optional[datetime] = Field(None, description="最新快照时间")
