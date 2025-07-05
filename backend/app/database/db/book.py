@@ -15,7 +15,6 @@ class Book(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     novel_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(200), index=True)
-    author: Mapped[str] = mapped_column(String(100), index=True)
 
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

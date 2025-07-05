@@ -26,6 +26,35 @@ book_service = BookService()
 ranking_service = RankingService()
 
 
+@router.get("/", response_model=ListResponse[BookResponse])
+async def get_books_list(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(20, ge=1, le=100, description="每页数量"),
+    db: Session = Depends(get_db)
+):
+    """
+    获取书籍列表（分页）
+    """
+    try:
+        result = book_service.get_books_with_pagination(db, page, size)
+        
+        # 转换为响应模型
+        book_responses = []
+        for book in result["books"]:
+            book_responses.append(BookResponse(
+                id=book.id,
+                novel_id=book.novel_id,
+                title=book.title
+            ))
+        
+        return ListResponse(
+            data=book_responses,
+            count=len(book_responses),
+            message="获取书籍列表成功"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取书籍列表失败: {str(e)}")
+
 
 @router.get("/search", response_model=ListResponse[BookResponse])
 async def search_books(

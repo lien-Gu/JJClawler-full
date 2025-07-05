@@ -65,53 +65,33 @@ def _create_test_data(db):
     test_books = [
         Book(
             id=1,
-            book_id="12345",
+            novel_id=12345,
             title="测试书籍1",
-            author_id="author1",
-            author_name="测试作者1",
-            novel_class="现代言情",
-            tags="甜文,1v1",
-            first_seen=datetime.now()
+            created_at=datetime.now()
         ),
         Book(
             id=2,
-            book_id="12346",
+            novel_id=12346,
             title="现代言情小说",
-            author_id="author2",
-            author_name="测试作者2",
-            novel_class="现代言情",
-            tags="都市,职场",
-            first_seen=datetime.now()
+            created_at=datetime.now()
         ),
         Book(
             id=3,
-            book_id="12347",
+            novel_id=12347,
             title="古代言情",
-            author_id="author3",
-            author_name="测试作者3",
-            novel_class="古代言情",
-            tags="宫斗,穿越",
-            first_seen=datetime.now()
+            created_at=datetime.now()
         ),
         Book(
             id=4,
-            book_id="12348",
+            novel_id=12348,
             title="玄幻小说",
-            author_id="author1",
-            author_name="测试作者1",
-            novel_class="玄幻",
-            tags="修仙,异世",
-            first_seen=datetime.now()
+            created_at=datetime.now()
         ),
         Book(
             id=5,
-            book_id="12349",
+            novel_id=12349,
             title="科幻小说",
-            author_id="author4",
-            author_name="测试作者4",
-            novel_class="科幻",
-            tags="末世,重生",
-            first_seen=datetime.now()
+            created_at=datetime.now()
         )
     ]
     
@@ -160,8 +140,7 @@ def _create_test_data(db):
                 favorites=500 + i * 50 + day * 5,
                 comments=100 + i * 10 + day * 2,
                 recommendations=50 + i * 5 + day,
-                snapshot_time=snapshot_time,
-                created_at=snapshot_time
+                snapshot_time=snapshot_time
             )
             db.add(snapshot)
     
@@ -180,8 +159,7 @@ def _create_test_data(db):
                     ranking_id=ranking.rank_id,
                     book_id=book_id,
                     position=pos,
-                    snapshot_time=snapshot_time,
-                    created_at=snapshot_time
+                    snapshot_time=snapshot_time
                 )
                 db.add(ranking_snapshot)
     
@@ -194,8 +172,7 @@ def sample_book_data():
     return {
         "id": 1,
         "novel_id": 12345,
-        "title": "测试书籍1",
-        "author": "测试作者1"
+        "title": "测试书籍1"
     }
 
 
@@ -217,20 +194,17 @@ def sample_books_list():
         {
             "id": 1,
             "novel_id": 12345,
-            "title": "测试书籍1",
-            "author": "测试作者1"
+            "title": "测试书籍1"
         },
         {
             "id": 2,
             "novel_id": 12346,
-            "title": "现代言情小说",
-            "author": "测试作者2"
+            "title": "现代言情小说"
         },
         {
             "id": 3,
             "novel_id": 12347,
-            "title": "古代言情",
-            "author": "测试作者3"
+            "title": "古代言情"
         }
     ]
 

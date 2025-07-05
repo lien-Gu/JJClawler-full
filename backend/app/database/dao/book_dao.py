@@ -30,14 +30,6 @@ class BookDAO(BaseDAO[Book]):
         )
         return list(result.scalars())
 
-    def search_by_author(self, db: Session, author: str, limit: int = 20) -> List[Book]:
-        """根据作者搜索书籍"""
-        result = db.execute(
-            select(Book)
-            .where(Book.author.like(f"%{author}%"))
-            .limit(limit)
-        )
-        return list(result.scalars())
 
     def get_all(self, db: Session, skip: int = 0, limit: int = 1000) -> List[Book]:
         """获取所有书籍"""

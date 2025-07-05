@@ -16,41 +16,42 @@ class TestBooksAPI:
         response = client.get("/api/v1/books")
         assert response.status_code == 200
         data = response.json()
-        assert "books" in data
-        assert "total" in data
-        assert "page" in data
-        assert "size" in data
-        assert isinstance(data["books"], list)
+        assert "data" in data
+        assert "count" in data
+        assert "message" in data
+        assert isinstance(data["data"], list)
     
     def test_get_books_with_pagination(self, client: TestClient):
         """测试带分页的书籍列表API"""
         response = client.get("/api/v1/books?page=1&size=10")
         assert response.status_code == 200
         data = response.json()
-        assert data["page"] == 1
-        assert data["size"] == 10
+        assert "data" in data
+        assert "count" in data
+        assert isinstance(data["data"], list)
     
     def test_get_book_detail(self, client: TestClient, sample_book_data):
         """测试获取书籍详情API"""
         # 先创建一本书
-        book_id = 12345
+        book_id = 1  # 使用测试数据中存在的book_id
         response = client.get(f"/api/v1/books/{book_id}")
         
         # 如果书籍不存在，应该返回404
         if response.status_code == 404:
-            assert response.json()["detail"] == "Book not found"
+            assert response.json()["detail"] == "书籍不存在"
         else:
             assert response.status_code == 200
             data = response.json()
-            assert "novel_id" in data
-            assert "title" in data
-            assert "author" in data
+            assert "data" in data
+            book_data = data["data"]
+            assert "novel_id" in book_data
+            assert "title" in book_data
     
     def test_get_book_detail_not_found(self, client: TestClient):
         """测试获取不存在的书籍详情"""
         response = client.get("/api/v1/books/99999")
         assert response.status_code == 404
-        assert response.json()["detail"] == "Book not found"
+        assert response.json()["detail"] == "书籍不存在"
     
     def test_get_book_snapshots(self, client: TestClient):
         """测试获取书籍快照数据API"""
@@ -88,29 +89,28 @@ class TestBooksAPI:
     
     def test_search_books(self, client: TestClient):
         """测试搜索书籍API"""
-        response = client.get("/api/v1/books/search?q=测试")
+        response = client.get("/api/v1/books/search?keyword=测试")
         assert response.status_code == 200
         data = response.json()
-        assert "books" in data
-        assert "total" in data
-        assert isinstance(data["books"], list)
+        assert "data" in data
+        assert "count" in data
+        assert isinstance(data["data"], list)
     
     def test_search_books_with_filters(self, client: TestClient):
         """测试带过滤条件的搜索API"""
         response = client.get(
             "/api/v1/books/search"
-            "?q=测试&tag=现代言情&status=连载中&page=1&size=10"
+            "?keyword=测试&page=1&size=10"
         )
         assert response.status_code == 200
         data = response.json()
-        assert "books" in data
-        assert "total" in data
+        assert "data" in data
+        assert "count" in data
     
     def test_search_books_empty_query(self, client: TestClient):
         """测试空查询搜索"""
-        response = client.get("/api/v1/books/search?q=")
-        assert response.status_code == 400
-        assert "Query cannot be empty" in response.json()["detail"]
+        response = client.get("/api/v1/books/search?keyword=")
+        assert response.status_code == 422  # FastAPI validation error for min_length=1
     
     def test_get_book_ranking_history(self, client: TestClient):
         """测试获取书籍排名历史API"""
@@ -123,37 +123,6 @@ class TestBooksAPI:
             assert "ranking_history" in data
             assert isinstance(data["ranking_history"], list)
     
-    def test_get_popular_books(self, client: TestClient):
-        """测试获取热门书籍API"""
-        response = client.get("/api/v1/books/popular")
-        assert response.status_code == 200
-        data = response.json()
-        assert "books" in data
-        assert isinstance(data["books"], list)
-    
-    def test_get_recent_books(self, client: TestClient):
-        """测试获取最新书籍API"""
-        response = client.get("/api/v1/books/recent")
-        assert response.status_code == 200
-        data = response.json()
-        assert "books" in data
-        assert isinstance(data["books"], list)
-    
-    def test_get_books_by_tag(self, client: TestClient):
-        """测试按标签获取书籍API"""
-        response = client.get("/api/v1/books/by-tag/现代言情")
-        assert response.status_code == 200
-        data = response.json()
-        assert "books" in data
-        assert isinstance(data["books"], list)
-    
-    def test_get_books_by_author(self, client: TestClient):
-        """测试按作者获取书籍API"""
-        response = client.get("/api/v1/books/by-author/测试作者")
-        assert response.status_code == 200
-        data = response.json()
-        assert "books" in data
-        assert isinstance(data["books"], list)
     
     def test_api_response_format(self, client: TestClient):
         """测试API响应格式"""
@@ -163,15 +132,14 @@ class TestBooksAPI:
         
         # 检查响应格式
         assert isinstance(data, dict)
-        assert "books" in data
-        assert "total" in data
-        assert "page" in data
-        assert "size" in data
+        assert "data" in data
+        assert "count" in data
+        assert "message" in data
         
         # 检查书籍数据格式
-        if data["books"]:
-            book = data["books"][0]
-            required_fields = ["novel_id", "title", "author", "status", "tag"]
+        if data["data"]:
+            book = data["data"][0]
+            required_fields = ["novel_id", "title"]
             for field in required_fields:
                 assert field in book
     

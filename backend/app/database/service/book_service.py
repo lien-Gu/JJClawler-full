@@ -35,23 +35,34 @@ class BookService:
         """搜索书籍"""
         skip = (page - 1) * size
         
-        # 先按标题搜索
-        books_by_title = self.book_dao.search_by_title(db, keyword, limit=size)
+        # 按标题搜索
+        books = self.book_dao.search_by_title(db, keyword, limit=size + skip)
         
-        # 如果结果不够，再按作者搜索
-        if len(books_by_title) < size:
-            remaining = size - len(books_by_title)
-            books_by_author = self.book_dao.search_by_author(db, keyword, limit=remaining)
-            
-            # 合并结果，去重
-            book_ids = {book.id for book in books_by_title}
-            for book in books_by_author:
-                if book.id not in book_ids:
-                    books_by_title.append(book)
-                    if len(books_by_title) >= size:
-                        break
+        return books[skip:skip + size]
+    
+    def get_books_with_pagination(
+        self, 
+        db: Session, 
+        page: int = 1, 
+        size: int = 20
+    ) -> Dict[str, Any]:
+        """获取书籍列表（分页）"""
+        skip = (page - 1) * size
         
-        return books_by_title[skip:skip + size]
+        # 获取总数
+        total_books = self.book_dao.get_all(db, skip=0, limit=10000)
+        total = len(total_books)
+        
+        # 获取分页数据
+        books = self.book_dao.get_all(db, skip=skip, limit=size)
+        
+        return {
+            "books": books,
+            "total": total,
+            "page": page,
+            "size": size,
+            "total_pages": (total + size - 1) // size
+        }
     
     def get_book_detail_with_latest_snapshot(
         self, 
