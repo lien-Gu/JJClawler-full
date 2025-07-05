@@ -1,21 +1,23 @@
 """
 书籍相关API接口
 """
-from typing import List, Optional
-from datetime import date as Date, datetime, timedelta
-from fastapi import APIRouter, Query, Depends, HTTPException, BackgroundTasks
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..database.db.base import get_db
+from ..database.service.book_service import BookService
+from ..database.service.ranking_service import RankingService
+from ..models.base import DataResponse, ListResponse
 from ..models.book import (
-    BookResponse, 
-    BookDetailResponse, 
+    BookResponse,
+    BookDetailResponse,
     BookTrendPoint,
+    BookTrendAggregatedPoint,
     BookRankingHistoryResponse
 )
-from ..models.base import DataResponse, ListResponse
-from ..database.base import get_db
-from ..modules.service.book_service import BookService
-from ..modules.service.ranking_service import RankingService
 
 router = APIRouter()
 
@@ -110,7 +112,7 @@ async def get_book_trend(
     db: Session = Depends(get_db)
 ):
     """
-    获取书籍数据趋势
+    获取书籍数据趋势（原始快照数据）
     
     Args:
         book_id: 书籍ID
@@ -148,6 +150,245 @@ async def get_book_trend(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取趋势数据失败: {str(e)}")
+
+
+@router.get("/{book_id}/trend/hourly", response_model=ListResponse[BookTrendAggregatedPoint])
+async def get_book_trend_hourly(
+    book_id: int,
+    hours: int = Query(24, ge=1, le=168, description="统计小时数，最多1周"),
+    db: Session = Depends(get_db)
+):
+    """
+    按小时获取书籍聚合趋势数据
+    
+    Args:
+        book_id: 书籍ID
+        hours: 统计小时数
+        
+    Returns:
+        按小时聚合的趋势数据
+    """
+    try:
+        # 检查书籍是否存在
+        book = book_service.get_book_by_id(db, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取小时级趋势数据
+        trend_data = book_service.get_book_trend_hourly(db, book_id, hours)
+        
+        # 转换为响应模型
+        trend_points = _convert_to_aggregated_points(trend_data)
+        
+        return ListResponse(
+            data=trend_points,
+            count=len(trend_points),
+            message=f"获取{hours}小时的趋势数据成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取小时趋势数据失败: {str(e)}")
+
+
+@router.get("/{book_id}/trend/daily", response_model=ListResponse[BookTrendAggregatedPoint])
+async def get_book_trend_daily(
+    book_id: int,
+    days: int = Query(7, ge=1, le=90, description="统计天数，最多90天"),
+    db: Session = Depends(get_db)
+):
+    """
+    按天获取书籍聚合趋势数据
+    
+    Args:
+        book_id: 书籍ID
+        days: 统计天数
+        
+    Returns:
+        按天聚合的趋势数据
+    """
+    try:
+        # 检查书籍是否存在
+        book = book_service.get_book_by_id(db, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取日级趋势数据
+        trend_data = book_service.get_book_trend_daily(db, book_id, days)
+        
+        # 转换为响应模型
+        trend_points = _convert_to_aggregated_points(trend_data)
+        
+        return ListResponse(
+            data=trend_points,
+            count=len(trend_points),
+            message=f"获取{days}天的趋势数据成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取日趋势数据失败: {str(e)}")
+
+
+@router.get("/{book_id}/trend/weekly", response_model=ListResponse[BookTrendAggregatedPoint])
+async def get_book_trend_weekly(
+    book_id: int,
+    weeks: int = Query(4, ge=1, le=52, description="统计周数，最多52周"),
+    db: Session = Depends(get_db)
+):
+    """
+    按周获取书籍聚合趋势数据
+    
+    Args:
+        book_id: 书籍ID
+        weeks: 统计周数
+        
+    Returns:
+        按周聚合的趋势数据
+    """
+    try:
+        # 检查书籍是否存在
+        book = book_service.get_book_by_id(db, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取周级趋势数据
+        trend_data = book_service.get_book_trend_weekly(db, book_id, weeks)
+        
+        # 转换为响应模型
+        trend_points = _convert_to_aggregated_points(trend_data)
+        
+        return ListResponse(
+            data=trend_points,
+            count=len(trend_points),
+            message=f"获取{weeks}周的趋势数据成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取周趋势数据失败: {str(e)}")
+
+
+@router.get("/{book_id}/trend/monthly", response_model=ListResponse[BookTrendAggregatedPoint])
+async def get_book_trend_monthly(
+    book_id: int,
+    months: int = Query(3, ge=1, le=24, description="统计月数，最多24个月"),
+    db: Session = Depends(get_db)
+):
+    """
+    按月获取书籍聚合趋势数据
+    
+    Args:
+        book_id: 书籍ID
+        months: 统计月数
+        
+    Returns:
+        按月聚合的趋势数据
+    """
+    try:
+        # 检查书籍是否存在
+        book = book_service.get_book_by_id(db, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取月级趋势数据
+        trend_data = book_service.get_book_trend_monthly(db, book_id, months)
+        
+        # 转换为响应模型
+        trend_points = _convert_to_aggregated_points(trend_data)
+        
+        return ListResponse(
+            data=trend_points,
+            count=len(trend_points),
+            message=f"获取{months}个月的趋势数据成功"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取月趋势数据失败: {str(e)}")
+
+
+@router.get("/{book_id}/trend/aggregated", response_model=ListResponse[BookTrendAggregatedPoint])
+async def get_book_trend_aggregated(
+    book_id: int,
+    period_count: int = Query(7, ge=1, le=365, description="统计周期数"),
+    interval: str = Query("day", regex="^(hour|day|week|month)$", description="时间间隔：hour/day/week/month"),
+    db: Session = Depends(get_db)
+):
+    """
+    按指定时间间隔获取书籍聚合趋势数据（通用接口）
+    
+    Args:
+        book_id: 书籍ID
+        period_count: 统计周期数（对应interval的数量）
+        interval: 时间间隔
+            - hour: 按小时聚合
+            - day: 按天聚合  
+            - week: 按周聚合
+            - month: 按月聚合
+        
+    Returns:
+        聚合后的趋势数据，包含平均值、最大值、最小值等统计信息
+    """
+    try:
+        # 检查书籍是否存在
+        book = book_service.get_book_by_id(db, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="书籍不存在")
+        
+        # 获取聚合趋势数据
+        trend_data = book_service.get_book_trend_with_interval(db, book_id, period_count, interval)
+        
+        # 转换为响应模型
+        trend_points = _convert_to_aggregated_points(trend_data)
+        
+        interval_desc = {
+            "hour": "小时",
+            "day": "天", 
+            "week": "周",
+            "month": "月"
+        }
+        
+        return ListResponse(
+            data=trend_points,
+            count=len(trend_points),
+            message=f"获取{period_count}个{interval_desc[interval]}的聚合趋势数据成功"
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取聚合趋势数据失败: {str(e)}")
+
+
+def _convert_to_aggregated_points(trend_data: List[Dict[str, Any]]) -> List[BookTrendAggregatedPoint]:
+    """
+    将趋势数据转换为响应模型
+    
+    Args:
+        trend_data: 原始趋势数据
+        
+    Returns:
+        List[BookTrendAggregatedPoint]: 响应模型列表
+    """
+    trend_points = []
+    for data_point in trend_data:
+        trend_points.append(BookTrendAggregatedPoint(
+            time_period=data_point["time_period"],
+            avg_favorites=data_point["avg_favorites"],
+            avg_clicks=data_point["avg_clicks"],
+            avg_comments=data_point["avg_comments"],
+            avg_recommendations=data_point["avg_recommendations"],
+            max_favorites=data_point["max_favorites"],
+            max_clicks=data_point["max_clicks"],
+            min_favorites=data_point["min_favorites"],
+            min_clicks=data_point["min_clicks"],
+            snapshot_count=data_point["snapshot_count"],
+            period_start=data_point["period_start"],
+            period_end=data_point["period_end"]
+        ))
+    return trend_points
 
 
 @router.get("/{book_id}/rankings", response_model=DataResponse[BookRankingHistoryResponse])

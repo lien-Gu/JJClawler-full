@@ -77,11 +77,138 @@ class BookService:
         book_id: int, 
         days: int = 7
     ) -> List[BookSnapshot]:
-        """获取书籍趋势数据"""
+        """获取书籍趋势数据（原始快照数据）"""
         start_time = datetime.now() - timedelta(days=days)
         return self.book_snapshot_dao.get_trend_by_book_id(
             db, book_id, start_time=start_time, limit=days * 24  # 假设每小时一个快照
         )
+
+    def get_book_trend_hourly(
+        self,
+        db: Session,
+        book_id: int,
+        hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """
+        按小时获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            hours: 统计小时数
+            
+        Returns:
+            List[Dict]: 按小时聚合的趋势数据
+        """
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=hours)
+        
+        return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
+            db, book_id, start_time, end_time, "hour"
+        )
+
+    def get_book_trend_daily(
+        self,
+        db: Session,
+        book_id: int,
+        days: int = 7
+    ) -> List[Dict[str, Any]]:
+        """
+        按天获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            days: 统计天数
+            
+        Returns:
+            List[Dict]: 按天聚合的趋势数据
+        """
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=days)
+        
+        return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
+            db, book_id, start_time, end_time, "day"
+        )
+
+    def get_book_trend_weekly(
+        self,
+        db: Session,
+        book_id: int,
+        weeks: int = 4
+    ) -> List[Dict[str, Any]]:
+        """
+        按周获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            weeks: 统计周数
+            
+        Returns:
+            List[Dict]: 按周聚合的趋势数据
+        """
+        end_time = datetime.now()
+        start_time = end_time - timedelta(weeks=weeks)
+        
+        return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
+            db, book_id, start_time, end_time, "week"
+        )
+
+    def get_book_trend_monthly(
+        self,
+        db: Session,
+        book_id: int,
+        months: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        按月获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            months: 统计月数
+            
+        Returns:
+            List[Dict]: 按月聚合的趋势数据
+        """
+        end_time = datetime.now()
+        # 使用更精确的月份计算
+        start_time = end_time - timedelta(days=months * 30)  # 近似计算
+        
+        return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
+            db, book_id, start_time, end_time, "month"
+        )
+
+    def get_book_trend_with_interval(
+        self,
+        db: Session,
+        book_id: int,
+        period_count: int = 7,
+        interval: str = "day"
+    ) -> List[Dict[str, Any]]:
+        """
+        按指定时间间隔获取书籍趋势数据（统一入口函数）
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            period_count: 时间周期数量
+            interval: 时间间隔 ('hour', 'day', 'week', 'month')
+            
+        Returns:
+            List[Dict]: 按时间间隔聚合的趋势数据
+        """
+        if interval == "hour":
+            return self.get_book_trend_hourly(db, book_id, period_count)
+        elif interval == "day":
+            return self.get_book_trend_daily(db, book_id, period_count)
+        elif interval == "week":
+            return self.get_book_trend_weekly(db, book_id, period_count)
+        elif interval == "month":
+            return self.get_book_trend_monthly(db, book_id, period_count)
+        else:
+            raise ValueError(f"不支持的时间间隔: {interval}")
     
     def create_or_update_book(self, db: Session, book_data: Dict[str, Any]) -> Book:
         """创建或更新书籍"""

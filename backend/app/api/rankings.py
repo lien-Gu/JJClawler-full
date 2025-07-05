@@ -15,17 +15,14 @@ from ..models.ranking import (
     RankingCompareResponse,
     BookInRanking
 )
-from ..models.base import PaginatedResponse, DataResponse, ListResponse
-from ..database.base import get_db
-from ..modules.service.ranking_service import RankingService
-from ..modules.service.data_service import DataService
+from ..models.base import DataResponse, ListResponse
+from ..database.db.base import get_db
+from ..database.service.ranking_service import RankingService
 
 router = APIRouter()
 
 # 初始化服务
 ranking_service = RankingService()
-data_service = DataService()
-
 
 @router.get("/", response_model=ListResponse[RankingResponse])
 async def get_rankings(
@@ -347,7 +344,8 @@ async def get_trending_books(
         List[dict]: 趋势书籍列表
     """
     try:
-        trending_books = data_service.get_trending_books(db, days, limit)
+        from ..modules.data_service import get_trending_books
+        trending_books = get_trending_books(db, days, limit)
         
         # 转换为字典格式
         result_data = []

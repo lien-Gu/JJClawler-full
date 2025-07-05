@@ -4,7 +4,7 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from sqlalchemy import select, and_, desc, func
+from sqlalchemy import select, and_, desc, func, delete
 from sqlalchemy.orm import Session, joinedload
 
 from .base_dao import BaseDAO
@@ -36,6 +36,16 @@ class BookDAO(BaseDAO[Book]):
             select(Book)
             .where(Book.author.like(f"%{author}%"))
             .limit(limit)
+        )
+        return list(result.scalars())
+
+    def get_all(self, db: Session, skip: int = 0, limit: int = 1000) -> List[Book]:
+        """获取所有书籍"""
+        result = db.execute(
+            select(Book)
+            .offset(skip)
+            .limit(limit)
+            .order_by(desc(Book.created_at))
         )
         return list(result.scalars())
 
@@ -90,6 +100,195 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             query.order_by(desc(BookSnapshot.snapshot_time)).limit(limit)
         )
         return list(result.scalars())
+
+    def _execute_trend_query(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime,
+            time_group: str
+    ) -> List[Dict[str, Any]]:
+        """
+        执行趋势数据查询的通用方法
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            time_group: 时间分组表达式
+            
+        Returns:
+            List[Dict]: 聚合后的趋势数据
+        """
+        from sqlalchemy import text
+        query = text(f"""
+            SELECT 
+                {time_group} as time_period,
+                AVG(favorites) as avg_favorites,
+                AVG(clicks) as avg_clicks,
+                AVG(comments) as avg_comments,
+                AVG(recommendations) as avg_recommendations,
+                MAX(favorites) as max_favorites,
+                MAX(clicks) as max_clicks,
+                MIN(favorites) as min_favorites,
+                MIN(clicks) as min_clicks,
+                COUNT(*) as snapshot_count,
+                MIN(snapshot_time) as period_start,
+                MAX(snapshot_time) as period_end
+            FROM BookSnapshot
+            WHERE book_id = :book_id 
+                AND snapshot_time >= :start_time 
+                AND snapshot_time <= :end_time
+            GROUP BY {time_group}
+            ORDER BY period_start DESC
+        """)
+
+        result = db.execute(query, {
+            "book_id": book_id,
+            "start_time": start_time,
+            "end_time": end_time
+        })
+
+        trend_data = []
+        for row in result:
+            trend_data.append({
+                "time_period": row.time_period,
+                "avg_favorites": round(row.avg_favorites or 0, 2),
+                "avg_clicks": round(row.avg_clicks or 0, 2),
+                "avg_comments": round(row.avg_comments or 0, 2),
+                "avg_recommendations": round(row.avg_recommendations or 0, 2),
+                "max_favorites": row.max_favorites or 0,
+                "max_clicks": row.max_clicks or 0,
+                "min_favorites": row.min_favorites or 0,
+                "min_clicks": row.min_clicks or 0,
+                "snapshot_count": row.snapshot_count,
+                "period_start": row.period_start,
+                "period_end": row.period_end
+            })
+
+        return trend_data
+
+    def get_hourly_trend_by_book_id(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        按小时获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            
+        Returns:
+            List[Dict]: 按小时聚合的趋势数据
+        """
+        time_group = "strftime('%Y-%m-%d %H', BookSnapshot.snapshot_time)"
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
+
+    def get_daily_trend_by_book_id(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        按天获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            
+        Returns:
+            List[Dict]: 按天聚合的趋势数据
+        """
+        time_group = "strftime('%Y-%m-%d', BookSnapshot.snapshot_time)"
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
+
+    def get_weekly_trend_by_book_id(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        按周获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            
+        Returns:
+            List[Dict]: 按周聚合的趋势数据
+        """
+        time_group = "strftime('%Y-W%W', BookSnapshot.snapshot_time)"
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
+
+    def get_monthly_trend_by_book_id(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime
+    ) -> List[Dict[str, Any]]:
+        """
+        按月获取书籍趋势数据
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            
+        Returns:
+            List[Dict]: 按月聚合的趋势数据
+        """
+        time_group = "strftime('%Y-%m', BookSnapshot.snapshot_time)"
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
+
+    def get_trend_by_book_id_with_interval(
+            self,
+            db: Session,
+            book_id: int,
+            start_time: datetime,
+            end_time: datetime,
+            interval: str = "day"
+    ) -> List[Dict[str, Any]]:
+        """
+        按指定时间间隔获取书籍趋势数据（统一入口函数）
+        
+        Args:
+            db: 数据库会话
+            book_id: 书籍ID
+            start_time: 开始时间
+            end_time: 结束时间
+            interval: 时间间隔 ('hour', 'day', 'week', 'month')
+            
+        Returns:
+            List[Dict]: 聚合后的趋势数据
+        """
+        if interval == "hour":
+            return self.get_hourly_trend_by_book_id(db, book_id, start_time, end_time)
+        elif interval == "day":
+            return self.get_daily_trend_by_book_id(db, book_id, start_time, end_time)
+        elif interval == "week":
+            return self.get_weekly_trend_by_book_id(db, book_id, start_time, end_time)
+        elif interval == "month":
+            return self.get_monthly_trend_by_book_id(db, book_id, start_time, end_time)
+        else:
+            raise ValueError(f"不支持的时间间隔: {interval}")
 
     def get_statistics_by_book_id(self, db: Session, book_id: int) -> Dict[str, Any]:
         """获取书籍统计信息"""

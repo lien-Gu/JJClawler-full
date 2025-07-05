@@ -23,6 +23,22 @@ class BookTrendPoint(BaseModel):
     recommendations: Optional[int] = Field(None, description="推荐数")
 
 
+class BookTrendAggregatedPoint(BaseModel):
+    """书籍聚合趋势数据点"""
+    time_period: str = Field(..., description="时间周期")
+    avg_favorites: float = Field(..., description="平均收藏数")
+    avg_clicks: float = Field(..., description="平均点击数")
+    avg_comments: float = Field(..., description="平均评论数")
+    avg_recommendations: float = Field(..., description="平均推荐数")
+    max_favorites: int = Field(..., description="最大收藏数")
+    max_clicks: int = Field(..., description="最大点击数")
+    min_favorites: int = Field(..., description="最小收藏数")
+    min_clicks: int = Field(..., description="最小点击数")
+    snapshot_count: int = Field(..., description="快照数量")
+    period_start: datetime = Field(..., description="周期开始时间")
+    period_end: datetime = Field(..., description="周期结束时间")
+
+
 class BookDetailResponse(BookResponse, BookTrendPoint):
     """书籍详情响应，总是获取最新时间的point"""
 

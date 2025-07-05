@@ -23,7 +23,8 @@ class DataResponse(BaseResponse, Generic[T]):
 
 
 class ListResponse(BaseResponse, Generic[T]):
-    data: List[T] = Field(..., description="响应消息")
+    data: List[T] = Field(..., description="响应数据")
+    count: int = Field(0, description="数据条数")
 
 
 class HealthResponse(BaseModel):
