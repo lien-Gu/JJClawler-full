@@ -137,7 +137,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 COUNT(*) as snapshot_count,
                 MIN(snapshot_time) as period_start,
                 MAX(snapshot_time) as period_end
-            FROM BookSnapshot
+            FROM book_snapshots
             WHERE book_id = :book_id 
                 AND snapshot_time >= :start_time 
                 AND snapshot_time <= :end_time
@@ -189,7 +189,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         Returns:
             List[Dict]: 按小时聚合的趋势数据
         """
-        time_group = "strftime('%Y-%m-%d %H', BookSnapshot.snapshot_time)"
+        time_group = "strftime('%Y-%m-%d %H', book_snapshots.snapshot_time)"
         return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_daily_trend_by_book_id(
@@ -211,7 +211,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         Returns:
             List[Dict]: 按天聚合的趋势数据
         """
-        time_group = "strftime('%Y-%m-%d', BookSnapshot.snapshot_time)"
+        time_group = "strftime('%Y-%m-%d', book_snapshots.snapshot_time)"
         return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_weekly_trend_by_book_id(
@@ -233,7 +233,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         Returns:
             List[Dict]: 按周聚合的趋势数据
         """
-        time_group = "strftime('%Y-W%W', BookSnapshot.snapshot_time)"
+        time_group = "strftime('%Y-W%W', book_snapshots.snapshot_time)"
         return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_monthly_trend_by_book_id(
@@ -255,7 +255,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         Returns:
             List[Dict]: 按月聚合的趋势数据
         """
-        time_group = "strftime('%Y-%m', BookSnapshot.snapshot_time)"
+        time_group = "strftime('%Y-%m', book_snapshots.snapshot_time)"
         return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_trend_by_book_id_with_interval(
