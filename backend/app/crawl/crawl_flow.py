@@ -5,7 +5,10 @@ import asyncio
 import time
 from typing import Dict, List, Set, Optional, Any
 from .base import CrawlConfig, HttpClient
-from .parser import UnifiedParser, DataType, ParsedItem
+from .parser import Parser, DataType, ParsedItem
+from app.config import settings
+
+crawl_settings = settings.crawler
 
 
 class CrawlFlow:
@@ -20,24 +23,21 @@ class CrawlFlow:
     5. 去重后爬取书籍详情
     """
     
-    def __init__(self, request_delay: float = 1.0):
+    def __init__(self):
         """
         初始化爬取流程管理器
-        
-        Args:
-            request_delay: 请求间隔时间（秒）
         """
-        self.request_delay = request_delay
-        
         # 初始化组件
         self.config = CrawlConfig()
-        self.client = HttpClient(request_delay=request_delay)
-        self.parser = UnifiedParser()
+        self.client = HttpClient(request_delay=crawl_settings.request_delay)
+        self.parser = Parser()
         
         # 书籍去重集合
         self.crawled_book_ids: Set[str] = set()
         # 数据存储
         self.books_data: List[Dict] = []
+        self.pages_data: List[Dict] = []
+        self.rankings_data: List[Dict] = []
         
         # 简化统计
         self.stats = {
@@ -111,7 +111,7 @@ class CrawlFlow:
         # 为每个任务创建独立的流程实例（避免书籍去重冲突）
         tasks = []
         for task_id in task_ids:
-            flow = CrawlFlow(self.request_delay)
+            flow = CrawlFlow()
             task = flow.execute_crawl_task(task_id)
             tasks.append(task)
         

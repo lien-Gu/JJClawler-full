@@ -17,7 +17,7 @@ class CrawlerManager:
             request_delay: 请求间隔时间（秒）
         """
         self.request_delay = request_delay or settings.crawler.request_delay
-        self.flow = CrawlFlow(self.request_delay)
+        self.flow = CrawlFlow()
     
     async def crawl(self, task_ids: Union[str, List[str]]) -> List[Dict[str, Any]]:
         """

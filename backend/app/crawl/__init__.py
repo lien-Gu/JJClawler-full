@@ -3,13 +3,13 @@
 """
 
 from .manager import CrawlerManager
-from .parser import UnifiedParser, DataType, ParsedItem
+from .parser import Parser, DataType, ParsedItem
 from .base import CrawlConfig, HttpClient
 from .crawl_flow import CrawlFlow
 
 __all__ = [
     'CrawlerManager',
-    'UnifiedParser', 
+    'Parser',
     'DataType',
     'ParsedItem',
     'CrawlConfig',

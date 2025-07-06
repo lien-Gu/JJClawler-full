@@ -20,7 +20,7 @@ class ParsedItem:
         self.data = data
 
 
-class UnifiedParser:
+class Parser:
     """统一数据解析器"""
     
     def parse(self, raw_data: Dict) -> List[ParsedItem]:
@@ -52,14 +52,13 @@ class UnifiedParser:
         if not isinstance(data, dict):
             return DataType.PAGE
         
-        # 检查是否为书籍详情数据
-        if "novelId" in data or "novel_id" in data:
-            return DataType.BOOK
-        
         # 检查是否为夹子榜数据（单一榜单）
         if "list" in data:
             return DataType.RANKING
-        
+
+        # 检查是否为书籍详情数据
+        if "novelId" in data or "novel_id" in data:
+            return DataType.BOOK
         # 默认返回页面类型
         return DataType.PAGE
     
@@ -71,8 +70,9 @@ class UnifiedParser:
             
             for ranking_data in data_list:
                 ranking_info = {
-                    "ranking_id": ranking_data.get("channelId"),
-                    "ranking_name": ranking_data.get("channelName"),
+                    "rank_id": ranking_data.get("rankid"),
+                    "rank_name": ranking_data.get("channelName"),
+                    "rank_group_type":ranking_data.get("rank_group_type"),
                     "books": []
                 }
                 
@@ -118,19 +118,20 @@ class UnifiedParser:
         """解析书籍详情数据"""
         try:
             book_info = {
-                "book_id": self._get_field(raw_data, ["novelId", "novel_id"]),
+                "novel_id": self._get_field(raw_data, ["novelId", "novel_id"]),
                 "title": self._get_field(raw_data, ["novelName", "novel_name"]),
-                "author_id": self._get_field(raw_data, ["authorId", "author_id"]),
-                "author_name": self._get_field(raw_data, ["authorName", "author_name"]),
-                "category": self._get_field(raw_data, ["novelClass", "novel_class"]),
-                "status": self._get_field(raw_data, ["novelStep", "novel_step"]),
-                "word_count": self._get_field(raw_data, ["novelSize", "novel_size"]),
-                "summary": self._get_field(raw_data, ["novelIntro", "novel_intro"]),
-                "tags": self._get_field(raw_data, ["novelTags", "novel_tags"], []),
-                "total_clicks": self._get_field(raw_data, ["novelClickCount", "novel_click_count"], 0),
-                "total_favorites": self._get_field(raw_data, ["novelFavoriteCount", "novel_favorite_count"], 0),
-                "chapter_count": self._get_field(raw_data, ["novelChapterCount", "novel_chapter_count"], 0),
-                "comment_count": self._get_field(raw_data, ["novelCommentCount", "novel_comment_count"], 0)
+                # "author_id": self._get_field(raw_data, ["authorId", "author_id"]),
+                # "author_name": self._get_field(raw_data, ["authorName", "author_name"]),
+                # "category": self._get_field(raw_data, ["novelClass", "novel_class"]),
+                # "status": self._get_field(raw_data, ["novelStep", "novel_step"]),
+                # "word_count": self._get_field(raw_data, ["novelSize", "novel_size"]),
+                # "summary": self._get_field(raw_data, ["novelIntro", "novel_intro"]),
+                # "tags": self._get_field(raw_data, ["novelTags", "novel_tags"], []),
+                "clicks": self._get_field(raw_data, ["novelClickCount", "novip_clicks"], 0),
+                "favorites": self._get_field(raw_data, ["novelFavoriteCount", "novel_favorite_count"], 0),
+                # "chapters": self._get_field(raw_data, ["novelChapterCount", "novel_chapter_count"], 0),
+                "comments": self._get_field(raw_data, ["CommentCount", "comment_count"], 0),
+                "nutrition":  self._get_field(raw_data, ["nutritionNovel", "nutrition_novel"], 0)
             }
             
             return [ParsedItem(DataType.BOOK, book_info)]
@@ -145,10 +146,9 @@ class UnifiedParser:
             return {
                 "book_id": self._get_field(book_item, ["novelId", "novel_id"]),
                 "title": self._get_field(book_item, ["novelName", "novel_name"]),
-                "author_name": self._get_field(book_item, ["authorName", "author_name"]),
                 "position": position,
-                "total_clicks": self._get_field(book_item, ["novelClickCount", "novel_click_count"], 0),
-                "total_favorites": self._get_field(book_item, ["novelFavoriteCount", "novel_favorite_count"], 0)
+                "clicks": self._get_field(book_item, ["novelClickCount", "novel_click_count"], 0),
+                "favorites": self._get_field(book_item, ["novelFavoriteCount", "novel_favorite_count"], 0)
             }
         except Exception:
             return None

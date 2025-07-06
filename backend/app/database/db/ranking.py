@@ -19,9 +19,9 @@ class Ranking(Base):
 
     # 基本信息
     rank_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), index=True)
-    page_id: Mapped[str] = mapped_column(String(50), index=True)
+    rank_name: Mapped[str] = mapped_column(String(100), index=True)
     rank_group_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    page_id: Mapped[str] = mapped_column(String(50), index=True)
 
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

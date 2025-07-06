@@ -31,7 +31,7 @@ class BookSnapshot(Base):
 
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id"), index=True)
+    novel_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id"), index=True)
 
     # 统计数据
     favorites: Mapped[int] = mapped_column(Integer, default=0)
