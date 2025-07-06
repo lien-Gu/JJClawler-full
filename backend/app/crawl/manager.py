@@ -1,34 +1,30 @@
 """
-统一爬虫管理器，整合统一解析器和嵌套爬虫功能
+统一爬虫管理器，默认启用嵌套爬取功能
 """
 import json
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
-from .base import BaseCrawler
-from .parser import UnifiedParser
 from .nested import NestedCrawler
 from app.config import settings
 
 
 class CrawlerManager:
-    """爬虫管理器，负责统一管理所有爬虫任务"""
+    """爬虫管理器，负责统一管理所有爬虫任务，默认启用嵌套爬取"""
     
-    def __init__(self, request_delay: float = None):
+    def __init__(self, request_delay: float = None, max_book_details: int = 100):
         """
         初始化爬虫管理器
         
         Args:
             request_delay: 请求间隔时间（秒）
+            max_book_details: 每次最大爬取的书籍详情数量
         """
         self.request_delay = request_delay if request_delay else settings.crawler.request_delay
         
-        # 使用统一解析器
-        self.unified_crawler = BaseCrawler(UnifiedParser(), request_delay)
-        
-        # 嵌套爬虫（支持深度爬取）
-        self.nested_crawler = NestedCrawler(request_delay)
+        # 默认使用嵌套爬虫（包含书籍详情爬取）
+        self.nested_crawler = NestedCrawler(request_delay, max_book_details=max_book_details)
         
         # 任务统计
         self.total_stats = {
@@ -40,44 +36,12 @@ class CrawlerManager:
             'end_time': None
         }
     
-    async def crawl_basic(self, task_ids: Union[str, List[str]]) -> List[Dict[str, Any]]:
+    async def crawl(self, task_ids: Union[str, List[str]]) -> List[Dict[str, Any]]:
         """
-        基础爬取（不包含嵌套）
+        爬取任务（默认启用嵌套爬取，包含书籍详情）
         
         Args:
             task_ids: 任务ID或任务ID列表
-            
-        Returns:
-            爬取结果列表
-        """
-        if isinstance(task_ids, str):
-            task_ids = [task_ids]
-        
-        self.total_stats['start_time'] = time.time()
-        self.total_stats['total_tasks'] += len(task_ids)
-        
-        results = await self.unified_crawler.crawl_multiple_tasks(task_ids)
-        
-        # 更新统计信息
-        for result in results:
-            if result.get('success'):
-                self.total_stats['successful_tasks'] += 1
-                self.total_stats['total_items'] += result.get('valid_items', 0)
-            else:
-                self.total_stats['failed_tasks'] += 1
-        
-        self.total_stats['end_time'] = time.time()
-        
-        return results
-    
-    async def crawl_with_nesting(self, task_ids: Union[str, List[str]], 
-                               enable_book_details: bool = True) -> List[Dict[str, Any]]:
-        """
-        嵌套爬取（包含书籍详情）
-        
-        Args:
-            task_ids: 任务ID或任务ID列表
-            enable_book_details: 是否启用书籍详情爬取
             
         Returns:
             嵌套爬取结果列表
@@ -88,8 +52,9 @@ class CrawlerManager:
         self.total_stats['start_time'] = time.time()
         self.total_stats['total_tasks'] += len(task_ids)
         
+        # 默认启用书籍详情爬取
         results = await self.nested_crawler.crawl_multiple_with_nesting(
-            task_ids, enable_book_details
+            task_ids, enable_book_details=True
         )
         
         # 更新统计信息
@@ -102,63 +67,12 @@ class CrawlerManager:
         self.total_stats['end_time'] = time.time()
         
         return results
+
     
-    async def crawl_jiazi(self, with_nesting: bool = False) -> Dict[str, Any]:
+    async def crawl_all_tasks(self) -> List[Dict[str, Any]]:
         """
-        爬取夹子榜
+        爬取所有配置的任务（包含书籍详情）
         
-        Args:
-            with_nesting: 是否启用嵌套爬取（包含书籍详情）
-            
-        Returns:
-            爬取结果
-        """
-        if with_nesting:
-            results = await self.crawl_with_nesting(["jiazi"])
-        else:
-            results = await self.crawl_basic(["jiazi"])
-        return results[0] if results else {"success": False, "error": "爬取失败"}
-    
-    async def crawl_page(self, page_id: str, with_nesting: bool = False) -> Dict[str, Any]:
-        """
-        爬取指定页面
-        
-        Args:
-            page_id: 页面ID
-            with_nesting: 是否启用嵌套爬取（包含书籍详情）
-            
-        Returns:
-            爬取结果
-        """
-        if with_nesting:
-            results = await self.crawl_with_nesting([page_id])
-        else:
-            results = await self.crawl_basic([page_id])
-        return results[0] if results else {"success": False, "error": "爬取失败"}
-    
-    async def crawl_multiple_pages(self, page_ids: List[str], with_nesting: bool = False) -> List[Dict[str, Any]]:
-        """
-        爬取多个页面
-        
-        Args:
-            page_ids: 页面ID列表
-            with_nesting: 是否启用嵌套爬取（包含书籍详情）
-            
-        Returns:
-            爬取结果列表
-        """
-        if with_nesting:
-            return await self.crawl_with_nesting(page_ids)
-        else:
-            return await self.crawl_basic(page_ids)
-    
-    async def crawl_all_tasks(self, with_nesting: bool = False) -> List[Dict[str, Any]]:
-        """
-        爬取所有配置的任务
-        
-        Args:
-            with_nesting: 是否启用嵌套爬取（包含书籍详情）
-            
         Returns:
             爬取结果列表
         """
@@ -169,18 +83,14 @@ class CrawlerManager:
         # 获取所有任务ID
         task_ids = [task["id"] for task in all_tasks]
         
-        if with_nesting:
-            return await self.crawl_with_nesting(task_ids)
-        else:
-            return await self.crawl_basic(task_ids)
+        return await self.crawl(task_ids)
     
-    async def crawl_tasks_by_category(self, category: str, with_nesting: bool = False) -> List[Dict[str, Any]]:
+    async def crawl_tasks_by_category(self, category: str) -> List[Dict[str, Any]]:
         """
-        根据分类爬取任务
+        根据分类爬取任务（包含书籍详情）
         
         Args:
             category: 任务分类（如 "yq", "ca", "ys"等）
-            with_nesting: 是否启用嵌套爬取（包含书籍详情）
             
         Returns:
             爬取结果列表
@@ -200,27 +110,16 @@ class CrawlerManager:
         if not matching_tasks:
             return []
         
-        if with_nesting:
-            return await self.crawl_with_nesting(matching_tasks)
-        else:
-            return await self.crawl_basic(matching_tasks)
+        return await self.crawl(matching_tasks)
     
     def get_crawler_stats(self) -> Dict[str, Any]:
         """获取爬虫统计信息"""
-        unified_stats = self.unified_crawler.get_stats()
         nested_stats = self.nested_crawler.get_stats()
         
         return {
             'total_stats': self.total_stats,
-            'unified_crawler_stats': unified_stats,
             'nested_crawler_stats': nested_stats,
-            'combined_stats': {
-                'total_requests': unified_stats['total_requests'] + nested_stats['total_requests'],
-                'successful_requests': unified_stats['successful_requests'] + nested_stats['successful_requests'],
-                'failed_requests': unified_stats['failed_requests'] + nested_stats['failed_requests'],
-                'total_items': unified_stats['total_items'] + nested_stats['total_items'],
-                'valid_items': unified_stats['valid_items'] + nested_stats['valid_items'],
-            }
+            'crawler_stats': nested_stats  # 简化统计信息
         }
     
     def get_crawled_data(self) -> Dict[str, List]:
@@ -241,7 +140,6 @@ class CrawlerManager:
     
     async def close(self):
         """关闭所有爬虫连接"""
-        await self.unified_crawler.close()
         await self.nested_crawler.close()
 
 

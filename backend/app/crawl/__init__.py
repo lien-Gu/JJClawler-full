@@ -5,7 +5,7 @@
 from .manager import CrawlerManager
 from .parser import UnifiedParser, DataType, ParsedItem
 from .nested import NestedCrawler
-from .base import BaseCrawler, CrawlConfig, HttpClient
+from .base import CrawlConfig, HttpClient
 
 __all__ = [
     'CrawlerManager',
@@ -13,7 +13,6 @@ __all__ = [
     'DataType',
     'ParsedItem',
     'NestedCrawler',
-    'BaseCrawler',
     'CrawlConfig',
     'HttpClient'
 ]

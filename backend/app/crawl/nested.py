@@ -49,11 +49,11 @@ class NestedCrawler:
     
     async def crawl_with_nesting(self, task_id: str, enable_book_details: bool = True) -> Dict[str, Any]:
         """
-        执行嵌套爬取
+        执行嵌套爬取（默认启用书籍详情爬取）
         
         Args:
             task_id: 初始任务ID
-            enable_book_details: 是否启用书籍详情爬取
+            enable_book_details: 是否启用书籍详情爬取（默认True）
             
         Returns:
             完整的爬取结果
@@ -66,22 +66,26 @@ class NestedCrawler:
             if not initial_result or not initial_result.get('success'):
                 return initial_result
             
-            # 收集嵌套任务
+            # 收集所有书籍ID用于嵌套爬取
             nested_tasks = self._extract_nested_tasks(initial_result.get('parsed_items', []))
             self.stats['nested_tasks_generated'] = len(nested_tasks)
             
-            # 第二层：执行嵌套任务（主要是书籍详情）
+            # 第二层：执行书籍详情爬取（默认启用）
             nested_results = []
-            if enable_book_details and nested_tasks:
-                # 限制书籍详情爬取数量
+            if nested_tasks:
+                # 过滤书籍详情任务
                 book_detail_tasks = [task for task in nested_tasks if task.get('type') == 'book_detail']
-                limited_tasks = book_detail_tasks[:self.max_book_details]
                 
-                print(f"开始爬取 {len(limited_tasks)} 个书籍详情（总共 {len(book_detail_tasks)} 个）")
-                
-                # 批量执行书籍详情爬取
-                nested_results = await self._crawl_nested_tasks(limited_tasks)
-                self.stats['nested_tasks_executed'] = len(nested_results)
+                # 如果启用书籍详情爬取，则爬取所有书籍（受max_book_details限制）
+                if enable_book_details:
+                    limited_tasks = book_detail_tasks[:self.max_book_details]
+                    print(f"开始爬取 {len(limited_tasks)} 个书籍详情（总共 {len(book_detail_tasks)} 个）")
+                    
+                    # 批量执行书籍详情爬取
+                    nested_results = await self._crawl_nested_tasks(limited_tasks)
+                    self.stats['nested_tasks_executed'] = len(nested_results)
+                else:
+                    print(f"跳过书籍详情爬取，共 {len(book_detail_tasks)} 个书籍")
             
             # 整合结果
             result = {
@@ -91,6 +95,7 @@ class NestedCrawler:
                 'nested_results': nested_results,
                 'total_nested_tasks': len(nested_tasks),
                 'executed_nested_tasks': len(nested_results),
+                'book_details_enabled': enable_book_details,
                 'stats': self.get_stats(),
                 'execution_time': time.time() - start_time,
                 'timestamp': time.time()
@@ -111,15 +116,17 @@ class NestedCrawler:
     async def crawl_multiple_with_nesting(self, task_ids: List[str], 
                                         enable_book_details: bool = True) -> List[Dict[str, Any]]:
         """
-        并发执行多个嵌套爬取任务
+        并发执行多个嵌套爬取任务（默认启用书籍详情爬取）
         
         Args:
             task_ids: 任务ID列表
-            enable_book_details: 是否启用书籍详情爬取
+            enable_book_details: 是否启用书籍详情爬取（默认True）
             
         Returns:
             爬取结果列表
         """
+        print(f"开始执行 {len(task_ids)} 个嵌套爬取任务，书籍详情爬取: {'启用' if enable_book_details else '禁用'}")
+        
         tasks = [self.crawl_with_nesting(task_id, enable_book_details) for task_id in task_ids]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -135,6 +142,12 @@ class NestedCrawler:
                 })
             else:
                 processed_results.append(result)
+        
+        # 统计结果
+        successful_tasks = sum(1 for r in processed_results if r.get('success'))
+        total_books_crawled = sum(r.get('executed_nested_tasks', 0) for r in processed_results if r.get('success'))
+        
+        print(f"嵌套爬取完成: {successful_tasks}/{len(task_ids)} 任务成功，共爬取 {total_books_crawled} 个书籍详情")
         
         return processed_results
     
