@@ -293,7 +293,12 @@ async def get_ranking_history(
 #### 3.3.3 爬虫管理API (crawl.py)
 ```python
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from typing import List, Optional
+from typing import List, Optiok k现在进行爬虫模块的生成，参考 @README.md 
+  中的技术，在 @app/crawl/目录下生成相关的代
+  码。主要功能分为两部分，爬取和解析。爬取是
+  以页面为单位进行的，可以参考 
+  @data/urls.json中的页面以及地址，解析参考 
+  @data/example/ 文件夹中的nal
 from app.scheduler.task_scheduler import get_scheduler
 from app.crawler.crawler import JJCrawler
 
