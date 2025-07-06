@@ -58,8 +58,12 @@ class CrawlerSettings(BaseSettings):
     """爬虫配置"""
 
     # HTTP客户端配置
-    user_agent: str = Field(
-        default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    user_agent: dict = Field(
+        default={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 jjwxc/4.9.0',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'zh-CN,zh;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive'},
         description="User-Agent字符串")
     timeout: int = Field(default=30, ge=5, le=300, description="请求超时时间（秒）")
     retry_times: int = Field(default=3, ge=1, le=10, description="重试次数")
