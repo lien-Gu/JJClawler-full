@@ -9,21 +9,22 @@ from typing import Dict, List, Optional, Any, Union
 from .base import BaseCrawler
 from .jiazi_parser import JiaziParser
 from .page_parser import PageParser
+from app.config import settings
 
 
 class CrawlerManager:
     """爬虫管理器，负责统一管理所有爬虫任务"""
     
-    def __init__(self, rate_limit: float = 1.0):
+    def __init__(self, request_delay: float = None):
         """
         初始化爬虫管理器
         
         Args:
             rate_limit: 请求间隔时间（秒）
         """
-        self.rate_limit = rate_limit
-        self.jiazi_crawler = BaseCrawler(JiaziParser(), rate_limit)
-        self.page_crawler = BaseCrawler(PageParser(), rate_limit)
+        self.rate_limit = request_delay if request_delay else settings.crawler.user_agent
+        self.jiazi_crawler = BaseCrawler(JiaziParser(), request_delay)
+        self.page_crawler = BaseCrawler(PageParser(), request_delay)
         
         # 任务统计
         self.total_stats = {
