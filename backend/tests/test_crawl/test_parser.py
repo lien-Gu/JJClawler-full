@@ -1,7 +1,6 @@
 """
 解析器测试
 """
-import pytest
 from typing import Dict, Any
 
 from app.crawl.parser import Parser, DataType, ParsedItem

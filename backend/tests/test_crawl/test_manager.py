@@ -2,7 +2,6 @@
 爬虫管理器测试 - 使用 pytest-mock
 """
 import pytest
-from typing import Dict, Any, List
 
 from app.crawl.manager import CrawlerManager
 
