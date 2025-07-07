@@ -3,63 +3,54 @@
 """
 from typing import Dict, Any
 
-from app.crawl.parser import Parser, DataType, ParsedItem
+from app.crawl.parser import DataType, ParsedItem
 
 
 class TestParser:
     """解析器测试类"""
 
-    def test_init(self):
+    def test_init(self, real_parser):
         """测试解析器初始化"""
-        parser = Parser()
-        assert parser is not None
+        assert real_parser is not None
 
-    def test_identify_data_type_page(self, mock_page_response: Dict[str, Any]):
+    def test_identify_data_type_page(self, real_parser, mock_page_response: Dict[str, Any]):
         """测试识别页面数据类型"""
-        parser = Parser()
-        data_type = parser._identify_data_type(mock_page_response)
+        data_type = real_parser._identify_data_type(mock_page_response)
         assert data_type == DataType.PAGE
 
-    def test_identify_data_type_ranking(self, mock_jiazi_response: Dict[str, Any]):
+    def test_identify_data_type_ranking(self, real_parser, mock_jiazi_response: Dict[str, Any]):
         """测试识别榜单数据类型"""
-        parser = Parser()
-        data_type = parser._identify_data_type(mock_jiazi_response)
+        data_type = real_parser._identify_data_type(mock_jiazi_response)
         assert data_type == DataType.RANKING
 
-    def test_identify_data_type_book(self, mock_book_detail_response: Dict[str, Any]):
+    def test_identify_data_type_book(self, real_parser, mock_book_detail_response: Dict[str, Any]):
         """测试识别书籍数据类型"""
-        parser = Parser()
-        data_type = parser._identify_data_type(mock_book_detail_response)
+        data_type = real_parser._identify_data_type(mock_book_detail_response)
         assert data_type == DataType.BOOK
 
-    def test_identify_data_type_default(self):
+    def test_identify_data_type_default(self, real_parser):
         """测试默认数据类型识别"""
-        parser = Parser()
-        data_type = parser._identify_data_type({"unknown": "data"})
+        data_type = real_parser._identify_data_type({"unknown": "data"})
         assert data_type == DataType.PAGE
 
-    def test_identify_data_type_invalid_input(self):
+    def test_identify_data_type_invalid_input(self, real_parser):
         """测试无效输入的数据类型识别"""
-        parser = Parser()
-        data_type = parser._identify_data_type("invalid")
+        data_type = real_parser._identify_data_type("invalid")
         assert data_type == DataType.PAGE
 
-    def test_parse_empty_data(self):
+    def test_parse_empty_data(self, real_parser):
         """测试解析空数据"""
-        parser = Parser()
-        result = parser.parse({})
+        result = real_parser.parse({})
         assert result == []
 
-    def test_parse_none_data(self):
+    def test_parse_none_data(self, real_parser):
         """测试解析None数据"""
-        parser = Parser()
-        result = parser.parse(None)
+        result = real_parser.parse(None)
         assert result == []
 
-    def test_parse_page_data(self, mock_page_response: Dict[str, Any]):
+    def test_parse_page_data(self, real_parser, mock_page_response: Dict[str, Any]):
         """测试解析页面数据"""
-        parser = Parser()
-        result = parser.parse(mock_page_response)
+        result = real_parser.parse(mock_page_response)
         
         assert len(result) == 1
         assert result[0].data_type == DataType.RANKING
@@ -78,10 +69,9 @@ class TestParser:
         assert book1["clicks"] == 1000
         assert book1["favorites"] == 500
 
-    def test_parse_jiazi_data(self, mock_jiazi_response: Dict[str, Any]):
+    def test_parse_jiazi_data(self, real_parser, mock_jiazi_response: Dict[str, Any]):
         """测试解析夹子榜数据"""
-        parser = Parser()
-        result = parser.parse(mock_jiazi_response)
+        result = real_parser.parse(mock_jiazi_response)
         
         assert len(result) == 1
         assert result[0].data_type == DataType.RANKING
@@ -96,10 +86,9 @@ class TestParser:
         assert book1["book_id"] == 11111
         assert book1["title"] == "夹子榜小说1"
 
-    def test_parse_book_data(self, mock_book_detail_response: Dict[str, Any]):
+    def test_parse_book_data(self, real_parser, mock_book_detail_response: Dict[str, Any]):
         """测试解析书籍详情数据"""
-        parser = Parser()
-        result = parser.parse(mock_book_detail_response)
+        result = real_parser.parse(mock_book_detail_response)
         
         assert len(result) == 1
         assert result[0].data_type == DataType.BOOK
@@ -112,25 +101,22 @@ class TestParser:
         assert book_data["comments"] == 200
         assert book_data["nutrition"] == 95
 
-    def test_parse_page_data_empty_content(self):
+    def test_parse_page_data_empty_content(self, real_parser):
         """测试解析空内容的页面数据"""
-        parser = Parser()
         empty_page = {"content": {"data": []}}
-        result = parser.parse(empty_page)
+        result = real_parser.parse(empty_page)
         assert result == []
 
-    def test_parse_page_data_missing_content(self):
+    def test_parse_page_data_missing_content(self, real_parser):
         """测试解析缺少内容的页面数据"""
-        parser = Parser()
         incomplete_page = {"some_other_field": "value"}
-        result = parser.parse(incomplete_page)
+        result = real_parser.parse(incomplete_page)
         assert result == []
 
-    def test_parse_jiazi_data_empty_list(self):
+    def test_parse_jiazi_data_empty_list(self, real_parser):
         """测试解析空列表的夹子榜数据"""
-        parser = Parser()
         empty_jiazi = {"list": []}
-        result = parser.parse(empty_jiazi)
+        result = real_parser.parse(empty_jiazi)
         
         assert len(result) == 1
         assert result[0].data_type == DataType.RANKING
@@ -138,16 +124,15 @@ class TestParser:
         assert ranking_data["rank_id"] == "jiazi"
         assert len(ranking_data["books"]) == 0
 
-    def test_parse_book_basic_complete_data(self):
+    def test_parse_book_basic_complete_data(self, real_parser):
         """测试解析完整的书籍基础信息"""
-        parser = Parser()
         book_item = {
             "novelId": 12345,
             "novelName": "测试小说",
             "novelClickCount": 1000,
             "novelFavoriteCount": 500
         }
-        result = parser._parse_book_basic(book_item, 1)
+        result = real_parser._parse_book_basic(book_item, 1)
         
         assert result["book_id"] == 12345
         assert result["title"] == "测试小说"
@@ -155,11 +140,10 @@ class TestParser:
         assert result["clicks"] == 1000
         assert result["favorites"] == 500
 
-    def test_parse_book_basic_missing_fields(self):
+    def test_parse_book_basic_missing_fields(self, real_parser):
         """测试解析缺少字段的书籍基础信息"""
-        parser = Parser()
         book_item = {"novelId": 12345}
-        result = parser._parse_book_basic(book_item, 1)
+        result = real_parser._parse_book_basic(book_item, 1)
         
         assert result["book_id"] == 12345
         assert result["title"] is None
@@ -167,45 +151,39 @@ class TestParser:
         assert result["clicks"] == 0
         assert result["favorites"] == 0
 
-    def test_parse_book_basic_invalid_data(self):
+    def test_parse_book_basic_invalid_data(self, real_parser):
         """测试解析无效的书籍基础信息"""
-        parser = Parser()
-        result = parser._parse_book_basic(None, 1)
+        result = real_parser._parse_book_basic(None, 1)
         assert result is None
 
-    def test_get_field_first_match(self):
+    def test_get_field_first_match(self, real_parser):
         """测试获取字段值 - 第一个匹配"""
-        parser = Parser()
         data = {"field1": "value1", "field2": "value2"}
-        result = parser._get_field(data, ["field1", "field2"])
+        result = real_parser._get_field(data, ["field1", "field2"])
         assert result == "value1"
 
-    def test_get_field_second_match(self):
+    def test_get_field_second_match(self, real_parser):
         """测试获取字段值 - 第二个匹配"""
-        parser = Parser()
         data = {"field2": "value2"}
-        result = parser._get_field(data, ["field1", "field2"])
+        result = real_parser._get_field(data, ["field1", "field2"])
         assert result == "value2"
 
-    def test_get_field_no_match(self):
+    def test_get_field_no_match(self, real_parser):
         """测试获取字段值 - 无匹配"""
-        parser = Parser()
         data = {"other_field": "value"}
-        result = parser._get_field(data, ["field1", "field2"])
+        result = real_parser._get_field(data, ["field1", "field2"])
         assert result is None
 
-    def test_get_field_with_default(self):
+    def test_get_field_with_default(self, real_parser):
         """测试获取字段值 - 使用默认值"""
-        parser = Parser()
         data = {"other_field": "value"}
-        result = parser._get_field(data, ["field1", "field2"], "default")
+        result = real_parser._get_field(data, ["field1", "field2"], "default")
         assert result == "default"
 
-    def test_get_field_empty_field_names(self):
+    def test_get_field_empty_field_names(self, real_parser):
         """测试获取字段值 - 空字段名列表"""
-        parser = Parser()
         data = {"field1": "value1"}
-        result = parser._get_field(data, [])
+        result = real_parser._get_field(data, [])
         assert result is None
 
 

@@ -105,8 +105,8 @@ def mock_book_detail_response() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_parser():
-    """模拟解析器"""
+def real_parser():
+    """真实解析器（用于某些测试）"""
     from app.crawl.parser import Parser
     return Parser()
 
@@ -237,4 +237,108 @@ def mock_failed_crawl_result() -> Dict[str, Any]:
             "end_time": None
         },
         "timestamp": 1234567890.0
+    }
+
+
+@pytest.fixture
+def mock_crawl_config(mocker):
+    """模拟爬取配置"""
+    mock_config = mocker.MagicMock()
+    mock_config.get_task_config.return_value = {"template": "page_rank", "params": {}}
+    mock_config.build_url.return_value = "https://api.example.com/page"
+    mock_config.templates = {"novel_detail": "https://api.example.com/novel/{novel_id}"}
+    mock_config.params = {}
+    return mock_config
+
+
+@pytest.fixture 
+def mock_http_client(mocker):
+    """模拟HTTP客户端"""
+    mock_client = mocker.MagicMock()
+    mock_client.get = mocker.AsyncMock()
+    mock_client.close = mocker.AsyncMock()
+    return mock_client
+
+
+@pytest.fixture
+def mock_parser(mocker):
+    """模拟解析器"""
+    from app.crawl.parser import ParsedItem, DataType
+    
+    mock_parser = mocker.MagicMock()
+    mock_parser.parse.return_value = [
+        ParsedItem(DataType.RANKING, {
+            "rank_id": 1001,
+            "rank_name": "测试榜单",
+            "books": [{"book_id": 12345, "title": "测试小说"}]
+        })
+    ]
+    return mock_parser
+
+
+@pytest.fixture
+def mock_crawl_flow_dependencies(mocker, mock_crawl_config, mock_http_client, mock_parser):
+    """模拟CrawlFlow的所有依赖项"""
+    # Mock settings
+    mock_settings = mocker.patch('app.crawl.crawl_flow.settings')
+    mock_settings.crawler.request_delay = 0.1
+    
+    # Mock classes
+    mocker.patch('app.crawl.crawl_flow.CrawlConfig', return_value=mock_crawl_config)
+    mocker.patch('app.crawl.crawl_flow.HttpClient', return_value=mock_http_client)
+    mocker.patch('app.crawl.crawl_flow.Parser', return_value=mock_parser)
+    
+    return {
+        'config': mock_crawl_config,
+        'client': mock_http_client, 
+        'parser': mock_parser,
+        'settings': mock_settings
+    }
+
+
+@pytest.fixture
+def mock_file_operations(mocker):
+    """模拟文件操作"""
+    return {
+        'open': mocker.patch("builtins.open"),
+        'mock_open': mocker.mock_open
+    }
+
+
+@pytest.fixture
+def mock_httpx_client(mocker):
+    """模拟httpx.AsyncClient"""
+    mock_client = mocker.MagicMock()
+    mock_client.get = mocker.AsyncMock()
+    mock_client.aclose = mocker.AsyncMock()
+    
+    # Mock类本身
+    mocker.patch('httpx.AsyncClient', return_value=mock_client)
+    
+    return mock_client
+
+
+@pytest.fixture
+def mock_crawler_manager_dependencies(mocker):
+    """模拟CrawlerManager的所有依赖项"""
+    # Mock settings
+    mock_settings = mocker.patch('app.crawl.manager.settings')
+    mock_settings.crawler.request_delay = 1.5
+    
+    # Mock CrawlFlow
+    mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
+    mock_flow = mocker.AsyncMock()
+    mock_flow_class.return_value = mock_flow
+    
+    # Mock CrawlConfig for manager tests
+    mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
+    mock_config = mocker.MagicMock()
+    mock_config_class.return_value = mock_config
+    
+    return {
+        'settings': mock_settings,
+        'flow_class': mock_flow_class,
+        'flow': mock_flow,
+        'config_class': mock_config_class,
+        'config': mock_config
     }
