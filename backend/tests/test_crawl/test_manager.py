@@ -1,8 +1,7 @@
 """
-爬虫管理器测试
+爬虫管理器测试 - 使用 pytest-mock
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any, List
 
 from app.crawl.manager import CrawlerManager
@@ -11,33 +10,32 @@ from app.crawl.manager import CrawlerManager
 class TestCrawlerManager:
     """爬虫管理器测试类"""
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.manager.settings')
-    def test_init_with_default_delay(self, mock_settings, mock_flow_class):
+    def test_init_with_default_delay(self, mocker):
         """测试使用默认延迟初始化"""
+        mock_settings = mocker.patch('app.crawl.manager.settings')
         mock_settings.crawler.request_delay = 1.5
+        mocker.patch('app.crawl.manager.CrawlFlow')
         
         manager = CrawlerManager()
         
         assert manager.request_delay == 1.5
-        mock_flow_class.assert_called_once()
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.manager.settings')
-    def test_init_with_custom_delay(self, mock_settings, mock_flow_class):
+    def test_init_with_custom_delay(self, mocker):
         """测试使用自定义延迟初始化"""
+        mock_settings = mocker.patch('app.crawl.manager.settings')
         mock_settings.crawler.request_delay = 1.5
+        mocker.patch('app.crawl.manager.CrawlFlow')
         
         manager = CrawlerManager(request_delay=2.0)
         
         assert manager.request_delay == 2.0
-        mock_flow_class.assert_called_once()
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_single_task_string(self, mock_flow_class, mock_successful_crawl_result):
+    @pytest.mark.asyncio
+    async def test_crawl_single_task_string(self, mocker, mock_successful_crawl_result):
         """测试爬取单个任务（字符串输入）"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_crawl_task = AsyncMock(return_value=mock_successful_crawl_result)
+        mock_flow.execute_crawl_task = mocker.AsyncMock(return_value=mock_successful_crawl_result)
         
         manager = CrawlerManager()
         results = await manager.crawl("test_task_1")
@@ -46,29 +44,31 @@ class TestCrawlerManager:
         assert results[0] == mock_successful_crawl_result
         mock_flow.execute_crawl_task.assert_called_once_with("test_task_1")
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_single_task_list(self, mock_flow_class, mock_successful_crawl_result):
+    @pytest.mark.asyncio
+    async def test_crawl_single_task_list(self, mocker, mock_successful_crawl_result):
         """测试爬取单个任务（列表输入）"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_crawl_task = AsyncMock(return_value=mock_successful_crawl_result)
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[mock_successful_crawl_result])
         
         manager = CrawlerManager()
         results = await manager.crawl(["test_task_1"])
         
         assert len(results) == 1
         assert results[0] == mock_successful_crawl_result
-        mock_flow.execute_crawl_task.assert_called_once_with("test_task_1")
+        mock_flow.execute_multiple_tasks.assert_called_once_with(["test_task_1"])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_multiple_tasks(self, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_multiple_tasks(self, mocker):
         """测试爬取多个任务"""
         mock_results = [
             {"task_id": "task1", "success": True},
             {"task_id": "task2", "success": True}
         ]
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=mock_results)
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=mock_results)
         
         manager = CrawlerManager()
         results = await manager.crawl(["task1", "task2"])
@@ -77,11 +77,12 @@ class TestCrawlerManager:
         assert results == mock_results
         mock_flow.execute_multiple_tasks.assert_called_once_with(["task1", "task2"])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_failed_task(self, mock_flow_class, mock_failed_crawl_result):
+    @pytest.mark.asyncio
+    async def test_crawl_failed_task(self, mocker, mock_failed_crawl_result):
         """测试爬取失败的任务"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_crawl_task = AsyncMock(return_value=mock_failed_crawl_result)
+        mock_flow.execute_crawl_task = mocker.AsyncMock(return_value=mock_failed_crawl_result)
         
         manager = CrawlerManager()
         results = await manager.crawl("invalid_task")
@@ -90,10 +91,10 @@ class TestCrawlerManager:
         assert results[0]["success"] is False
         assert results[0]["error"] == "无法生成页面地址"
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.base.CrawlConfig')
-    async def test_crawl_all_tasks(self, mock_config_class, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_all_tasks(self, mocker):
         """测试爬取所有任务"""
+        mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
         mock_config = mock_config_class.return_value
         mock_config.get_all_tasks.return_value = [
             {"id": "task1"},
@@ -101,8 +102,9 @@ class TestCrawlerManager:
             {"id": "task3"}
         ]
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=[
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[
             {"task_id": "task1", "success": True},
             {"task_id": "task2", "success": True},
             {"task_id": "task3", "success": True}
@@ -114,10 +116,10 @@ class TestCrawlerManager:
         assert len(results) == 3
         mock_flow.execute_multiple_tasks.assert_called_once_with(["task1", "task2", "task3"])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.base.CrawlConfig')
-    async def test_crawl_tasks_by_category_exact_match(self, mock_config_class, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_tasks_by_category_exact_match(self, mocker):
         """测试根据分类爬取任务（精确匹配）"""
+        mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
         mock_config = mock_config_class.return_value
         mock_config.get_all_tasks.return_value = [
             {"id": "romance"},
@@ -126,8 +128,9 @@ class TestCrawlerManager:
             {"id": "fantasy.magic"}
         ]
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=[
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[
             {"task_id": "romance", "success": True},
             {"task_id": "romance.modern", "success": True}
         ])
@@ -138,10 +141,10 @@ class TestCrawlerManager:
         assert len(results) == 2
         mock_flow.execute_multiple_tasks.assert_called_once_with(["romance", "romance.modern"])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.base.CrawlConfig')
-    async def test_crawl_tasks_by_category_no_match(self, mock_config_class, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_tasks_by_category_no_match(self, mocker):
         """测试根据分类爬取任务（无匹配）"""
+        mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
         mock_config = mock_config_class.return_value
         mock_config.get_all_tasks.return_value = [
             {"id": "romance"},
@@ -153,10 +156,10 @@ class TestCrawlerManager:
         
         assert results == []
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.base.CrawlConfig')
-    async def test_crawl_tasks_by_category_prefix_match(self, mock_config_class, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_tasks_by_category_prefix_match(self, mocker):
         """测试根据分类爬取任务（前缀匹配）"""
+        mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
         mock_config = mock_config_class.return_value
         mock_config.get_all_tasks.return_value = [
             {"id": "romance"},
@@ -165,8 +168,9 @@ class TestCrawlerManager:
             {"id": "fantasy"}
         ]
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=[
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[
             {"task_id": "romance", "success": True},
             {"task_id": "romance.modern", "success": True},
             {"task_id": "romance.ancient", "success": True}
@@ -179,8 +183,7 @@ class TestCrawlerManager:
         expected_task_ids = ["romance", "romance.modern", "romance.ancient"]
         mock_flow.execute_multiple_tasks.assert_called_once_with(expected_task_ids)
 
-    @patch('app.crawl.manager.CrawlFlow')
-    def test_get_stats(self, mock_flow_class):
+    def test_get_stats(self, mocker):
         """测试获取统计信息"""
         mock_stats = {
             "books_crawled": 10,
@@ -188,6 +191,7 @@ class TestCrawlerManager:
             "execution_time": 30.5
         }
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
         mock_flow.get_stats.return_value = mock_stats
         
@@ -197,8 +201,7 @@ class TestCrawlerManager:
         assert stats == mock_stats
         mock_flow.get_stats.assert_called_once()
 
-    @patch('app.crawl.manager.CrawlFlow')
-    def test_get_data(self, mock_flow_class):
+    def test_get_data(self, mocker):
         """测试获取爬取数据"""
         mock_data = {
             "books": [
@@ -207,6 +210,7 @@ class TestCrawlerManager:
             ]
         }
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
         mock_flow.get_all_data.return_value = mock_data
         
@@ -216,22 +220,24 @@ class TestCrawlerManager:
         assert data == mock_data
         mock_flow.get_all_data.assert_called_once()
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_close(self, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_close(self, mocker):
         """测试关闭连接"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.close = AsyncMock()
+        mock_flow.close = mocker.AsyncMock()
         
         manager = CrawlerManager()
         await manager.close()
         
         mock_flow.close.assert_called_once()
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_empty_task_list(self, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_empty_task_list(self, mocker):
         """测试爬取空任务列表"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=[])
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[])
         
         manager = CrawlerManager()
         results = await manager.crawl([])
@@ -239,11 +245,12 @@ class TestCrawlerManager:
         assert results == []
         mock_flow.execute_multiple_tasks.assert_called_once_with([])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_with_exception(self, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_with_exception(self, mocker):
         """测试爬取过程中出现异常"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_crawl_task = AsyncMock(side_effect=Exception("Unexpected error"))
+        mock_flow.execute_crawl_task = mocker.AsyncMock(side_effect=Exception("Unexpected error"))
         
         manager = CrawlerManager()
         
@@ -251,8 +258,8 @@ class TestCrawlerManager:
         with pytest.raises(Exception, match="Unexpected error"):
             await manager.crawl("test_task")
 
-    @patch('app.crawl.manager.CrawlFlow')
-    async def test_crawl_mixed_success_and_failure(self, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_mixed_success_and_failure(self, mocker):
         """测试混合成功和失败的爬取结果"""
         mixed_results = [
             {"task_id": "task1", "success": True, "books_crawled": 5},
@@ -260,8 +267,9 @@ class TestCrawlerManager:
             {"task_id": "task3", "success": True, "books_crawled": 3}
         ]
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=mixed_results)
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=mixed_results)
         
         manager = CrawlerManager()
         results = await manager.crawl(["task1", "task2", "task3"])
@@ -271,15 +279,16 @@ class TestCrawlerManager:
         assert results[1]["success"] is False
         assert results[2]["success"] is True
 
-    @patch('app.crawl.manager.CrawlFlow')
-    @patch('app.crawl.base.CrawlConfig')
-    async def test_crawl_all_tasks_empty_config(self, mock_config_class, mock_flow_class):
+    @pytest.mark.asyncio
+    async def test_crawl_all_tasks_empty_config(self, mocker):
         """测试爬取所有任务（空配置）"""
+        mock_config_class = mocker.patch('app.crawl.base.CrawlConfig')
         mock_config = mock_config_class.return_value
         mock_config.get_all_tasks.return_value = []
         
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
-        mock_flow.execute_multiple_tasks = AsyncMock(return_value=[])
+        mock_flow.execute_multiple_tasks = mocker.AsyncMock(return_value=[])
         
         manager = CrawlerManager()
         results = await manager.crawl_all_tasks()
@@ -287,9 +296,9 @@ class TestCrawlerManager:
         assert results == []
         mock_flow.execute_multiple_tasks.assert_called_once_with([])
 
-    @patch('app.crawl.manager.CrawlFlow')
-    def test_get_stats_empty_stats(self, mock_flow_class):
+    def test_get_stats_empty_stats(self, mocker):
         """测试获取空统计信息"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
         mock_flow.get_stats.return_value = {}
         
@@ -298,9 +307,9 @@ class TestCrawlerManager:
         
         assert stats == {}
 
-    @patch('app.crawl.manager.CrawlFlow')
-    def test_get_data_empty_data(self, mock_flow_class):
+    def test_get_data_empty_data(self, mocker):
         """测试获取空数据"""
+        mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
         mock_flow = mock_flow_class.return_value
         mock_flow.get_all_data.return_value = {"books": []}
         

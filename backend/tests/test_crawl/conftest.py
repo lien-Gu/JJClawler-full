@@ -4,7 +4,6 @@
 import pytest
 import json
 from typing import Dict, List, Any
-from unittest.mock import AsyncMock, MagicMock
 
 
 @pytest.fixture
@@ -103,44 +102,6 @@ def mock_book_detail_response() -> Dict[str, Any]:
         "nutritionNovel": 95
     }
 
-
-@pytest.fixture
-def mock_http_client():
-    """模拟HTTP客户端"""
-    client = AsyncMock()
-    client.get = AsyncMock()
-    client.close = AsyncMock()
-    return client
-
-
-@pytest.fixture
-def mock_crawl_config(mock_urls_config):
-    """模拟爬取配置"""
-    config = MagicMock()
-    config.params = mock_urls_config["global"]["params"]
-    config.templates = mock_urls_config["global"]["templates"]
-    config._config = mock_urls_config
-    
-    def get_task_config(task_id: str):
-        for task in mock_urls_config["crawl_tasks"]:
-            if task["id"] == task_id:
-                return task
-        return None
-    
-    def get_all_tasks():
-        return mock_urls_config["crawl_tasks"]
-    
-    def build_url(task_config: Dict):
-        template_name = task_config["template"]
-        template = mock_urls_config["global"]["templates"][template_name]
-        params = {**mock_urls_config["global"]["params"], **task_config.get("params", {})}
-        return template.format(**params)
-    
-    config.get_task_config = get_task_config
-    config.get_all_tasks = get_all_tasks
-    config.build_url = build_url
-    
-    return config
 
 
 @pytest.fixture
