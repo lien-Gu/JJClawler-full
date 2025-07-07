@@ -171,7 +171,7 @@ class TestCrawlerManager:
         deps['flow'].get_stats.return_value = mock_stats
         
         manager = CrawlerManager()
-        manager._flow = deps['flow']  # 直接设置_flow
+        manager.flow = deps['flow']  # 直接设置flow
         stats = manager.get_stats()
         
         assert stats == mock_stats
@@ -189,7 +189,7 @@ class TestCrawlerManager:
         deps['flow'].get_all_data.return_value = mock_data
         
         manager = CrawlerManager()
-        manager._flow = deps['flow']  # 直接设置_flow
+        manager.flow = deps['flow']  # 直接设置flow
         data = manager.get_data()
         
         assert data == mock_data
@@ -267,7 +267,7 @@ class TestCrawlerManager:
         deps['flow'].get_stats.return_value = {}
         
         manager = CrawlerManager()
-        manager._flow = deps['flow']
+        manager.flow = deps['flow']
         stats = manager.get_stats()
         
         assert stats == {}
@@ -278,7 +278,72 @@ class TestCrawlerManager:
         deps['flow'].get_all_data.return_value = {"books": []}
         
         manager = CrawlerManager()
-        manager._flow = deps['flow']
+        manager.flow = deps['flow']
         data = manager.get_data()
         
         assert data == {"books": []}
+    
+    @pytest.mark.asyncio
+    async def test_crawl_with_data_storage(self, mock_crawler_manager_dependencies, mock_successful_crawl_result):
+        """测试爬取任务并保存数据到数据库"""
+        deps = mock_crawler_manager_dependencies
+        deps['flow'].execute_crawl_task.return_value = mock_successful_crawl_result
+        
+        # Mock数据库服务方法的返回值
+        mock_book = deps['book_service'].create_or_update_book.return_value
+        mock_book.id = 1
+        
+        mock_ranking = deps['ranking_service'].create_or_update_ranking.return_value  
+        mock_ranking.id = 100
+        
+        manager = CrawlerManager()
+        results = await manager.crawl("test_task_1")
+        
+        # 验证爬取结果
+        assert len(results) == 1
+        assert results[0] == mock_successful_crawl_result
+        
+        # 验证数据库操作被调用
+        deps['book_service'].create_or_update_book.assert_called()
+        deps['ranking_service'].create_or_update_ranking.assert_called()
+        deps['book_service'].batch_create_book_snapshots.assert_called_once()
+        deps['ranking_service'].batch_create_ranking_snapshots.assert_called_once()
+        deps['db'].commit.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_crawl_with_failed_result_no_storage(self, mock_crawler_manager_dependencies, mock_failed_crawl_result):
+        """测试爬取失败时不保存数据"""
+        deps = mock_crawler_manager_dependencies
+        deps['flow'].execute_crawl_task.return_value = mock_failed_crawl_result
+        
+        manager = CrawlerManager()
+        results = await manager.crawl("invalid_task")
+        
+        # 验证爬取结果
+        assert len(results) == 1
+        assert results[0]["success"] is False
+        
+        # 验证数据库操作没有被调用
+        deps['book_service'].create_or_update_book.assert_not_called()
+        deps['ranking_service'].create_or_update_ranking.assert_not_called()
+        deps['db'].commit.assert_not_called()
+    
+    @pytest.mark.asyncio
+    async def test_crawl_data_storage_exception_handling(self, mock_crawler_manager_dependencies, mock_successful_crawl_result):
+        """测试数据存储异常处理"""
+        deps = mock_crawler_manager_dependencies
+        deps['flow'].execute_crawl_task.return_value = mock_successful_crawl_result
+        
+        # Mock数据库操作抛出异常
+        deps['book_service'].create_or_update_book.side_effect = Exception("Database error")
+        
+        manager = CrawlerManager()
+        results = await manager.crawl("test_task_1")
+        
+        # 验证爬取结果依然返回
+        assert len(results) == 1
+        assert results[0] == mock_successful_crawl_result
+        
+        # 验证异常被捕获，事务被回滚
+        deps['db'].rollback.assert_called_once()
+        deps['logger'].error.assert_called()

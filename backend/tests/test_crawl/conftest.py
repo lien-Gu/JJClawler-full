@@ -327,7 +327,14 @@ def mock_crawler_manager_dependencies(mocker):
     
     # Mock CrawlFlow
     mock_flow_class = mocker.patch('app.crawl.manager.CrawlFlow')
-    mock_flow = mocker.AsyncMock()
+    mock_flow = mocker.MagicMock()
+    # 只有异步方法才使用AsyncMock
+    mock_flow.execute_crawl_task = mocker.AsyncMock()
+    mock_flow.execute_multiple_tasks = mocker.AsyncMock() 
+    mock_flow.close = mocker.AsyncMock()
+    # 同步方法使用普通的Mock
+    mock_flow.get_stats = mocker.MagicMock()
+    mock_flow.get_all_data = mocker.MagicMock()
     mock_flow_class.return_value = mock_flow
     
     # Mock CrawlConfig for manager tests
@@ -335,10 +342,37 @@ def mock_crawler_manager_dependencies(mocker):
     mock_config = mocker.MagicMock()
     mock_config_class.return_value = mock_config
     
+    # Mock database services
+    mock_book_service_class = mocker.patch('app.crawl.manager.BookService')
+    mock_book_service = mocker.MagicMock()
+    mock_book_service_class.return_value = mock_book_service
+    
+    mock_ranking_service_class = mocker.patch('app.crawl.manager.RankingService')
+    mock_ranking_service = mocker.MagicMock()
+    mock_ranking_service_class.return_value = mock_ranking_service
+    
+    # Mock database connection
+    mock_get_db = mocker.patch('app.crawl.manager.get_db')
+    mock_db = mocker.MagicMock()
+    mock_get_db.return_value = [mock_db]  # 模拟生成器返回单个数据库会话
+    
+    # Mock logging
+    mock_logging = mocker.patch('app.crawl.manager.logging')
+    mock_logger = mocker.MagicMock()
+    mock_logging.getLogger.return_value = mock_logger
+    
     return {
         'settings': mock_settings,
         'flow_class': mock_flow_class,
         'flow': mock_flow,
         'config_class': mock_config_class,
-        'config': mock_config
+        'config': mock_config,
+        'book_service_class': mock_book_service_class,
+        'book_service': mock_book_service,
+        'ranking_service_class': mock_ranking_service_class,
+        'ranking_service': mock_ranking_service,
+        'get_db': mock_get_db,
+        'db': mock_db,
+        'logging': mock_logging,
+        'logger': mock_logger
     }
