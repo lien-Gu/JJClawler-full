@@ -37,8 +37,7 @@ def sample_book(test_db: Session) -> Book:
     """创建示例书籍"""
     book = Book(
         novel_id=12345,
-        title="测试小说",
-        author="测试作者"
+        title="测试小说"
     )
     test_db.add(book)
     test_db.commit()
@@ -53,8 +52,7 @@ def sample_books(test_db: Session) -> list[Book]:
     for i in range(5):
         book = Book(
             novel_id=10000 + i,
-            title=f"测试小说{i+1}",
-            author=f"作者{i+1}"
+            title=f"测试小说{i+1}"
         )
         books.append(book)
     
@@ -75,7 +73,7 @@ def sample_book_snapshots(test_db: Session, sample_book: Book) -> list[BookSnaps
     
     for i in range(7):
         snapshot = BookSnapshot(
-            book_id=sample_book.id,
+            novel_id=sample_book.id,
             favorites=1000 + i * 10,
             clicks=5000 + i * 50,
             comments=100 + i * 5,
@@ -100,7 +98,7 @@ def sample_ranking(test_db: Session) -> Ranking:
     """创建示例榜单"""
     ranking = Ranking(
         rank_id=1,
-        name="测试榜单",
+        rank_name="测试榜单",
         page_id="test_page",
         rank_group_type="romance"
     )
@@ -117,7 +115,7 @@ def sample_rankings(test_db: Session) -> list[Ranking]:
     for i in range(3):
         ranking = Ranking(
             rank_id=100 + i,
-            name=f"测试榜单{i+1}",
+            rank_name=f"测试榜单{i+1}",
             page_id=f"test_page_{i+1}",
             rank_group_type="romance" if i % 2 == 0 else "fantasy"
         )
@@ -176,7 +174,7 @@ def sample_complete_data(
     for book in sample_books:
         for day in range(30):
             snapshot = BookSnapshot(
-                book_id=book.id,
+                novel_id=book.id,
                 favorites=1000 + day * 10,
                 clicks=5000 + day * 50,
                 comments=100 + day * 5,

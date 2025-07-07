@@ -102,21 +102,21 @@ def _create_test_data(db):
     test_rankings = [
         Ranking(
             rank_id=1,
-            name="晋江VIP完结榜",
+            rank_name="晋江VIP完结榜",
             rank_group_type="VIP",
             page_id="vip_complete",
             created_at=datetime.now()
         ),
         Ranking(
             rank_id=2,
-            name="原创小说风云榜",
+            rank_name="原创小说风云榜",
             rank_group_type="原创",
             page_id="original_popular",
             created_at=datetime.now()
         ),
         Ranking(
             rank_id=3,
-            name="现代言情榜",
+            rank_name="现代言情榜",
             rank_group_type="现代",
             page_id="modern_romance",
             created_at=datetime.now()
@@ -135,7 +135,7 @@ def _create_test_data(db):
         for day in range(30):
             snapshot_time = base_time + timedelta(days=day)
             snapshot = BookSnapshot(
-                book_id=book.id,
+                novel_id=book.id,
                 clicks=1000 + i * 100 + day * 10,
                 favorites=500 + i * 50 + day * 5,
                 comments=100 + i * 10 + day * 2,
@@ -156,7 +156,7 @@ def _create_test_data(db):
                 book_id = ((day + pos + ranking.rank_id) % 5) + 1
                 
                 ranking_snapshot = RankingSnapshot(
-                    ranking_id=ranking.rank_id,
+                    ranking_id=ranking.id,
                     book_id=book_id,
                     position=pos,
                     snapshot_time=snapshot_time

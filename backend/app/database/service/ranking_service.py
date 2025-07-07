@@ -145,7 +145,7 @@ class RankingService:
         for snapshot in snapshots:
             history_data.append({
                 "ranking_id": snapshot.ranking.id,
-                "ranking_name": snapshot.ranking.name,
+                "ranking_name": snapshot.ranking.rank_name,
                 "position": snapshot.position,
                 "score": snapshot.score,
                 "snapshot_time": snapshot.snapshot_time
@@ -205,8 +205,7 @@ class RankingService:
                 book_ids.add(snapshot.book_id)
                 all_books[snapshot.book_id] = {
                     "id": snapshot.book.id,
-                    "title": snapshot.book.title,
-                    "author": snapshot.book.author
+                    "title": snapshot.book.title
                 }
             ranking_books[ranking_id] = book_ids
         
@@ -217,7 +216,7 @@ class RankingService:
             "rankings": [
                 {
                     "ranking_id": r.id,
-                    "name": r.name,
+                    "name": r.rank_name,
                     "page_id": r.page_id
                 } for r in rankings
             ],
@@ -227,7 +226,6 @@ class RankingService:
                     {
                         "book_id": s.book_id,
                         "title": s.book.title,
-                        "author": s.book.author,
                         "position": s.position,
                         "score": s.score
                     } for s in snapshots

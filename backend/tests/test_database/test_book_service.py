@@ -51,7 +51,7 @@ class TestBookService:
         results = service.get_book_trend(test_db, sample_book.id, days=7)
         assert isinstance(results, list)
         if results:
-            assert all(snapshot.book_id == sample_book.id for snapshot in results)
+            assert all(snapshot.novel_id == sample_book.id for snapshot in results)
     
     def test_get_book_trend_hourly(self, test_db: Session, sample_book: Book, sample_book_snapshots: list[BookSnapshot]):
         """测试按小时获取书籍趋势数据"""
@@ -92,8 +92,7 @@ class TestBookService:
         
         book_data = {
             "novel_id": 88888,
-            "title": "服务测试书籍",
-            "author": "服务测试作者"
+            "title": "服务测试书籍"
         }
         
         book = service.create_or_update_book(test_db, book_data)
@@ -103,8 +102,7 @@ class TestBookService:
         # 测试更新
         update_data = {
             "novel_id": 88888,
-            "title": "更新的服务测试书籍",
-            "author": "服务测试作者"
+            "title": "更新的服务测试书籍"
         }
         
         updated_book = service.create_or_update_book(test_db, update_data)
@@ -116,7 +114,7 @@ class TestBookService:
         service = BookService()
         
         snapshot_data = {
-            "book_id": sample_book.id,
+            "novel_id": sample_book.id,
             "favorites": 2000,
             "clicks": 10000,
             "comments": 200,
@@ -125,7 +123,7 @@ class TestBookService:
         }
         
         snapshot = service.create_book_snapshot(test_db, snapshot_data)
-        assert snapshot.book_id == sample_book.id
+        assert snapshot.novel_id == sample_book.id
         assert snapshot.favorites == 2000
     
     def test_batch_create_book_snapshots(self, test_db: Session, sample_book: Book):
@@ -134,7 +132,7 @@ class TestBookService:
         
         snapshots_data = [
             {
-                "book_id": sample_book.id,
+                "novel_id": sample_book.id,
                 "favorites": 1000 + i * 100,
                 "clicks": 5000 + i * 500,
                 "comments": 100 + i * 10,
@@ -146,7 +144,7 @@ class TestBookService:
         
         snapshots = service.batch_create_book_snapshots(test_db, snapshots_data)
         assert len(snapshots) == 3
-        assert all(snapshot.book_id == sample_book.id for snapshot in snapshots)
+        assert all(snapshot.novel_id == sample_book.id for snapshot in snapshots)
     
     def test_cleanup_old_snapshots(self, test_db: Session, sample_book: Book, sample_book_snapshots: list[BookSnapshot]):
         """测试清理旧快照"""

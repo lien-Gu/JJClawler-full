@@ -18,7 +18,7 @@ class TestRankingDAO:
         result = ranking_dao.get_by_rank_id(test_db, sample_ranking.rank_id)
         assert result is not None
         assert result.rank_id == sample_ranking.rank_id
-        assert result.name == sample_ranking.name
+        assert result.rank_name == sample_ranking.rank_name
     
     def test_get_by_page_id(self, test_db: Session, sample_rankings: list[Ranking]):
         """测试根据page_id获取榜单列表"""
@@ -42,24 +42,24 @@ class TestRankingDAO:
         # 创建新榜单
         ranking_data = {
             "rank_id": 99999,
-            "name": "新榜单",
+            "rank_name": "新榜单",
             "page_id": "new_page",
             "rank_group_type": "fantasy"
         }
         ranking = ranking_dao.create_or_update_by_rank_id(test_db, ranking_data)
         assert ranking.rank_id == 99999
-        assert ranking.name == "新榜单"
+        assert ranking.rank_name == "新榜单"
         
         # 更新现有榜单
         update_data = {
             "rank_id": 99999,
-            "name": "更新的榜单",
+            "rank_name": "更新的榜单",
             "page_id": "new_page",
             "rank_group_type": "fantasy"
         }
         updated_ranking = ranking_dao.create_or_update_by_rank_id(test_db, update_data)
         assert updated_ranking.id == ranking.id
-        assert updated_ranking.name == "更新的榜单"
+        assert updated_ranking.rank_name == "更新的榜单"
 
 
 class TestRankingSnapshotDAO:

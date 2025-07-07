@@ -67,7 +67,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         """获取书籍最新快照"""
         return db.scalar(
             select(BookSnapshot)
-            .where(BookSnapshot.book_id == book_id)
+            .where(BookSnapshot.novel_id == book_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(1)
         )
@@ -81,7 +81,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             limit: int = 30
     ) -> List[BookSnapshot]:
         """获取书籍趋势数据"""
-        query = select(BookSnapshot).where(BookSnapshot.book_id == book_id)
+        query = select(BookSnapshot).where(BookSnapshot.novel_id == book_id)
 
         if start_time:
             query = query.where(BookSnapshot.snapshot_time >= start_time)
@@ -130,7 +130,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 MIN(snapshot_time) as period_start,
                 MAX(snapshot_time) as period_end
             FROM book_snapshots
-            WHERE book_id = :book_id 
+            WHERE novel_id = :book_id 
                 AND snapshot_time >= :start_time 
                 AND snapshot_time <= :end_time
             GROUP BY {time_group}
@@ -292,7 +292,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 func.max(BookSnapshot.comments).label("max_comments"),
                 func.min(BookSnapshot.snapshot_time).label("first_snapshot_time"),
                 func.max(BookSnapshot.snapshot_time).label("last_snapshot_time")
-            ).where(BookSnapshot.book_id == book_id)
+            ).where(BookSnapshot.novel_id == book_id)
         ).first()
 
         if result:
@@ -318,7 +318,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         # 获取要保留的快照IDs
         result = db.execute(
             select(BookSnapshot.id)
-            .where(BookSnapshot.book_id == book_id)
+            .where(BookSnapshot.novel_id == book_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(keep_count)
         )
@@ -329,7 +329,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             delete(BookSnapshot)
             .where(
                 and_(
-                    BookSnapshot.book_id == book_id,
+                    BookSnapshot.novel_id == book_id,
                     BookSnapshot.snapshot_time < before_time,
                     ~BookSnapshot.id.in_(keep_ids)
                 )

@@ -103,8 +103,8 @@ class Parser:
                     books.append(book_info)
             
             ranking_info = {
-                "ranking_id": "jiazi",
-                "ranking_name": "夹子榜",
+                "rank_id": "jiazi",
+                "rank_name": "夹子榜",
                 "books": books
             }
             

@@ -18,7 +18,7 @@ class TestRankingService:
         result = service.get_ranking_by_id(test_db, sample_ranking.id)
         assert result is not None
         assert result.id == sample_ranking.id
-        assert result.name == sample_ranking.name
+        assert result.rank_name == sample_ranking.rank_name
     
     def test_get_ranking_by_rank_id(self, test_db: Session, sample_ranking: Ranking):
         """测试根据rank_id获取榜单"""
@@ -26,7 +26,7 @@ class TestRankingService:
         result = service.get_ranking_by_rank_id(test_db, sample_ranking.rank_id)
         assert result is not None
         assert result.rank_id == sample_ranking.rank_id
-        assert result.name == sample_ranking.name
+        assert result.rank_name == sample_ranking.rank_name
     
     def test_get_rankings_by_page_id(self, test_db: Session, sample_rankings: list[Ranking]):
         """测试根据页面ID获取榜单列表"""
@@ -114,26 +114,26 @@ class TestRankingService:
         
         ranking_data = {
             "rank_id": 77777,
-            "name": "服务测试榜单",
+            "rank_name": "服务测试榜单",
             "page_id": "service_test_page",
             "rank_group_type": "fantasy"
         }
         
         ranking = service.create_or_update_ranking(test_db, ranking_data)
         assert ranking.rank_id == 77777
-        assert ranking.name == "服务测试榜单"
+        assert ranking.rank_name == "服务测试榜单"
         
         # 测试更新
         update_data = {
             "rank_id": 77777,
-            "name": "更新的服务测试榜单",
+            "rank_name": "更新的服务测试榜单",
             "page_id": "service_test_page",
             "rank_group_type": "fantasy"
         }
         
         updated_ranking = service.create_or_update_ranking(test_db, update_data)
         assert updated_ranking.id == ranking.id
-        assert updated_ranking.name == "更新的服务测试榜单"
+        assert updated_ranking.rank_name == "更新的服务测试榜单"
     
     def test_create_ranking_snapshot(self, test_db: Session, sample_ranking: Ranking, sample_books: list):
         """测试创建榜单快照"""

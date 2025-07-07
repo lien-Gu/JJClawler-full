@@ -49,5 +49,5 @@ class BookSnapshot(Base):
 
     # 复合索引
     __table_args__ = (
-        Index("idx_book_snapshot_time", "book_id", "snapshot_time"),
+        Index("idx_book_snapshot_time", "novel_id", "snapshot_time"),
     )

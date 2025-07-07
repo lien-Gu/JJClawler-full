@@ -191,8 +191,7 @@ class CrawlFlow:
             if book_id not in self.crawled_book_ids:
                 unique_ids.append(book_id)
                 self.crawled_book_ids.add(book_id)
-            else:
-                self.stats['duplicate_books_skipped'] += 1
+            # 跳过重复的书籍ID
         
         print(f"去重后书籍ID: {len(unique_ids)} 个")
         return unique_ids
@@ -258,11 +257,7 @@ class CrawlFlow:
             'url': url,
             'rankings': rankings,
             'books': books,
-            'pages_crawled': self.stats['pages_crawled'],
-            'rankings_found': len(rankings),
-            'books_found': self.stats['books_found'],
             'books_crawled': len(books),
-            'duplicate_books_skipped': self.stats['duplicate_books_skipped'],
             'stats': self.stats.copy(),
             'timestamp': time.time()
         }
