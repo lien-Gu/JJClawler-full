@@ -1,461 +1,376 @@
 """
-调度模块单元测试 - 测试TaskScheduler类的各个方法和功能
+调度模块单元测试 - 测试重构后的调度模块核心功能
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from datetime import datetime, timedelta
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, JobExecutionEvent
-from apscheduler.job import Job
 import asyncio
+import pytest
+from unittest.mock import Mock, patch, AsyncMock
+from datetime import datetime
 
-# 跳过此测试类，因为scheduler模块不存在
-pytest.skip("Scheduler module not available", allow_module_level=True)
-
-# 假设的导入（根据项目实际结构调整）
-# from app.scheduler.task_scheduler import TaskScheduler
-# from app.scheduler.jobs import JobManager
+from app.schedule import TaskScheduler, get_scheduler, BaseJobHandler, JobContext, JobResult
+from app.models.schedule import JobStatus, TriggerType, JobHandlerType, PREDEFINED_JOB_CONFIGS
 
 
 class TestTaskScheduler:
-    """TaskScheduler单元测试类"""
+    """TaskScheduler核心功能测试"""
     
     def setup_method(self):
         """每个测试方法执行前的设置"""
+        # 清除全局单例
+        import app.schedule
+        app.schedule._scheduler = None
+        
+        # 创建新的调度器实例
         self.scheduler = TaskScheduler()
-        self.mock_apscheduler = Mock(spec=AsyncIOScheduler)
-        self.scheduler.scheduler = self.mock_apscheduler
-    
-    def test_init_scheduler(self, scheduler_config):
+        
+    def test_scheduler_initialization(self):
         """测试调度器初始化"""
-        # 测试默认初始化
         scheduler = TaskScheduler()
-        assert scheduler.timezone == "Asia/Shanghai"
-        assert scheduler.job_defaults is not None
-        assert scheduler.executors is not None
         
-        # 测试自定义配置初始化
-        custom_config = scheduler_config.copy()
-        custom_config["timezone"] = "UTC"
-        scheduler_custom = TaskScheduler(config=custom_config)
-        assert scheduler_custom.timezone == "UTC"
-    
-    def test_start_scheduler_success(self):
-        """测试成功启动调度器"""
-        self.mock_apscheduler.start = Mock()
-        self.mock_apscheduler.running = False
+        # 验证初始状态
+        assert scheduler.scheduler is None
+        assert scheduler.start_time is None
+        assert len(scheduler.job_handlers) == 3
+        assert JobHandlerType.CRAWL in scheduler.job_handlers
+        assert JobHandlerType.MAINTENANCE in scheduler.job_handlers
+        assert JobHandlerType.REPORT in scheduler.job_handlers
         
-        # 执行启动
-        self.scheduler.start()
+    def test_scheduler_singleton(self):
+        """测试调度器单例模式"""
+        scheduler1 = get_scheduler()
+        scheduler2 = get_scheduler()
         
-        # 验证调用
-        self.mock_apscheduler.start.assert_called_once()
-        assert self.scheduler.is_running is True
-    
-    def test_start_scheduler_already_running(self):
-        """测试调度器已经在运行的情况"""
-        self.mock_apscheduler.running = True
-        self.mock_apscheduler.start = Mock()
+        assert scheduler1 is scheduler2
         
-        # 执行启动
-        self.scheduler.start()
+    @patch('app.schedule.TaskScheduler._create_scheduler')
+    async def test_start_scheduler(self, mock_create_scheduler):
+        """测试调度器启动"""
+        mock_apscheduler = Mock()
+        mock_create_scheduler.return_value = mock_apscheduler
         
-        # 验证不会重复启动
-        self.mock_apscheduler.start.assert_not_called()
-    
-    def test_start_scheduler_with_exception(self):
-        """测试启动调度器时发生异常"""
-        self.mock_apscheduler.start = Mock(side_effect=Exception("启动失败"))
-        self.mock_apscheduler.running = False
+        # 启动调度器
+        await self.scheduler.start()
         
-        # 执行启动并验证异常
-        with pytest.raises(Exception) as exc_info:
-            self.scheduler.start()
+        # 验证状态
+        assert self.scheduler.scheduler is not None
+        assert self.scheduler.start_time is not None
+        mock_apscheduler.start.assert_called_once()
         
-        assert "启动失败" in str(exc_info.value)
-        assert self.scheduler.is_running is False
-    
-    def test_stop_scheduler_success(self):
-        """测试成功停止调度器"""
-        self.mock_apscheduler.shutdown = Mock()
-        self.mock_apscheduler.running = True
-        self.scheduler.is_running = True
+    async def test_start_scheduler_already_running(self):
+        """测试重复启动调度器"""
+        self.scheduler.scheduler = Mock()
         
-        # 执行停止
-        self.scheduler.stop()
+        # 尝试重复启动
+        await self.scheduler.start()
         
-        # 验证调用
-        self.mock_apscheduler.shutdown.assert_called_once_with(wait=True)
-        assert self.scheduler.is_running is False
-    
-    def test_stop_scheduler_not_running(self):
-        """测试停止未运行的调度器"""
-        self.mock_apscheduler.running = False
-        self.mock_apscheduler.shutdown = Mock()
-        self.scheduler.is_running = False
+        # 验证不会创建新的调度器
+        assert self.scheduler.scheduler is not None
         
-        # 执行停止
-        self.scheduler.stop()
+    @patch('app.schedule.TaskScheduler._create_scheduler')
+    async def test_shutdown_scheduler(self, mock_create_scheduler):
+        """测试调度器关闭"""
+        mock_apscheduler = Mock()
+        mock_create_scheduler.return_value = mock_apscheduler
         
-        # 验证不会调用shutdown
-        self.mock_apscheduler.shutdown.assert_not_called()
-    
-    def test_add_job_success(self, sample_job_data):
-        """测试成功添加任务"""
-        job_config = sample_job_data["jiazi_crawl_job"]
-        mock_job = Mock(spec=Job)
-        mock_job.id = job_config["id"]
+        # 先启动再关闭
+        await self.scheduler.start()
+        await self.scheduler.shutdown()
         
-        self.mock_apscheduler.add_job = Mock(return_value=mock_job)
+        # 验证状态
+        assert self.scheduler.scheduler is None
+        assert self.scheduler.start_time is None
+        mock_apscheduler.shutdown.assert_called_once_with(wait=True)
         
-        # 执行添加任务
-        result = self.scheduler.add_job(
-            func=job_config["func"],
-            trigger=job_config["trigger"],
-            id=job_config["id"],
-            name=job_config["name"],
-            hours=job_config["hours"]
+    async def test_shutdown_not_started(self):
+        """测试关闭未启动的调度器"""
+        # 关闭未启动的调度器不应该报错
+        await self.scheduler.shutdown()
+        
+        assert self.scheduler.scheduler is None
+        
+    def test_is_running_true(self):
+        """测试调度器运行状态检查 - 运行中"""
+        mock_scheduler = Mock()
+        mock_scheduler.running = True
+        self.scheduler.scheduler = mock_scheduler
+        
+        assert self.scheduler.is_running() is True
+        
+    def test_is_running_false(self):
+        """测试调度器运行状态检查 - 未运行"""
+        assert self.scheduler.is_running() is False
+        
+        mock_scheduler = Mock()
+        mock_scheduler.running = False
+        self.scheduler.scheduler = mock_scheduler
+        
+        assert self.scheduler.is_running() is False
+        
+    def test_get_status_stopped(self):
+        """测试获取停止状态的调度器状态"""
+        status = self.scheduler.get_status()
+        
+        assert status["status"] == "stopped"
+        assert status["job_count"] == 0
+        assert status["running_jobs"] == 0
+        assert status["paused_jobs"] == 0
+        assert status["uptime"] == 0.0
+        
+    def test_get_status_running(self):
+        """测试获取运行状态的调度器状态"""
+        # 模拟运行中的调度器
+        mock_scheduler = Mock()
+        mock_scheduler.running = True
+        mock_scheduler.timezone = "Asia/Shanghai"
+        mock_scheduler.state = "running"
+        
+        # 模拟任务
+        mock_jobs = [Mock(), Mock(), Mock()]
+        mock_jobs[0].next_run_time = datetime.now()
+        mock_jobs[1].next_run_time = datetime.now()
+        mock_jobs[2].next_run_time = None  # 暂停的任务
+        
+        self.scheduler.scheduler = mock_scheduler
+        self.scheduler.start_time = datetime.now()
+        
+        with patch.object(self.scheduler, 'get_jobs', return_value=mock_jobs):
+            status = self.scheduler.get_status()
+            
+            assert status["status"] == "running"
+            assert status["job_count"] == 3
+            assert status["running_jobs"] == 2
+            assert status["paused_jobs"] == 1
+            assert status["uptime"] > 0
+            
+    def test_get_metrics(self):
+        """测试获取调度器指标"""
+        with patch.object(self.scheduler, 'get_status') as mock_get_status:
+            mock_get_status.return_value = {
+                "job_count": 5,
+                "running_jobs": 3,
+                "paused_jobs": 2,
+                "status": "running",
+                "uptime": 100.0
+            }
+            
+            metrics = self.scheduler.get_metrics()
+            
+            assert metrics["total_jobs"] == 5
+            assert metrics["running_jobs"] == 3
+            assert metrics["paused_jobs"] == 2
+            assert metrics["scheduler_status"] == "running"
+            assert metrics["uptime"] == 100.0
+            assert "success_rate" in metrics
+            assert "average_execution_time" in metrics
+            
+    def test_get_job_data_by_type(self):
+        """测试根据任务类型获取任务数据"""
+        from app.models.schedule import IntervalJobConfigModel
+        
+        # 测试各种任务类型
+        jiazi_config = IntervalJobConfigModel(
+            job_id="jiazi_crawl",
+            handler_class=JobHandlerType.CRAWL,
+            interval_seconds=3600
         )
         
-        # 验证结果
-        assert result == mock_job
-        self.mock_apscheduler.add_job.assert_called_once()
-    
-    def test_add_job_with_exception(self, sample_job_data):
-        """测试添加任务时发生异常"""
-        job_config = sample_job_data["jiazi_crawl_job"]
-        self.mock_apscheduler.add_job = Mock(side_effect=Exception("添加失败"))
+        data = self.scheduler._get_job_data_by_type(jiazi_config)
+        assert data["type"] == "jiazi"
         
-        # 执行添加任务并验证异常
-        with pytest.raises(Exception) as exc_info:
-            self.scheduler.add_job(
-                func=job_config["func"],
-                trigger=job_config["trigger"],
-                id=job_config["id"],
-                name=job_config["name"],
-                hours=job_config["hours"]
-            )
-        
-        assert "添加失败" in str(exc_info.value)
-    
-    def test_remove_job_success(self):
-        """测试成功删除任务"""
-        job_id = "test_job_id"
-        self.mock_apscheduler.remove_job = Mock()
-        
-        # 执行删除任务
-        self.scheduler.remove_job(job_id)
-        
-        # 验证调用
-        self.mock_apscheduler.remove_job.assert_called_once_with(job_id)
-    
-    def test_remove_job_not_found(self):
-        """测试删除不存在的任务"""
-        job_id = "non_existent_job"
-        self.mock_apscheduler.remove_job = Mock(side_effect=Exception("任务不存在"))
-        
-        # 执行删除任务并验证异常
-        with pytest.raises(Exception) as exc_info:
-            self.scheduler.remove_job(job_id)
-        
-        assert "任务不存在" in str(exc_info.value)
-    
-    def test_pause_job_success(self):
-        """测试成功暂停任务"""
-        job_id = "test_job_id"
-        self.mock_apscheduler.pause_job = Mock()
-        
-        # 执行暂停任务
-        self.scheduler.pause_job(job_id)
-        
-        # 验证调用
-        self.mock_apscheduler.pause_job.assert_called_once_with(job_id)
-    
-    def test_resume_job_success(self):
-        """测试成功恢复任务"""
-        job_id = "test_job_id"
-        self.mock_apscheduler.resume_job = Mock()
-        
-        # 执行恢复任务
-        self.scheduler.resume_job(job_id)
-        
-        # 验证调用
-        self.mock_apscheduler.resume_job.assert_called_once_with(job_id)
-    
-    def test_get_job_success(self):
-        """测试成功获取任务"""
-        job_id = "test_job_id"
-        mock_job = Mock(spec=Job)
-        mock_job.id = job_id
-        mock_job.name = "测试任务"
-        
-        self.mock_apscheduler.get_job = Mock(return_value=mock_job)
-        
-        # 执行获取任务
-        result = self.scheduler.get_job(job_id)
-        
-        # 验证结果
-        assert result == mock_job
-        self.mock_apscheduler.get_job.assert_called_once_with(job_id)
-    
-    def test_get_job_not_found(self):
-        """测试获取不存在的任务"""
-        job_id = "non_existent_job"
-        self.mock_apscheduler.get_job = Mock(return_value=None)
-        
-        # 执行获取任务
-        result = self.scheduler.get_job(job_id)
-        
-        # 验证结果
-        assert result is None
-    
-    def test_get_jobs_success(self, mock_scheduler_jobs):
-        """测试成功获取任务列表"""
-        mock_jobs = []
-        for job_data in mock_scheduler_jobs:
-            mock_job = Mock(spec=Job)
-            mock_job.id = job_data["id"]
-            mock_job.name = job_data["name"]
-            mock_job.func = job_data["func"]
-            mock_job.trigger = job_data["trigger"]
-            mock_job.next_run_time = datetime.fromisoformat(job_data["next_run_time"])
-            mock_jobs.append(mock_job)
-        
-        self.mock_apscheduler.get_jobs = Mock(return_value=mock_jobs)
-        
-        # 执行获取任务列表
-        result = self.scheduler.get_jobs()
-        
-        # 验证结果
-        assert len(result) == len(mock_scheduler_jobs)
-        assert all(isinstance(job, Mock) for job in result)
-        self.mock_apscheduler.get_jobs.assert_called_once()
-    
-    def test_get_jobs_empty(self):
-        """测试获取空任务列表"""
-        self.mock_apscheduler.get_jobs = Mock(return_value=[])
-        
-        # 执行获取任务列表
-        result = self.scheduler.get_jobs()
-        
-        # 验证结果
-        assert result == []
-    
-    def test_modify_job_success(self):
-        """测试成功修改任务"""
-        job_id = "test_job_id"
-        changes = {"hours": 2, "name": "修改后的任务"}
-        
-        self.mock_apscheduler.modify_job = Mock()
-        
-        # 执行修改任务
-        self.scheduler.modify_job(job_id, **changes)
-        
-        # 验证调用
-        self.mock_apscheduler.modify_job.assert_called_once_with(job_id, **changes)
-    
-    def test_modify_job_not_found(self):
-        """测试修改不存在的任务"""
-        job_id = "non_existent_job"
-        changes = {"hours": 2}
-        
-        self.mock_apscheduler.modify_job = Mock(side_effect=Exception("任务不存在"))
-        
-        # 执行修改任务并验证异常
-        with pytest.raises(Exception) as exc_info:
-            self.scheduler.modify_job(job_id, **changes)
-        
-        assert "任务不存在" in str(exc_info.value)
-    
-    def test_reschedule_job_success(self):
-        """测试成功重新调度任务"""
-        job_id = "test_job_id"
-        trigger = "interval"
-        trigger_args = {"hours": 3}
-        
-        self.mock_apscheduler.reschedule_job = Mock()
-        
-        # 执行重新调度任务
-        self.scheduler.reschedule_job(job_id, trigger, **trigger_args)
-        
-        # 验证调用
-        self.mock_apscheduler.reschedule_job.assert_called_once_with(
-            job_id, trigger=trigger, **trigger_args
+        category_config = IntervalJobConfigModel(
+            job_id="category_crawl",
+            handler_class=JobHandlerType.CRAWL,
+            interval_seconds=3600
         )
-    
-    def test_get_scheduler_info_success(self, mock_scheduler_statistics):
-        """测试成功获取调度器信息"""
-        # 模拟调度器状态
-        self.mock_apscheduler.running = True
-        self.mock_apscheduler.get_jobs = Mock(return_value=[Mock(), Mock(), Mock()])
         
-        with patch.object(self.scheduler, 'get_scheduler_statistics') as mock_stats:
-            mock_stats.return_value = mock_scheduler_statistics
-            
-            # 执行获取调度器信息
-            result = self.scheduler.get_scheduler_info()
-            
-            # 验证结果
-            assert result["running"] is True
-            assert result["total_jobs"] == 3
-            assert "statistics" in result
-            assert result["statistics"] == mock_scheduler_statistics
-    
-    def test_get_scheduler_info_not_running(self):
-        """测试获取未运行调度器的信息"""
-        self.mock_apscheduler.running = False
+        data = self.scheduler._get_job_data_by_type(category_config)
+        assert data["type"] == "category"
         
-        # 执行获取调度器信息
-        result = self.scheduler.get_scheduler_info()
-        
-        # 验证结果
-        assert result["running"] is False
-        assert result["total_jobs"] == 0
-    
-    def test_job_execution_event_success(self, mock_task_execution_data):
-        """测试任务执行成功事件处理"""
-        execution_data = mock_task_execution_data["successful_execution"]
-        
-        # 创建模拟事件
-        mock_event = Mock(spec=JobExecutionEvent)
-        mock_event.job_id = execution_data["job_id"]
-        mock_event.scheduled_run_time = datetime.fromisoformat(execution_data["start_time"])
-        mock_event.retval = execution_data["result"]
-        mock_event.exception = None
-        
-        # 执行事件处理
-        with patch.object(self.scheduler, '_handle_job_execution') as mock_handler:
-            self.scheduler._on_job_executed(mock_event)
-            
-            # 验证调用
-            mock_handler.assert_called_once_with(mock_event, success=True)
-    
-    def test_job_execution_event_failure(self, mock_task_execution_data):
-        """测试任务执行失败事件处理"""
-        execution_data = mock_task_execution_data["failed_execution"]
-        
-        # 创建模拟事件
-        mock_event = Mock(spec=JobExecutionEvent)
-        mock_event.job_id = execution_data["job_id"]
-        mock_event.scheduled_run_time = datetime.fromisoformat(execution_data["start_time"])
-        mock_event.retval = None
-        mock_event.exception = Exception(execution_data["error"])
-        
-        # 执行事件处理
-        with patch.object(self.scheduler, '_handle_job_execution') as mock_handler:
-            self.scheduler._on_job_error(mock_event)
-            
-            # 验证调用
-            mock_handler.assert_called_once_with(mock_event, success=False)
-    
-    def test_add_event_listener_success(self):
-        """测试成功添加事件监听器"""
-        self.mock_apscheduler.add_listener = Mock()
-        
-        # 执行添加事件监听器
-        self.scheduler.add_event_listener(EVENT_JOB_EXECUTED, self.scheduler._on_job_executed)
-        
-        # 验证调用
-        self.mock_apscheduler.add_listener.assert_called_once_with(
-            self.scheduler._on_job_executed, EVENT_JOB_EXECUTED
+        # 测试未知任务类型
+        unknown_config = IntervalJobConfigModel(
+            job_id="unknown_task",
+            handler_class=JobHandlerType.CRAWL,
+            interval_seconds=3600
         )
+        
+        data = self.scheduler._get_job_data_by_type(unknown_config)
+        assert data == {}
+
+
+class TestJobHandlers:
+    """任务处理器测试"""
     
-    def test_remove_event_listener_success(self):
-        """测试成功移除事件监听器"""
-        self.mock_apscheduler.remove_listener = Mock()
+    def setup_method(self):
+        """每个测试方法执行前的设置"""
+        # 创建一个具体的处理器实例用于测试
+        class TestHandler(BaseJobHandler):
+            async def execute(self, context):
+                return JobResult.success_result("测试成功")
         
-        # 执行移除事件监听器
-        self.scheduler.remove_event_listener(self.scheduler._on_job_executed)
+        self.handler = TestHandler()
         
-        # 验证调用
-        self.mock_apscheduler.remove_listener.assert_called_once_with(
-            self.scheduler._on_job_executed
+    def test_job_context_creation(self):
+        """测试任务上下文创建"""
+        context = JobContext(
+            job_id="test_job",
+            job_name="测试任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"key": "value"}
         )
+        
+        assert context.job_id == "test_job"
+        assert context.job_name == "测试任务"
+        assert context.job_data == {"key": "value"}
+        assert context.retry_count == 0
+        assert context.max_retries == 3
+        
+    def test_job_context_to_model(self):
+        """测试任务上下文转换为模型"""
+        context = JobContext(
+            job_id="test_job",
+            job_name="测试任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now()
+        )
+        
+        model = context.to_model()
+        assert model.job_id == "test_job"
+        assert model.job_name == "测试任务"
+        
+    def test_job_result_success(self):
+        """测试成功结果创建"""
+        result = JobResult.success_result("任务完成", {"count": 10})
+        
+        assert result.success is True
+        assert result.message == "任务完成"
+        assert result.data == {"count": 10}
+        assert result.exception is None
+        
+    def test_job_result_error(self):
+        """测试错误结果创建"""
+        exception = Exception("测试错误")
+        result = JobResult.error_result("任务失败", exception)
+        
+        assert result.success is False
+        assert result.message == "任务失败"
+        assert result.exception == exception
+        assert result.data is None
+        
+    def test_job_result_to_model(self):
+        """测试任务结果转换为模型"""
+        result = JobResult.success_result("任务完成", {"count": 10})
+        
+        model = result.to_model()
+        assert model.success is True
+        assert model.message == "任务完成"
+        assert model.data == {"count": 10}
+        
+    def test_should_retry_retryable_exception(self):
+        """测试可重试异常"""
+        connection_error = ConnectionError("连接失败")
+        assert self.handler.should_retry(connection_error, 0) is True
+        
+        timeout_error = TimeoutError("超时")
+        assert self.handler.should_retry(timeout_error, 0) is True
+        
+    def test_should_retry_non_retryable_exception(self):
+        """测试不可重试异常"""
+        value_error = ValueError("值错误")
+        assert self.handler.should_retry(value_error, 0) is False
+        
+        assert self.handler.should_retry(None, 0) is False
+        
+    def test_get_retry_delay(self):
+        """测试重试延迟计算"""
+        # 测试指数退避
+        assert self.handler.get_retry_delay(1) == 1
+        assert self.handler.get_retry_delay(2) == 2
+        assert self.handler.get_retry_delay(3) == 4
+        assert self.handler.get_retry_delay(4) == 8
+        
+        # 测试最大延迟限制
+        assert self.handler.get_retry_delay(10) == 60
+        
+    async def test_execute_with_retry_success(self):
+        """测试带重试的执行 - 成功情况"""
+        # 创建模拟的处理器
+        handler = Mock(spec=BaseJobHandler)
+        handler.logger = Mock()
+        handler.should_retry = Mock(return_value=False)
+        handler.get_retry_delay = Mock(return_value=1)
+        handler.on_success = AsyncMock()
+        handler.on_failure = AsyncMock()
+        handler.on_retry = AsyncMock()
+        
+        # 模拟成功执行
+        success_result = JobResult.success_result("执行成功")
+        handler.execute = AsyncMock(return_value=success_result)
+        
+        # 执行测试
+        context = JobContext(
+            job_id="test_job",
+            job_name="测试任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now()
+        )
+        
+        result = await BaseJobHandler.execute_with_retry(handler, context)
+        
+        # 验证结果
+        assert result.success is True
+        assert result.message == "执行成功"
+        handler.on_success.assert_called_once()
+        handler.on_failure.assert_not_called()
+        handler.on_retry.assert_not_called()
+
+
+class TestPredefinedJobs:
+    """预定义任务测试"""
     
-    def test_get_scheduler_statistics_success(self, mock_scheduler_statistics):
-        """测试成功获取调度器统计信息"""
-        # 模拟统计数据
-        with patch.object(self.scheduler, '_calculate_statistics') as mock_calc:
-            mock_calc.return_value = mock_scheduler_statistics
+    def test_predefined_jobs_exist(self):
+        """测试预定义任务存在"""
+        assert len(PREDEFINED_JOB_CONFIGS) == 5
+        
+        # 验证所有预定义任务都存在
+        expected_jobs = [
+            "jiazi_crawl",
+            "category_crawl", 
+            "database_cleanup",
+            "log_rotation",
+            "system_health_check"
+        ]
+        
+        for job_id in expected_jobs:
+            assert job_id in PREDEFINED_JOB_CONFIGS
             
-            # 执行获取统计信息
-            result = self.scheduler.get_scheduler_statistics()
-            
-            # 验证结果
-            assert result == mock_scheduler_statistics
-            assert result["total_jobs"] == 3
-            assert result["successful_executions"] == 145
-            assert result["failed_executions"] == 5
-            assert result["scheduler_status"] == "running"
-    
-    def test_validate_job_config_success(self, sample_job_data):
-        """测试成功验证任务配置"""
-        job_config = sample_job_data["jiazi_crawl_job"]
+    def test_predefined_job_configs(self):
+        """测试预定义任务配置"""
+        jiazi_config = PREDEFINED_JOB_CONFIGS["jiazi_crawl"]
         
-        # 执行验证任务配置
-        result = self.scheduler.validate_job_config(job_config)
+        assert jiazi_config.job_id == "jiazi_crawl"
+        assert jiazi_config.handler_class == JobHandlerType.CRAWL
+        assert jiazi_config.trigger_type == TriggerType.INTERVAL
+        assert jiazi_config.interval_seconds == 3600
+        assert jiazi_config.enabled is True
         
-        # 验证结果
-        assert result is True
-    
-    def test_validate_job_config_missing_required_field(self):
-        """测试验证缺少必需字段的任务配置"""
-        invalid_config = {
-            "id": "test_job",
-            # 缺少 func 字段
-            "trigger": "interval",
-            "hours": 1
-        }
+    def test_job_handler_types(self):
+        """测试任务处理器类型"""
+        assert JobHandlerType.CRAWL == "CrawlJobHandler"
+        assert JobHandlerType.MAINTENANCE == "MaintenanceJobHandler"
+        assert JobHandlerType.REPORT == "ReportJobHandler"
         
-        # 执行验证任务配置
-        result = self.scheduler.validate_job_config(invalid_config)
+    def test_job_status_enum(self):
+        """测试任务状态枚举"""
+        assert JobStatus.PENDING == "pending"
+        assert JobStatus.RUNNING == "running"
+        assert JobStatus.SUCCESS == "success"
+        assert JobStatus.FAILED == "failed"
+        assert JobStatus.CANCELLED == "cancelled"
+        assert JobStatus.PAUSED == "paused"
+        assert JobStatus.RETRYING == "retrying"
         
-        # 验证结果
-        assert result is False
-    
-    def test_validate_job_config_invalid_trigger(self):
-        """测试验证无效触发器的任务配置"""
-        invalid_config = {
-            "id": "test_job",
-            "func": "test_function",
-            "trigger": "invalid_trigger",  # 无效的触发器类型
-            "hours": 1
-        }
-        
-        # 执行验证任务配置
-        result = self.scheduler.validate_job_config(invalid_config)
-        
-        # 验证结果
-        assert result is False
-    
-    def test_health_check_healthy(self):
-        """测试健康检查 - 健康状态"""
-        self.mock_apscheduler.running = True
-        self.mock_apscheduler.get_jobs = Mock(return_value=[Mock(), Mock()])
-        
-        # 执行健康检查
-        result = self.scheduler.health_check()
-        
-        # 验证结果
-        assert result["status"] == "healthy"
-        assert result["scheduler_running"] is True
-        assert result["total_jobs"] == 2
-        assert "last_check_time" in result
-    
-    def test_health_check_unhealthy(self):
-        """测试健康检查 - 不健康状态"""
-        self.mock_apscheduler.running = False
-        
-        # 执行健康检查
-        result = self.scheduler.health_check()
-        
-        # 验证结果
-        assert result["status"] == "unhealthy"
-        assert result["scheduler_running"] is False
-        assert result["total_jobs"] == 0
-        assert "last_check_time" in result
-    
-    def teardown_method(self):
-        """每个测试方法执行后的清理"""
-        if hasattr(self.scheduler, 'scheduler') and self.scheduler.scheduler:
-            self.scheduler.scheduler = None 
+    def test_trigger_type_enum(self):
+        """测试触发器类型枚举"""
+        assert TriggerType.INTERVAL == "interval"
+        assert TriggerType.CRON == "cron"
+        assert TriggerType.DATE == "date"

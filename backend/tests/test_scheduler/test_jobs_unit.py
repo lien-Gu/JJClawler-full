@@ -1,220 +1,298 @@
 """
-任务管理器单元测试 - 测试JobManager类的各个方法和定时任务功能
+调度任务处理器单元测试 - 测试具体的任务处理器实现
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from datetime import datetime, timedelta
-import asyncio
+from unittest.mock import Mock, AsyncMock, patch
+from datetime import datetime
 
-# 跳过此测试类，因为scheduler模块不存在
-pytest.skip("Scheduler module not available", allow_module_level=True)
-
-# 假设的导入（根据项目实际结构调整）
-# from app.scheduler.jobs import JobManager
-# from app.scheduler.task_scheduler import TaskScheduler
-# from app.crawler.crawler import Crawler
-# from app.database.service.book_service import BookService
-# from app.database.service.ranking_service import RankingService
+from app.schedule import (
+    CrawlJobHandler, MaintenanceJobHandler, ReportJobHandler,
+    JobContext, JobResult
+)
 
 
-class TestJobManager:
-    """JobManager单元测试类"""
+class TestCrawlJobHandler:
+    """爬虫任务处理器测试"""
     
     def setup_method(self):
         """每个测试方法执行前的设置"""
-        self.mock_scheduler = Mock(spec=TaskScheduler)
-        self.mock_crawler = Mock(spec=Crawler)
-        self.mock_book_service = Mock(spec=BookService)
-        self.mock_ranking_service = Mock(spec=RankingService)
+        self.handler = CrawlJobHandler()
         
-        self.job_manager = JobManager(
-            scheduler=self.mock_scheduler,
-            crawler=self.mock_crawler,
-            book_service=self.mock_book_service,
-            ranking_service=self.mock_ranking_service
-        )
-    
-    def test_init_job_manager(self):
-        """测试JobManager初始化"""
-        assert self.job_manager.scheduler == self.mock_scheduler
-        assert self.job_manager.crawler == self.mock_crawler
-        assert self.job_manager.book_service == self.mock_book_service
-        assert self.job_manager.ranking_service == self.mock_ranking_service
-        assert self.job_manager.jobs == {}
-        assert self.job_manager.task_history == []
-    
-    def test_register_default_jobs(self, sample_job_data):
-        """测试注册默认任务"""
-        self.mock_scheduler.add_job = Mock()
-        
-        # 执行注册默认任务
-        self.job_manager.register_default_jobs()
-        
-        # 验证调用次数（应该注册多个默认任务）
-        assert self.mock_scheduler.add_job.call_count >= 3
-        
-        # 验证任务已添加到jobs字典
-        assert len(self.job_manager.jobs) >= 3
-        assert "jiazi_crawl_job" in self.job_manager.jobs
-        assert "category_crawl_job" in self.job_manager.jobs
-        assert "data_cleanup_job" in self.job_manager.jobs
-    
-    def test_register_job_success(self, sample_job_data):
-        """测试成功注册单个任务"""
-        job_config = sample_job_data["jiazi_crawl_job"]
-        mock_job = Mock()
-        mock_job.id = job_config["id"]
-        
-        self.mock_scheduler.add_job = Mock(return_value=mock_job)
-        
-        # 执行注册任务
-        result = self.job_manager.register_job(job_config)
-        
-        # 验证结果
-        assert result == mock_job
-        assert job_config["id"] in self.job_manager.jobs
-        assert self.job_manager.jobs[job_config["id"]] == job_config
-        self.mock_scheduler.add_job.assert_called_once()
-    
-    def test_register_job_with_duplicate_id(self, sample_job_data):
-        """测试注册重复ID的任务"""
-        job_config = sample_job_data["jiazi_crawl_job"]
-        
-        # 先注册一个任务
-        self.job_manager.jobs[job_config["id"]] = job_config
-        
-        # 尝试注册相同ID的任务
-        with pytest.raises(ValueError) as exc_info:
-            self.job_manager.register_job(job_config)
-        
-        assert "已存在" in str(exc_info.value)
-    
-    def test_register_job_with_invalid_config(self):
-        """测试注册无效配置的任务"""
-        invalid_config = {
-            "id": "invalid_job",
-            # 缺少必需字段
-        }
-        
-        # 执行注册任务
-        with pytest.raises(ValueError) as exc_info:
-            self.job_manager.register_job(invalid_config)
-        
-        assert "无效" in str(exc_info.value) or "配置" in str(exc_info.value)
-    
-    @pytest.mark.asyncio
-    async def test_crawl_jiazi_ranking_success(self, sample_book_data):
-        """测试成功爬取夹子榜"""
-        # 模拟爬虫返回数据
-        mock_crawl_result = {
-            "books": [sample_book_data],
-            "crawl_time": datetime.now().isoformat(),
-            "total_books": 1
-        }
-        
-        self.mock_crawler.crawl_jiazi_ranking = AsyncMock(return_value=mock_crawl_result)
-        self.mock_ranking_service.save_ranking_snapshot = AsyncMock()
-        
-        # 执行爬取夹子榜
-        result = await self.job_manager.crawl_jiazi_ranking()
-        
-        # 验证结果
-        assert result["status"] == "success"
-        assert result["books_count"] == 1
-        assert "execution_time" in result
-        
-        # 验证调用
-        self.mock_crawler.crawl_jiazi_ranking.assert_called_once()
-        self.mock_ranking_service.save_ranking_snapshot.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_crawl_jiazi_ranking_failure(self):
-        """测试爬取夹子榜失败"""
-        # 模拟爬虫抛出异常
-        self.mock_crawler.crawl_jiazi_ranking = AsyncMock(
-            side_effect=Exception("网络连接失败")
+    async def test_execute_jiazi_crawl_success(self):
+        """测试夹子榜爬取任务成功执行"""
+        context = JobContext(
+            job_id="jiazi_crawl",
+            job_name="夹子榜爬取任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "jiazi"}
         )
         
-        # 执行爬取夹子榜
-        result = await self.job_manager.crawl_jiazi_ranking()
+        result = await self.handler.execute(context)
         
-        # 验证结果
-        assert result["status"] == "failed"
-        assert "网络连接失败" in result["error"]
-        assert "execution_time" in result
+        assert result.success is True
+        assert "夹子榜爬取完成" in result.message
+        assert "crawled_count" in result.data
+        assert result.data["crawled_count"] == 50
+        
+    async def test_execute_category_crawl_success(self):
+        """测试分类榜单爬取任务成功执行"""
+        context = JobContext(
+            job_id="category_crawl",
+            job_name="分类榜单爬取任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "category"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is True
+        assert "分类榜单爬取完成" in result.message
+        assert "crawled_count" in result.data
+        assert result.data["crawled_count"] == 100
+        
+    async def test_execute_unknown_crawl_type(self):
+        """测试未知爬虫任务类型"""
+        context = JobContext(
+            job_id="unknown_crawl",
+            job_name="未知爬虫任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "unknown"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is False
+        assert "未知的爬虫任务类型" in result.message
+        
+    async def test_execute_with_exception(self):
+        """测试爬虫任务执行异常"""
+        context = JobContext(
+            job_id="jiazi_crawl",
+            job_name="夹子榜爬取任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "jiazi"}
+        )
+        
+        # 模拟异步睡眠抛出异常
+        with patch('asyncio.sleep', side_effect=Exception("网络错误")):
+            result = await self.handler.execute(context)
+            
+            assert result.success is False
+            assert "爬虫任务执行失败" in result.message
+            assert result.exception is not None
+
+
+class TestMaintenanceJobHandler:
+    """维护任务处理器测试"""
     
-    @pytest.mark.asyncio
-    async def test_cleanup_old_data_success(self):
-        """测试成功清理旧数据"""
-        # 模拟清理结果
-        cleanup_result = {
-            "deleted_books": 10,
-            "deleted_snapshots": 50,
-            "deleted_rankings": 5
-        }
+    def setup_method(self):
+        """每个测试方法执行前的设置"""
+        self.handler = MaintenanceJobHandler()
         
-        self.mock_book_service.cleanup_old_data = AsyncMock(return_value=cleanup_result)
-        self.mock_ranking_service.cleanup_old_data = AsyncMock(return_value=cleanup_result)
+    async def test_execute_database_cleanup_success(self):
+        """测试数据库清理任务成功执行"""
+        context = JobContext(
+            job_id="database_cleanup",
+            job_name="数据库清理任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "database_cleanup"}
+        )
         
-        # 执行清理旧数据
-        result = await self.job_manager.cleanup_old_data()
+        result = await self.handler.execute(context)
         
-        # 验证结果
-        assert result["status"] == "success"
-        assert result["deleted_books"] == 10
-        assert result["deleted_snapshots"] == 50
-        assert result["deleted_rankings"] == 5
-        assert "execution_time" in result
+        assert result.success is True
+        assert "数据库清理完成" in result.message
+        assert "cleaned_records" in result.data
+        assert result.data["cleaned_records"] == 1000
         
-        # 验证调用
-        self.mock_book_service.cleanup_old_data.assert_called_once()
-        self.mock_ranking_service.cleanup_old_data.assert_called_once()
+    async def test_execute_log_rotation_success(self):
+        """测试日志轮转任务成功执行"""
+        context = JobContext(
+            job_id="log_rotation",
+            job_name="日志轮转任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "log_rotation"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is True
+        assert "日志轮转完成" in result.message
+        assert "rotated_files" in result.data
+        assert result.data["rotated_files"] == 5
+        
+    async def test_execute_health_check_success(self):
+        """测试健康检查任务成功执行"""
+        context = JobContext(
+            job_id="system_health_check",
+            job_name="系统健康检查任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "health_check"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is True
+        assert "系统健康检查完成" in result.message
+        assert "status" in result.data
+        assert result.data["status"] == "healthy"
+        
+    async def test_execute_unknown_maintenance_type(self):
+        """测试未知维护任务类型"""
+        context = JobContext(
+            job_id="unknown_maintenance",
+            job_name="未知维护任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "unknown"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is False
+        assert "未知的维护任务类型" in result.message
+        
+    async def test_execute_with_exception(self):
+        """测试维护任务执行异常"""
+        context = JobContext(
+            job_id="database_cleanup",
+            job_name="数据库清理任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "database_cleanup"}
+        )
+        
+        # 模拟异步睡眠抛出异常
+        with patch('asyncio.sleep', side_effect=Exception("磁盘错误")):
+            result = await self.handler.execute(context)
+            
+            assert result.success is False
+            assert "维护任务执行失败" in result.message
+            assert result.exception is not None
+
+
+class TestReportJobHandler:
+    """报告任务处理器测试"""
     
-    def test_get_jobs_statistics_success(self, sample_job_data, mock_task_execution_data):
-        """测试成功获取任务统计"""
-        # 添加任务
-        for job_config in sample_job_data.values():
-            self.job_manager.jobs[job_config["id"]] = job_config
+    def setup_method(self):
+        """每个测试方法执行前的设置"""
+        self.handler = ReportJobHandler()
         
-        # 添加执行历史
-        self.job_manager.task_history = list(mock_task_execution_data.values())
+    async def test_execute_data_analysis_success(self):
+        """测试数据分析报告任务成功执行"""
+        context = JobContext(
+            job_id="data_analysis_report",
+            job_name="数据分析报告任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "data_analysis"}
+        )
         
-        # 执行获取统计
-        result = self.job_manager.get_jobs_statistics()
+        result = await self.handler.execute(context)
         
-        # 验证结果
-        assert result["total_jobs"] == len(sample_job_data)
-        assert result["total_executions"] == len(mock_task_execution_data)
-        assert result["successful_executions"] >= 0
-        assert result["failed_executions"] >= 0
-        assert "average_execution_time" in result
-        assert "last_execution_time" in result
+        assert result.success is True
+        assert "数据分析报告生成完成" in result.message
+        assert "report_size" in result.data
+        assert result.data["report_size"] == "2.5MB"
+        
+    async def test_execute_unknown_report_type(self):
+        """测试未知报告任务类型"""
+        context = JobContext(
+            job_id="unknown_report",
+            job_name="未知报告任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "unknown"}
+        )
+        
+        result = await self.handler.execute(context)
+        
+        assert result.success is False
+        assert "未知的报告任务类型" in result.message
+        
+    async def test_execute_with_exception(self):
+        """测试报告任务执行异常"""
+        context = JobContext(
+            job_id="data_analysis_report",
+            job_name="数据分析报告任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            job_data={"type": "data_analysis"}
+        )
+        
+        # 模拟异步睡眠抛出异常
+        with patch('asyncio.sleep', side_effect=Exception("内存不足")):
+            result = await self.handler.execute(context)
+            
+            assert result.success is False
+            assert "报告任务执行失败" in result.message
+            assert result.exception is not None
+
+
+class TestJobHandlerIntegration:
+    """任务处理器集成测试"""
     
-    def test_validate_job_config_success(self, sample_job_data):
-        """测试成功验证任务配置"""
-        job_config = sample_job_data["jiazi_crawl_job"]
+    def test_all_handlers_inherit_from_base(self):
+        """测试所有处理器都继承自基类"""
+        from app.schedule import BaseJobHandler
         
-        # 执行验证
-        result = self.job_manager.validate_job_config(job_config)
+        crawl_handler = CrawlJobHandler()
+        maintenance_handler = MaintenanceJobHandler()
+        report_handler = ReportJobHandler()
         
-        # 验证结果
-        assert result is True
-    
-    def test_validate_job_config_missing_required_fields(self):
-        """测试验证缺少必需字段的配置"""
-        invalid_config = {
-            "id": "test_job",
-            # 缺少 func 字段
-            "trigger": "interval"
-        }
+        assert isinstance(crawl_handler, BaseJobHandler)
+        assert isinstance(maintenance_handler, BaseJobHandler)
+        assert isinstance(report_handler, BaseJobHandler)
         
-        # 执行验证
-        result = self.job_manager.validate_job_config(invalid_config)
+    def test_all_handlers_have_logger(self):
+        """测试所有处理器都有日志记录器"""
+        crawl_handler = CrawlJobHandler()
+        maintenance_handler = MaintenanceJobHandler()
+        report_handler = ReportJobHandler()
         
-        # 验证结果
-        assert result is False
-    
-    def teardown_method(self):
-        """每个测试方法执行后的清理"""
-        self.job_manager.jobs.clear()
-        self.job_manager.task_history.clear()
+        assert hasattr(crawl_handler, 'logger')
+        assert hasattr(maintenance_handler, 'logger')
+        assert hasattr(report_handler, 'logger')
+        
+        assert crawl_handler.logger.name == 'CrawlJobHandler'
+        assert maintenance_handler.logger.name == 'MaintenanceJobHandler'
+        assert report_handler.logger.name == 'ReportJobHandler'
+        
+    def test_job_context_basic_validation(self):
+        """测试任务上下文基本验证"""
+        # 测试上下文创建
+        context = JobContext(
+            job_id="test_job",
+            job_name="测试任务",
+            trigger_time=datetime.now(),
+            scheduled_time=datetime.now(),
+            max_retries=3,
+            retry_count=0
+        )
+        
+        # 验证基本属性
+        assert context.job_id == "test_job"
+        assert context.job_name == "测试任务"
+        assert context.max_retries == 3
+        assert context.retry_count == 0
+        
+    def test_job_result_basic_validation(self):
+        """测试任务结果基本验证"""
+        # 测试成功结果
+        success_result = JobResult.success_result("任务完成", {"count": 10})
+        assert success_result.success is True
+        assert success_result.message == "任务完成"
+        assert success_result.data == {"count": 10}
+        
+        # 测试错误结果
+        error_result = JobResult.error_result("任务失败", Exception("测试错误"))
+        assert error_result.success is False
+        assert error_result.message == "任务失败"
+        assert error_result.exception is not None
