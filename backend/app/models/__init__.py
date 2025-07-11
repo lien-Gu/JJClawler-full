@@ -6,6 +6,7 @@ from .base import *
 from .book import *
 from .ranking import *
 from .crawl import *
+from .schedule import *
 
 __all__ = [
     # 基础模型
@@ -32,4 +33,28 @@ __all__ = [
     "CrawlConfigResponse",
     "CrawlPagesRequest",
     "UpdateCrawlConfigRequest",
+    
+    # 调度相关模型
+    "JobStatus",
+    "TriggerType", 
+    "JobHandlerType",
+    "JobContextModel",
+    "JobResultModel",
+    "JobConfigModel",
+    "IntervalJobConfigModel",
+    "CronJobConfigModel",
+    "JobInfoModel",
+    "SchedulerStatusModel",
+    "SchedulerMetricsModel",
+    "AddJobRequest",
+    "UpdateJobRequest",
+    "JobActionRequest",
+    "JobHistoryQuery",
+    "JobResponse",
+    "JobListResponse",
+    "JobResultResponse",
+    "JobResultListResponse",
+    "SchedulerStatusResponse",
+    "SchedulerMetricsResponse",
+    "PREDEFINED_JOB_CONFIGS",
 ] 

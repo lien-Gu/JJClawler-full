@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from .books import router as books_router
 from .rankings import router as rankings_router
 from .crawl import router as crawl_router
+from .schedule import router as schedule_router
 
 # 创建主API路由器
 api_router = APIRouter(prefix="/api/v1")
@@ -14,5 +15,6 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(books_router, prefix="/books", tags=["books"])
 api_router.include_router(rankings_router, prefix="/rankings", tags=["rankings"]) 
 api_router.include_router(crawl_router, prefix="/crawl", tags=["crawl"])
+api_router.include_router(schedule_router, tags=["schedule"])
 
 __all__ = ["api_router"] 
