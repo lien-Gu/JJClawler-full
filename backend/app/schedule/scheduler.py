@@ -17,7 +17,7 @@ from app.config import get_settings
 from app.models.schedule import (
     JobConfigModel, JobHandlerType, TriggerType, PREDEFINED_JOB_CONFIGS
 )
-from .context import JobContext
+from app.models.schedule import JobContextModel
 from .handlers import BaseJobHandler, CrawlJobHandler, MaintenanceJobHandler, ReportJobHandler
 
 
@@ -248,7 +248,7 @@ class TaskScheduler:
         handler = handler_class(scheduler=self)
         
         # 创建任务上下文
-        context = JobContext(
+        context = JobContextModel(
             job_id=job_config.job_id,
             job_name=job_config.job_id,
             trigger_time=datetime.now(),
@@ -269,7 +269,7 @@ class TaskScheduler:
         handler = handler_class(scheduler=self)
         
         # 创建任务上下文
-        context = JobContext(
+        context = JobContextModel(
             job_id=context_data['job_id'],
             job_name=context_data['job_id'],
             trigger_time=datetime.now(),
@@ -402,9 +402,7 @@ class TaskScheduler:
             "running_jobs": status["running_jobs"],
             "paused_jobs": status["paused_jobs"],
             "scheduler_status": status["status"],
-            "uptime": status["uptime"],
-            "success_rate": 0.95,  # TODO: 从实际统计数据计算
-            "average_execution_time": 2.5  # TODO: 从实际统计数据计算
+            "uptime": status["uptime"]
         }
 
 

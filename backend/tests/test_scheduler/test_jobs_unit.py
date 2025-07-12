@@ -6,9 +6,9 @@ from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 
 from app.schedule import (
-    CrawlJobHandler, MaintenanceJobHandler, ReportJobHandler,
-    JobContext, JobResult
+    CrawlJobHandler, MaintenanceJobHandler, ReportJobHandler
 )
+from app.models.schedule import JobContextModel, JobResultModel
 
 
 class TestCrawlJobHandler:
@@ -20,7 +20,7 @@ class TestCrawlJobHandler:
         
     async def test_execute_jiazi_crawl_success(self):
         """测试夹子榜爬取任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="jiazi_crawl",
             job_name="夹子榜爬取任务",
             trigger_time=datetime.now(),
@@ -37,7 +37,7 @@ class TestCrawlJobHandler:
         
     async def test_execute_category_crawl_success(self):
         """测试分类榜单爬取任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="category_crawl",
             job_name="分类榜单爬取任务",
             trigger_time=datetime.now(),
@@ -54,7 +54,7 @@ class TestCrawlJobHandler:
         
     async def test_execute_unknown_crawl_type(self):
         """测试未知爬虫任务类型"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="unknown_crawl",
             job_name="未知爬虫任务",
             trigger_time=datetime.now(),
@@ -69,7 +69,7 @@ class TestCrawlJobHandler:
         
     async def test_execute_with_exception(self):
         """测试爬虫任务执行异常"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="jiazi_crawl",
             job_name="夹子榜爬取任务",
             trigger_time=datetime.now(),
@@ -95,7 +95,7 @@ class TestMaintenanceJobHandler:
         
     async def test_execute_database_cleanup_success(self):
         """测试数据库清理任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="database_cleanup",
             job_name="数据库清理任务",
             trigger_time=datetime.now(),
@@ -112,7 +112,7 @@ class TestMaintenanceJobHandler:
         
     async def test_execute_log_rotation_success(self):
         """测试日志轮转任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="log_rotation",
             job_name="日志轮转任务",
             trigger_time=datetime.now(),
@@ -129,7 +129,7 @@ class TestMaintenanceJobHandler:
         
     async def test_execute_health_check_success(self):
         """测试健康检查任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="system_health_check",
             job_name="系统健康检查任务",
             trigger_time=datetime.now(),
@@ -146,7 +146,7 @@ class TestMaintenanceJobHandler:
         
     async def test_execute_unknown_maintenance_type(self):
         """测试未知维护任务类型"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="unknown_maintenance",
             job_name="未知维护任务",
             trigger_time=datetime.now(),
@@ -161,7 +161,7 @@ class TestMaintenanceJobHandler:
         
     async def test_execute_with_exception(self):
         """测试维护任务执行异常"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="database_cleanup",
             job_name="数据库清理任务",
             trigger_time=datetime.now(),
@@ -187,7 +187,7 @@ class TestReportJobHandler:
         
     async def test_execute_data_analysis_success(self):
         """测试数据分析报告任务成功执行"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="data_analysis_report",
             job_name="数据分析报告任务",
             trigger_time=datetime.now(),
@@ -204,7 +204,7 @@ class TestReportJobHandler:
         
     async def test_execute_unknown_report_type(self):
         """测试未知报告任务类型"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="unknown_report",
             job_name="未知报告任务",
             trigger_time=datetime.now(),
@@ -219,7 +219,7 @@ class TestReportJobHandler:
         
     async def test_execute_with_exception(self):
         """测试报告任务执行异常"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="data_analysis_report",
             job_name="数据分析报告任务",
             trigger_time=datetime.now(),
@@ -268,7 +268,7 @@ class TestJobHandlerIntegration:
     def test_job_context_basic_validation(self):
         """测试任务上下文基本验证"""
         # 测试上下文创建
-        context = JobContext(
+        context = JobContextModel(
             job_id="test_job",
             job_name="测试任务",
             trigger_time=datetime.now(),
@@ -286,13 +286,13 @@ class TestJobHandlerIntegration:
     def test_job_result_basic_validation(self):
         """测试任务结果基本验证"""
         # 测试成功结果
-        success_result = JobResult.success_result("任务完成", {"count": 10})
+        success_result = JobResultModel.success_result("任务完成", {"count": 10})
         assert success_result.success is True
         assert success_result.message == "任务完成"
         assert success_result.data == {"count": 10}
         
         # 测试错误结果
-        error_result = JobResult.error_result("任务失败", Exception("测试错误"))
+        error_result = JobResultModel.error_result("任务失败", Exception("测试错误"))
         assert error_result.success is False
         assert error_result.message == "任务失败"
         assert error_result.exception is not None

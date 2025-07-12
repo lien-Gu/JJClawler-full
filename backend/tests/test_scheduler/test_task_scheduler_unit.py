@@ -6,7 +6,8 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 
-from app.schedule import TaskScheduler, get_scheduler, BaseJobHandler, JobContext, JobResult
+from app.schedule import TaskScheduler, get_scheduler, BaseJobHandler
+from app.models.schedule import JobContextModel, JobResultModel
 from app.models.schedule import JobStatus, TriggerType, JobHandlerType, PREDEFINED_JOB_CONFIGS
 
 
@@ -204,13 +205,13 @@ class TestJobHandlers:
         # 创建一个具体的处理器实例用于测试
         class TestHandler(BaseJobHandler):
             async def execute(self, context):
-                return JobResult.success_result("测试成功")
+                return JobResultModel.success_result("测试成功")
         
         self.handler = TestHandler()
         
     def test_job_context_creation(self):
         """测试任务上下文创建"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="test_job",
             job_name="测试任务",
             trigger_time=datetime.now(),
@@ -226,7 +227,7 @@ class TestJobHandlers:
         
     def test_job_context_to_model(self):
         """测试任务上下文转换为模型"""
-        context = JobContext(
+        context = JobContextModel(
             job_id="test_job",
             job_name="测试任务",
             trigger_time=datetime.now(),
@@ -239,7 +240,7 @@ class TestJobHandlers:
         
     def test_job_result_success(self):
         """测试成功结果创建"""
-        result = JobResult.success_result("任务完成", {"count": 10})
+        result = JobResultModel.success_result("任务完成", {"count": 10})
         
         assert result.success is True
         assert result.message == "任务完成"
@@ -249,7 +250,7 @@ class TestJobHandlers:
     def test_job_result_error(self):
         """测试错误结果创建"""
         exception = Exception("测试错误")
-        result = JobResult.error_result("任务失败", exception)
+        result = JobResultModel.error_result("任务失败", exception)
         
         assert result.success is False
         assert result.message == "任务失败"
@@ -258,7 +259,7 @@ class TestJobHandlers:
         
     def test_job_result_to_model(self):
         """测试任务结果转换为模型"""
-        result = JobResult.success_result("任务完成", {"count": 10})
+        result = JobResultModel.success_result("任务完成", {"count": 10})
         
         model = result.to_model()
         assert model.success is True
@@ -303,11 +304,11 @@ class TestJobHandlers:
         handler.on_retry = AsyncMock()
         
         # 模拟成功执行
-        success_result = JobResult.success_result("执行成功")
+        success_result = JobResultModel.success_result("执行成功")
         handler.execute = AsyncMock(return_value=success_result)
         
         # 执行测试
-        context = JobContext(
+        context = JobContextModel(
             job_id="test_job",
             job_name="测试任务",
             trigger_time=datetime.now(),

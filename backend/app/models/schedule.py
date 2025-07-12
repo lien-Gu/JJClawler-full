@@ -18,26 +18,26 @@ from .base import BaseResponse
 
 class JobStatus(str, Enum):
     """任务状态枚举"""
-    PENDING = "pending"      # 等待执行
-    RUNNING = "running"      # 正在执行
-    SUCCESS = "success"      # 执行成功
-    FAILED = "failed"        # 执行失败
+    PENDING = "pending"  # 等待执行
+    RUNNING = "running"  # 正在执行
+    SUCCESS = "success"  # 执行成功
+    FAILED = "failed"  # 执行失败
     CANCELLED = "cancelled"  # 已取消
-    PAUSED = "paused"       # 已暂停
-    RETRYING = "retrying"   # 重试中
+    PAUSED = "paused"  # 已暂停
+    RETRYING = "retrying"  # 重试中
 
 
 class TriggerType(str, Enum):
     """触发器类型枚举"""
-    INTERVAL = "interval"    # 间隔触发
-    CRON = "cron"           # Cron表达式
-    DATE = "date"           # 指定日期
+    INTERVAL = "interval"  # 间隔触发
+    CRON = "cron"  # Cron表达式
+    DATE = "date"  # 指定日期
 
 
 class JobHandlerType(str, Enum):
     """任务处理器类型"""
-    CRAWL = "CrawlJobHandler"              # 爬虫任务
-    REPORT = "ReportJobHandler"            # 报告任务
+    CRAWL = "CrawlJobHandler"  # 爬虫任务
+    REPORT = "ReportJobHandler"  # 报告任务
     MAINTENANCE = "MaintenanceJobHandler"  # 维护任务
 
 
@@ -74,6 +74,21 @@ class JobResultModel(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+    @classmethod
+    def success_result(cls, message: str, data: Dict[str, Any] = None,
+                       execution_time: float = 0.0, retry_count: int = 0) -> 'JobResultModel':
+        """创建成功结果"""
+        return cls(success=True, message=message, data=data,
+                   execution_time=execution_time, retry_count=retry_count)
+
+    @classmethod
+    def error_result(cls, message: str, exception: Exception = None,
+                     execution_time: float = 0.0, retry_count: int = 0) -> 'JobResultModel':
+        """创建失败结果"""
+        return cls(success=False, message=message,
+                   exception=str(exception) if exception else None,
+                   execution_time=execution_time, retry_count=retry_count)
 
 
 # 任务配置模型
@@ -216,7 +231,7 @@ PREDEFINED_JOB_CONFIGS = {
         interval_seconds=3600,  # 1小时
         description="夹子榜数据爬取任务，每小时更新一次"
     ),
-    
+
     "category_crawl": CronJobConfigModel(
         job_id="category_crawl",
         handler_class=JobHandlerType.CRAWL,
@@ -224,21 +239,21 @@ PREDEFINED_JOB_CONFIGS = {
         max_instances=2,
         description="分类榜单数据爬取任务，工作时间内每2小时执行"
     ),
-    
+
     "database_cleanup": CronJobConfigModel(
         job_id="database_cleanup",
         handler_class=JobHandlerType.MAINTENANCE,
         cron_expression="0 2 * * *",
         description="数据库清理任务，每天凌晨2点执行"
     ),
-    
+
     "log_rotation": CronJobConfigModel(
         job_id="log_rotation",
         handler_class=JobHandlerType.MAINTENANCE,
         cron_expression="0 0 * * *",
         description="日志轮转任务，每天午夜执行"
     ),
-    
+
     "system_health_check": CronJobConfigModel(
         job_id="system_health_check",
         handler_class=JobHandlerType.MAINTENANCE,
