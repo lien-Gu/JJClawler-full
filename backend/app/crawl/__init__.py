@@ -6,6 +6,7 @@ from .manager import CrawlerManager
 from .parser import Parser, DataType, ParsedItem
 from .base import CrawlConfig, HttpClient
 from .crawl_flow import CrawlFlow
+from .single_crawler import SinglePageCrawler
 
 __all__ = [
     'CrawlerManager',
@@ -14,5 +15,6 @@ __all__ = [
     'ParsedItem',
     'CrawlConfig',
     'HttpClient',
-    'CrawlFlow'
+    'CrawlFlow',
+    'SinglePageCrawler'
 ]

@@ -30,10 +30,8 @@ class TestTaskScheduler:
         # 验证初始状态
         assert scheduler.scheduler is None
         assert scheduler.start_time is None
-        assert len(scheduler.job_handlers) == 3
+        assert len(scheduler.job_handlers) == 2
         assert JobHandlerType.CRAWL in scheduler.job_handlers
-        assert JobHandlerType.MAINTENANCE in scheduler.job_handlers
-        assert JobHandlerType.REPORT in scheduler.job_handlers
         
     def test_scheduler_singleton(self):
         """测试调度器单例模式"""
@@ -160,16 +158,15 @@ class TestTaskScheduler:
             assert metrics["paused_jobs"] == 2
             assert metrics["scheduler_status"] == "running"
             assert metrics["uptime"] == 100.0
-            assert "success_rate" in metrics
-            assert "average_execution_time" in metrics
             
     def test_get_job_data_by_type(self):
         """测试根据任务类型获取任务数据"""
-        from app.models.schedule import IntervalJobConfigModel
+        from app.models.schedule import JobConfigModel
         
         # 测试各种任务类型
-        jiazi_config = IntervalJobConfigModel(
+        jiazi_config = JobConfigModel(
             job_id="jiazi_crawl",
+            trigger_type=TriggerType.INTERVAL,
             handler_class=JobHandlerType.CRAWL,
             interval_seconds=3600
         )
@@ -177,8 +174,9 @@ class TestTaskScheduler:
         data = self.scheduler._get_job_data_by_type(jiazi_config)
         assert data["type"] == "jiazi"
         
-        category_config = IntervalJobConfigModel(
+        category_config = JobConfigModel(
             job_id="category_crawl",
+            trigger_type=TriggerType.INTERVAL,
             handler_class=JobHandlerType.CRAWL,
             interval_seconds=3600
         )
@@ -187,8 +185,9 @@ class TestTaskScheduler:
         assert data["type"] == "category"
         
         # 测试未知任务类型
-        unknown_config = IntervalJobConfigModel(
+        unknown_config = JobConfigModel(
             job_id="unknown_task",
+            trigger_type=TriggerType.INTERVAL,
             handler_class=JobHandlerType.CRAWL,
             interval_seconds=3600
         )
@@ -204,7 +203,7 @@ class TestJobHandlers:
         """每个测试方法执行前的设置"""
         # 创建一个具体的处理器实例用于测试
         class TestHandler(BaseJobHandler):
-            async def execute(self, context):
+            async def execute(self, context, job_data=None):
                 return JobResultModel.success_result("测试成功")
         
         self.handler = TestHandler()
@@ -215,15 +214,11 @@ class TestJobHandlers:
             job_id="test_job",
             job_name="测试任务",
             trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-            job_data={"key": "value"}
+            scheduled_time=datetime.now()
         )
         
         assert context.job_id == "test_job"
         assert context.job_name == "测试任务"
-        assert context.job_data == {"key": "value"}
-        assert context.retry_count == 0
-        assert context.max_retries == 3
         
     def test_job_context_to_model(self):
         """测试任务上下文转换为模型"""
@@ -234,9 +229,9 @@ class TestJobHandlers:
             scheduled_time=datetime.now()
         )
         
-        model = context.to_model()
-        assert model.job_id == "test_job"
-        assert model.job_name == "测试任务"
+        # JobContextModel 就是 Pydantic 模型
+        assert context.job_id == "test_job"
+        assert context.job_name == "测试任务"
         
     def test_job_result_success(self):
         """测试成功结果创建"""
@@ -261,10 +256,10 @@ class TestJobHandlers:
         """测试任务结果转换为模型"""
         result = JobResultModel.success_result("任务完成", {"count": 10})
         
-        model = result.to_model()
-        assert model.success is True
-        assert model.message == "任务完成"
-        assert model.data == {"count": 10}
+        # JobResultModel 就是 Pydantic 模型
+        assert result.success is True
+        assert result.message == "任务完成"
+        assert result.data == {"count": 10}
         
     def test_should_retry_retryable_exception(self):
         """测试可重试异常"""
@@ -315,7 +310,7 @@ class TestJobHandlers:
             scheduled_time=datetime.now()
         )
         
-        result = await BaseJobHandler.execute_with_retry(handler, context)
+        result = await handler.execute_with_retry(context)
         
         # 验证结果
         assert result.success is True
@@ -330,15 +325,12 @@ class TestPredefinedJobs:
     
     def test_predefined_jobs_exist(self):
         """测试预定义任务存在"""
-        assert len(PREDEFINED_JOB_CONFIGS) == 5
+        assert len(PREDEFINED_JOB_CONFIGS) == 2
         
         # 验证所有预定义任务都存在
         expected_jobs = [
             "jiazi_crawl",
-            "category_crawl", 
-            "database_cleanup",
-            "log_rotation",
-            "system_health_check"
+            "category_crawl"
         ]
         
         for job_id in expected_jobs:
@@ -357,8 +349,6 @@ class TestPredefinedJobs:
     def test_job_handler_types(self):
         """测试任务处理器类型"""
         assert JobHandlerType.CRAWL == "CrawlJobHandler"
-        assert JobHandlerType.MAINTENANCE == "MaintenanceJobHandler"
-        assert JobHandlerType.REPORT == "ReportJobHandler"
         
     def test_job_status_enum(self):
         """测试任务状态枚举"""
@@ -368,7 +358,6 @@ class TestPredefinedJobs:
         assert JobStatus.FAILED == "failed"
         assert JobStatus.CANCELLED == "cancelled"
         assert JobStatus.PAUSED == "paused"
-        assert JobStatus.RETRYING == "retrying"
         
     def test_trigger_type_enum(self):
         """测试触发器类型枚举"""

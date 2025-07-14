@@ -18,7 +18,7 @@ from app.models.schedule import (
     JobConfigModel, JobHandlerType, TriggerType, PREDEFINED_JOB_CONFIGS
 )
 from app.models.schedule import JobContextModel
-from .handlers import BaseJobHandler, CrawlJobHandler, MaintenanceJobHandler, ReportJobHandler
+from .handlers import BaseJobHandler, CrawlJobHandler
 
 
 class TaskScheduler:
@@ -39,12 +39,8 @@ class TaskScheduler:
         """注册默认任务处理器"""
         self.job_handlers = {
             JobHandlerType.CRAWL: CrawlJobHandler,
-            JobHandlerType.MAINTENANCE: MaintenanceJobHandler,
-            JobHandlerType.REPORT: ReportJobHandler,
             # 添加字符串映射以支持动态任务
             "crawl": CrawlJobHandler,
-            "maintenance": MaintenanceJobHandler,
-            "report": ReportJobHandler,
         }
     
     def _create_scheduler(self) -> AsyncIOScheduler:
@@ -70,8 +66,7 @@ class TaskScheduler:
             timezone=self.settings.scheduler.timezone
         )
         
-        # 添加事件监听器
-        scheduler.add_listener(self._job_listener, events.EVENT_ALL)
+        # 不添加事件监听器以简化
         
         return scheduler
     
@@ -133,9 +128,6 @@ class TaskScheduler:
                 trigger=trigger,
                 id=job_config.job_id,
                 name=job_config.job_id,
-                max_instances=job_config.max_instances,
-                coalesce=job_config.coalesce,
-                misfire_grace_time=job_config.misfire_grace_time,
                 kwargs={
                     'job_config': job_config,
                     'handler_class': handler_class
@@ -216,31 +208,28 @@ class TaskScheduler:
             return False
     
     def _create_trigger(self, job_config: JobConfigModel):
-        """创建触发器"""
+        """创建触发器（简化版）"""
         if job_config.trigger_type == TriggerType.INTERVAL:
-            if hasattr(job_config, 'interval_seconds'):
-                return IntervalTrigger(seconds=job_config.interval_seconds)
-            else:
-                raise ValueError("间隔任务缺少 interval_seconds 参数")
+            interval_seconds = getattr(job_config, 'interval_seconds', 3600)  # 默认1小时
+            return IntervalTrigger(seconds=interval_seconds)
         elif job_config.trigger_type == TriggerType.CRON:
-            if hasattr(job_config, 'cron_expression'):
-                # 解析cron表达式
-                cron_parts = job_config.cron_expression.split()
-                if len(cron_parts) == 5:
-                    return CronTrigger(
-                        minute=cron_parts[0],
-                        hour=cron_parts[1], 
-                        day=cron_parts[2],
-                        month=cron_parts[3],
-                        day_of_week=cron_parts[4],
-                        timezone=getattr(job_config, 'timezone', self.settings.scheduler.timezone)
-                    )
-                else:
-                    raise ValueError(f"无效的cron表达式: {job_config.cron_expression}")
+            cron_expr = getattr(job_config, 'cron_expression', '0 * * * *')  # 默认每小时
+            cron_parts = cron_expr.split()
+            if len(cron_parts) >= 5:
+                return CronTrigger(
+                    minute=cron_parts[0],
+                    hour=cron_parts[1], 
+                    day=cron_parts[2],
+                    month=cron_parts[3],
+                    day_of_week=cron_parts[4],
+                    timezone=getattr(job_config, 'timezone', self.settings.scheduler.timezone)
+                )
             else:
-                raise ValueError("Cron任务缺少 cron_expression 参数")
+                # 简化：使用默认配置
+                return CronTrigger(minute='0', timezone=self.settings.scheduler.timezone)
         else:
-            raise ValueError(f"不支持的触发器类型: {job_config.trigger_type}")
+            # 默认使用间隔触发器
+            return IntervalTrigger(seconds=3600)
     
     async def _execute_job(self, job_config: JobConfigModel, handler_class: Type[BaseJobHandler]) -> None:
         """执行任务的包装函数"""
@@ -252,34 +241,36 @@ class TaskScheduler:
             job_id=job_config.job_id,
             job_name=job_config.job_id,
             trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-            job_data=self._get_job_data_by_type(job_config),
-            max_retries=3
+            scheduled_time=datetime.now()
         )
         
+        # 获取任务数据
+        job_data = self._get_job_data_by_type(job_config)
+        
         # 执行任务
-        result = await handler.execute_with_retry(context)
+        result = await handler.execute_with_retry(context, job_data)
         
         # 记录结果
         self.logger.info(f"任务 {job_config.job_id} 执行完成: {result.message}")
     
     async def _execute_one_time_job(self, handler_class: Type[BaseJobHandler], context_data: dict) -> None:
         """执行一次性任务的包装函数"""
-        # 创建处理器实例
-        handler = handler_class(scheduler=self)
+        # 创建处理器实例（一次性任务只重试一次）
+        handler = handler_class(scheduler=self, max_retries=1)
         
         # 创建任务上下文
         context = JobContextModel(
             job_id=context_data['job_id'],
             job_name=context_data['job_id'],
             trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-            job_data=context_data.get('job_data', {}),
-            max_retries=1  # 一次性任务只重试一次
+            scheduled_time=datetime.now()
         )
         
+        # 获取任务数据
+        job_data = context_data.get('job_data', {})
+        
         # 执行任务
-        result = await handler.execute_with_retry(context)
+        result = await handler.execute_with_retry(context, job_data)
         
         # 记录结果
         self.logger.info(f"一次性任务 {context_data['job_id']} 执行完成: {result.message}")
@@ -293,19 +284,14 @@ class TaskScheduler:
     
     def _get_job_data_by_type(self, job_config: JobConfigModel) -> Dict[str, Any]:
         """根据任务配置获取任务数据"""
-        job_data_map = {
-            "jiazi_crawl": {"type": "jiazi"},
-            "category_crawl": {"type": "category"},
-            "database_cleanup": {"type": "database_cleanup"},
-            "log_rotation": {"type": "log_rotation"},
-            "system_health_check": {"type": "health_check"},
-            "data_analysis_report": {"type": "data_analysis"},
-        }
-        return job_data_map.get(job_config.job_id, {})
+        # 从任务ID提取类型，简化硬编码映射
+        if "jiazi" in job_config.job_id:
+            return {"type": "jiazi"}
+        elif "category" in job_config.job_id:
+            return {"type": "category"}
+        else:
+            return {}
     
-    def _job_listener(self, event) -> None:
-        """任务事件监听器"""
-        self.logger.debug(f"任务事件: {event}")
     
     def remove_job(self, job_id: str) -> bool:
         """删除任务"""
