@@ -381,7 +381,7 @@ class TestCrawlFlow:
         flow.client = deps['client']
         flow.parser = deps['parser']
         
-        book = await flow._crawl_single_book_detail("12345")
+        book = await flow.crawl_book_detail("12345")
 
         assert book["novel_id"] == 12345
         assert flow.stats["total_requests"] == 1
@@ -401,7 +401,7 @@ class TestCrawlFlow:
         flow.client = deps['client']
         flow.parser = deps['parser']
         
-        book = await flow._crawl_single_book_detail("12345")
+        book = await flow.crawl_book_detail("12345")
 
         assert book is None
 
@@ -415,7 +415,7 @@ class TestCrawlFlow:
         flow.config = deps['config']
         flow.client = deps['client']
         
-        book = await flow._crawl_single_book_detail("12345")
+        book = await flow.crawl_book_detail("12345")
 
         assert book is None
 

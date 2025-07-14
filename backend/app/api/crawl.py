@@ -15,7 +15,8 @@ from ..models.crawl import (
     CrawlTaskResponse,
     TaskStatus,
 )
-from ..schedule import get_scheduler, TaskDecomposer
+from ..schedule import get_scheduler
+from ..crawl.base import CrawlConfig
 
 router = APIRouter()
 
@@ -36,11 +37,15 @@ async def crawl_all_pages(
         DataResponse[str]: 批次任务ID
     """
     try:
-        # 任务分解器
-        decomposer = TaskDecomposer()
+        # 获取所有分类页面（排除夹子榜）
+        config = CrawlConfig()
+        all_tasks = config.get_all_tasks()
+        page_ids = []
         
-        # 分解所有分类任务为单个页面任务
-        page_ids = await decomposer.decompose_category_task()
+        for task in all_tasks:
+            task_id = task.get('id', '')
+            if not ('jiazi' in task_id.lower() or task.get('category') == 'jiazi'):
+                page_ids.append(task_id)
         
         if not page_ids:
             raise HTTPException(
@@ -120,11 +125,15 @@ async def crawl_jiazi_pages(
         DataResponse[str]: 批次任务ID
     """
     try:
-        # 任务分解器
-        decomposer = TaskDecomposer()
+        # 获取夹子榜页面
+        config = CrawlConfig()
+        all_tasks = config.get_all_tasks()
+        page_ids = []
         
-        # 分解夹子榜任务为单个页面任务
-        page_ids = await decomposer.decompose_jiazi_task()
+        for task in all_tasks:
+            task_id = task.get('id', '')
+            if 'jiazi' in task_id.lower() or task.get('category') == 'jiazi':
+                page_ids.append(task_id)
         
         if not page_ids:
             raise HTTPException(
@@ -213,9 +222,11 @@ async def crawl_multiple_pages(
                 detail="页面ID列表不能为空"
             )
 
-        # 任务分解器验证页面ID
-        decomposer = TaskDecomposer()
-        valid_page_ids = await decomposer.decompose_pages_task(page_ids)
+        # 验证页面ID
+        config = CrawlConfig()
+        all_tasks = config.get_all_tasks()
+        available_ids = {task.get('id', '') for task in all_tasks}
+        valid_page_ids = [pid for pid in page_ids if pid in available_ids]
         
         if not valid_page_ids:
             raise HTTPException(
