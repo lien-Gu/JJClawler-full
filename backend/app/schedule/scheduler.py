@@ -31,16 +31,14 @@ class TaskScheduler:
         self.job_handlers: Dict[str, Type[BaseJobHandler]] = {}
         self.logger = logging.getLogger(__name__)
         self.start_time = None
-        
+
         # 注册默认任务处理器
         self._register_default_handlers()
-    
+
     def _register_default_handlers(self) -> None:
         """注册默认任务处理器"""
         self.job_handlers = {
             JobHandlerType.CRAWL: CrawlJobHandler,
-            # 添加字符串映射以支持动态任务
-            "crawl": CrawlJobHandler,
         }
     
     def _create_scheduler(self) -> AsyncIOScheduler:
