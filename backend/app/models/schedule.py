@@ -111,6 +111,7 @@ PREDEFINED_JOB_CONFIGS = {
         trigger_type=TriggerType.INTERVAL,
         handler_class=JobHandlerType.CRAWL,
         interval_seconds=3600,  # 1小时
+        job_data={"type": "jiazi"},  # 直接提供任务数据
         description="夹子榜数据爬取任务，每小时更新一次"
     ),
 
@@ -119,6 +120,7 @@ PREDEFINED_JOB_CONFIGS = {
         trigger_type=TriggerType.CRON,
         handler_class=JobHandlerType.CRAWL,
         cron_expression="0 6,8,10,12,14,16,18 * * *",
+        job_data={"type": "category"},  # 直接提供任务数据
         description="分类榜单数据爬取任务，工作时间内每2小时执行"
     )
 

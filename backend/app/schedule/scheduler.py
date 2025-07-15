@@ -136,7 +136,6 @@ class TaskScheduler:
             self.logger.error(f"添加任务失败 {job_config.job_id}: {e}")
             return False
 
-
     def _create_trigger(self, job_config: JobConfigModel):
         """创建触发器"""
         if job_config.trigger_type == TriggerType.DATE:
@@ -144,12 +143,12 @@ class TaskScheduler:
             from apscheduler.triggers.date import DateTrigger
             run_date = job_config.run_date or datetime.now()
             return DateTrigger(run_date=run_date)
-        
+
         elif job_config.trigger_type == TriggerType.INTERVAL:
             # 间隔触发器（重复任务）
             interval_seconds = job_config.interval_seconds or 3600
             return IntervalTrigger(seconds=interval_seconds)
-        
+
         elif job_config.trigger_type == TriggerType.CRON:
             # Cron触发器（重复任务）
             cron_expr = job_config.cron_expression or '0 * * * *'
@@ -166,7 +165,7 @@ class TaskScheduler:
             else:
                 # 简化：使用默认配置
                 return CronTrigger(minute='0', timezone=self.settings.scheduler.timezone)
-        
+
         else:
             raise ValueError(f"不支持的触发器类型: {job_config.trigger_type}")
 
@@ -178,12 +177,7 @@ class TaskScheduler:
             raise ValueError(f"未找到处理器: {job_config.handler_class}")
 
         # 创建处理器实例
-        if job_config.is_one_time:
-            # 一次性任务只重试一次
-            handler = handler_class(scheduler=self, max_retries=1)
-        else:
-            # 重复任务使用默认重试次数
-            handler = handler_class(scheduler=self)
+        handler = handler_class(scheduler=self)
 
         # 创建任务上下文
         context = JobContextModel(
@@ -193,77 +187,16 @@ class TaskScheduler:
             scheduled_time=datetime.now()
         )
 
-        # 获取任务数据
-        if job_config.is_one_time:
-            # 一次性任务直接使用 job_config.job_data
-            job_data = job_config.job_data or {}
-        else:
-            # 重复任务通过类型推断获取数据
-            job_data = self._get_job_data_by_type(job_config)
+        # 获取任务数据（统一使用job_config.job_data）
+        job_data = job_config.job_data or {}
 
         # 执行任务
         result = await handler.execute_with_retry(context, job_data)
 
         # 记录结果
-        task_type = "一次性任务" if job_config.is_one_time else "重复任务"
-        self.logger.info(f"{task_type} {job_config.job_id} 执行完成: {result.message}")
+        self.logger.info(f"任务 {job_config.job_id} 执行完成: {result.message}")
 
-        # 一次性任务执行完成后自动删除
-        if job_config.is_one_time:
-            try:
-                self.scheduler.remove_job(job_config.job_id)
-                self.logger.debug(f"一次性任务 {job_config.job_id} 已自动删除")
-            except Exception as e:
-                self.logger.warning(f"删除一次性任务失败 {job_config.job_id}: {e}")
-
-    def _get_job_data_by_type(self, job_config: JobConfigModel) -> Dict[str, Any]:
-        """根据任务配置获取任务数据"""
-        # 从任务ID提取类型，简化硬编码映射
-        if "jiazi" in job_config.job_id:
-            return {"type": "jiazi"}
-        elif "category" in job_config.job_id:
-            return {"type": "category"}
-        else:
-            return {}
-
-    def remove_job(self, job_id: str) -> bool:
-        """删除任务"""
-        if self.scheduler is None:
-            return False
-
-        try:
-            self.scheduler.remove_job(job_id)
-            self.logger.info(f"成功删除任务: {job_id}")
-            return True
-        except Exception as e:
-            self.logger.error(f"删除任务失败 {job_id}: {e}")
-            return False
-
-    def pause_job(self, job_id: str) -> bool:
-        """暂停任务"""
-        if self.scheduler is None:
-            return False
-
-        try:
-            self.scheduler.pause_job(job_id)
-            self.logger.info(f"成功暂停任务: {job_id}")
-            return True
-        except Exception as e:
-            self.logger.error(f"暂停任务失败 {job_id}: {e}")
-            return False
-
-    def resume_job(self, job_id: str) -> bool:
-        """恢复任务"""
-        if self.scheduler is None:
-            return False
-
-        try:
-            self.scheduler.resume_job(job_id)
-            self.logger.info(f"成功恢复任务: {job_id}")
-            return True
-        except Exception as e:
-            self.logger.error(f"恢复任务失败 {job_id}: {e}")
-            return False
+        # 注意: DATE触发器的一次性任务执行完成后会被APScheduler自动删除
 
     def get_jobs(self) -> List[Job]:
         """获取所有任务"""
