@@ -9,6 +9,7 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.job import Job
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.base import BaseTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -17,7 +18,7 @@ from app.models.schedule import (
     JobConfigModel, JobHandlerType, TriggerType, PREDEFINED_JOB_CONFIGS
 )
 from app.models.schedule import JobContextModel
-from .handlers import BaseJobHandler, CrawlJobHandler
+from .handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
 
 
 class TaskScheduler:
@@ -38,6 +39,7 @@ class TaskScheduler:
         """注册默认任务处理器"""
         self.job_handlers = {
             JobHandlerType.CRAWL: CrawlJobHandler,
+            JobHandlerType.REPORT: ReportJobHandler,
         }
 
     def _create_scheduler(self) -> AsyncIOScheduler:
@@ -112,7 +114,7 @@ class TaskScheduler:
 
         try:
             # 创建触发器
-            trigger = self._create_trigger(job_config)
+            trigger = job_config.build_trigger()
 
             # 添加任务到调度器（统一使用_execute_job函数）
             self.scheduler.add_job(
@@ -136,39 +138,6 @@ class TaskScheduler:
             self.logger.error(f"添加任务失败 {job_config.job_id}: {e}")
             return False
 
-    def _create_trigger(self, job_config: JobConfigModel):
-        """创建触发器"""
-        if job_config.trigger_type == TriggerType.DATE:
-            # 日期触发器（一次性任务）
-            from apscheduler.triggers.date import DateTrigger
-            run_date = job_config.run_date or datetime.now()
-            return DateTrigger(run_date=run_date)
-
-        elif job_config.trigger_type == TriggerType.INTERVAL:
-            # 间隔触发器（重复任务）
-            interval_seconds = job_config.interval_seconds or 3600
-            return IntervalTrigger(seconds=interval_seconds)
-
-        elif job_config.trigger_type == TriggerType.CRON:
-            # Cron触发器（重复任务）
-            cron_expr = job_config.cron_expression or '0 * * * *'
-            cron_parts = cron_expr.split()
-            if len(cron_parts) >= 5:
-                return CronTrigger(
-                    minute=cron_parts[0],
-                    hour=cron_parts[1],
-                    day=cron_parts[2],
-                    month=cron_parts[3],
-                    day_of_week=cron_parts[4],
-                    timezone=self.settings.scheduler.timezone
-                )
-            else:
-                # 简化：使用默认配置
-                return CronTrigger(minute='0', timezone=self.settings.scheduler.timezone)
-
-        else:
-            raise ValueError(f"不支持的触发器类型: {job_config.trigger_type}")
-
     async def _execute_job(self, job_config: JobConfigModel) -> None:
         """统一的任务执行函数"""
         # 获取处理器类
@@ -188,15 +157,13 @@ class TaskScheduler:
         )
 
         # 获取任务数据（统一使用job_config.job_data）
-        job_data = job_config.job_data or {}
+        page_ids = job_config.page_ids or []
 
         # 执行任务
-        result = await handler.execute_with_retry(context, job_data)
+        result = await handler.execute_with_retry(page_ids=page_ids, context=context)
 
         # 记录结果
         self.logger.info(f"任务 {job_config.job_id} 执行完成: {result.message}")
-
-        # 注意: DATE触发器的一次性任务执行完成后会被APScheduler自动删除
 
     def get_jobs(self) -> List[Job]:
         """获取所有任务"""

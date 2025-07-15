@@ -49,19 +49,12 @@ async def crawl_all_pages(
         batch_id = f"crawl_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         # 添加批量任务到调度器（统计逻辑在调度模块中处理）
-        job_data = {
-            "type": "pages",
-            "page_ids": page_ids,
-            "force": force,
-            "batch_id": batch_id
-        }
-
         job_config = JobConfigModel(
             job_id=batch_id,
             trigger_type=TriggerType.DATE,
             handler_class=JobHandlerType.CRAWL,
-            job_data=job_data,
-            description=f"批量爬取任务: {len(page_ids)} 个页面"
+            force=force,
+            page_ids=page_ids,
         )
 
         success = await scheduler.add_job(job_config)
@@ -125,18 +118,12 @@ async def crawl_specific_pages(
         scheduler = get_scheduler()
         batch_id = f"crawl_pages_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        job_data = {
-            "type": "pages",
-            "page_ids": valid_page_ids,
-            "force": force,
-            "batch_id": batch_id
-        }
-
         job_config = JobConfigModel(
             job_id=batch_id,
             trigger_type=TriggerType.DATE,
             handler_class=JobHandlerType.CRAWL,
-            job_data=job_data,
+            page_ids=valid_page_ids,
+            force=force,
             description=f"指定页面爬取任务: {len(valid_page_ids)} 个页面"
         )
 
@@ -194,16 +181,12 @@ async def crawl_single_page(
         scheduler = get_scheduler()
         job_id = f"crawl_single_{page_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        job_data = {
-            "page_id": page_id,
-            "force": force
-        }
-
         job_config = JobConfigModel(
             job_id=job_id,
             trigger_type=TriggerType.DATE,
             handler_class=JobHandlerType.CRAWL,
-            job_data=job_data,
+            page_ids=[page_id],
+            force=force,
             description=f"单页面爬取任务: {page_id}"
         )
 

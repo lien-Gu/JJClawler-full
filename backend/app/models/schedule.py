@@ -9,8 +9,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from pydantic import BaseModel, Field
 
 
@@ -34,6 +37,7 @@ class TriggerType(str, Enum):
 class JobHandlerType(str, Enum):
     """任务处理器类型"""
     CRAWL = "CrawlJobHandler"  # 爬虫任务
+    REPORT = "ReportJobHandler"  # 报告任务
 
 
 # 任务上下文模型
@@ -85,24 +89,46 @@ class JobConfigModel(BaseModel):
     trigger_type: TriggerType = Field(..., description="触发器类型")
     handler_class: JobHandlerType = Field(..., description="处理器类")
     enabled: bool = Field(default=True, description="是否启用")
-    description: str = Field(default="", description="任务描述")
-    
+    force: bool = Field(default=False, description="是否强制执行")
+    description: str = Field(default=None, description="任务描述")
+
     # 触发器配置（根据触发器类型使用不同字段）
     interval_seconds: Optional[int] = Field(None, ge=60, le=86400, description="间隔秒数")
     cron_expression: Optional[str] = Field(None, description="Cron表达式")
     run_date: Optional[datetime] = Field(None, description="指定执行时间")
-    
+
     # 任务数据
-    job_data: Optional[Dict[str, Any]] = Field(None, description="任务执行数据")
-    
-    @property
-    def is_one_time(self) -> bool:
-        """根据触发器类型判断是否为一次性任务"""
-        return self.trigger_type == TriggerType.DATE
+    page_ids: List[str] = Field(default_factory=list, description="页面id列表，可以是特殊字符all/jiazi/category")
 
+    def build_trigger(self) -> None | DateTrigger | IntervalTrigger | CronTrigger:
+        """创建触发器"""
+        if self.trigger_type == TriggerType.DATE:
+            # 日期触发器（一次性任务）
+            from apscheduler.triggers.date import DateTrigger
+            run_date = self.run_date or datetime.now()
+            return DateTrigger(run_date=run_date)
 
-# API响应模型 - 暂时保留空白，未来如需要可添加实际使用的响应模型
+        elif self.trigger_type == TriggerType.INTERVAL:
+            # 间隔触发器（重复任务）
+            interval_seconds = self.interval_seconds or 3600
+            return IntervalTrigger(seconds=interval_seconds)
 
+        elif self.trigger_type == TriggerType.CRON:
+            # Cron触发器（重复任务）
+            cron_expr = self.cron_expression or '0 * * * *'
+            cron_parts = cron_expr.split()
+            if len(cron_parts) >= 5:
+                return CronTrigger(
+                    minute=cron_parts[0],
+                    hour=cron_parts[1],
+                    day=cron_parts[2],
+                    month=cron_parts[3],
+                    day_of_week=cron_parts[4],
+                    timezone='Asia/Shanghai'
+                )
+
+        # 简化：使用默认配置
+        return CronTrigger(minute='0', timezone='Asia/Shanghai')
 
 # 预定义任务配置
 PREDEFINED_JOB_CONFIGS = {
@@ -111,7 +137,7 @@ PREDEFINED_JOB_CONFIGS = {
         trigger_type=TriggerType.INTERVAL,
         handler_class=JobHandlerType.CRAWL,
         interval_seconds=3600,  # 1小时
-        job_data={"type": "jiazi"},  # 直接提供任务数据
+        page_ids=["jiazi"],  # 直接提供任务数据
         description="夹子榜数据爬取任务，每小时更新一次"
     ),
 
@@ -120,7 +146,7 @@ PREDEFINED_JOB_CONFIGS = {
         trigger_type=TriggerType.CRON,
         handler_class=JobHandlerType.CRAWL,
         cron_expression="0 6,8,10,12,14,16,18 * * *",
-        job_data={"type": "category"},  # 直接提供任务数据
+        page_ids=["category"],
         description="分类榜单数据爬取任务，工作时间内每2小时执行"
     )
 
