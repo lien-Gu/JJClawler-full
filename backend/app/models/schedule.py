@@ -13,8 +13,6 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from .base import BaseResponse
-
 
 class JobStatus(str, Enum):
     """任务状态枚举"""
@@ -80,7 +78,7 @@ class JobResultModel(BaseModel):
                    exception=str(exception) if exception else None)
 
 
-# 任务配置模型 - 统一为单一配置模型
+# 任务配置模型
 class JobConfigModel(BaseModel):
     """任务配置模型"""
     job_id: str = Field(..., description="任务ID")
@@ -89,31 +87,18 @@ class JobConfigModel(BaseModel):
     enabled: bool = Field(default=True, description="是否启用")
     description: str = Field(default="", description="任务描述")
     
-    # 触发器配置
+    # 触发器配置（根据触发器类型使用不同字段）
     interval_seconds: Optional[int] = Field(None, ge=60, le=86400, description="间隔秒数")
     cron_expression: Optional[str] = Field(None, description="Cron表达式")
-
-
-# 任务信息模型
-class JobInfoModel(BaseModel):
-    """任务信息模型"""
-    id: str = Field(..., description="任务ID")
-    name: str = Field(..., description="任务名称")
-    status: JobStatus = Field(..., description="任务状态")
-    trigger_type: TriggerType = Field(..., description="触发器类型")
-    next_run_time: Optional[datetime] = Field(None, description="下次运行时间")
-    last_run_time: Optional[datetime] = Field(None, description="上次运行时间")
-    handler_class: str = Field(..., description="处理器类")
-    max_instances: int = Field(..., description="最大实例数")
-    enabled: bool = Field(..., description="是否启用")
-    description: str = Field(default="", description="任务描述")
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-
-
+    run_date: Optional[datetime] = Field(None, description="指定执行时间")
+    
+    # 任务数据
+    job_data: Optional[Dict[str, Any]] = Field(None, description="任务执行数据")
+    
+    @property
+    def is_one_time(self) -> bool:
+        """根据触发器类型判断是否为一次性任务"""
+        return self.trigger_type == TriggerType.DATE
 
 
 # API响应模型 - 暂时保留空白，未来如需要可添加实际使用的响应模型

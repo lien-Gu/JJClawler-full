@@ -9,7 +9,7 @@ from fastapi import status as http_status
 
 from ..crawl.base import CrawlConfig
 from ..models.base import DataResponse
-from ..models.schedule import JobHandlerType
+from ..models.schedule import JobHandlerType, JobConfigModel, TriggerType
 from ..schedule import get_scheduler
 
 router = APIRouter()
@@ -56,12 +56,15 @@ async def crawl_all_pages(
             "batch_id": batch_id
         }
 
-        success = await scheduler.add_one_time_job(
+        job_config = JobConfigModel(
             job_id=batch_id,
-            handler_class_name=JobHandlerType.CRAWL,
+            trigger_type=TriggerType.DATE,
+            handler_class=JobHandlerType.CRAWL,
             job_data=job_data,
-            run_date=None
+            description=f"批量爬取任务: {len(page_ids)} 个页面"
         )
+
+        success = await scheduler.add_job(job_config)
 
         if not success:
             raise HTTPException(
@@ -129,12 +132,15 @@ async def crawl_specific_pages(
             "batch_id": batch_id
         }
 
-        success = await scheduler.add_one_time_job(
+        job_config = JobConfigModel(
             job_id=batch_id,
-            handler_class_name="crawl",
+            trigger_type=TriggerType.DATE,
+            handler_class=JobHandlerType.CRAWL,
             job_data=job_data,
-            run_date=None
+            description=f"指定页面爬取任务: {len(valid_page_ids)} 个页面"
         )
+
+        success = await scheduler.add_job(job_config)
 
         if not success:
             raise HTTPException(
@@ -193,12 +199,15 @@ async def crawl_single_page(
             "force": force
         }
 
-        success = await scheduler.add_one_time_job(
+        job_config = JobConfigModel(
             job_id=job_id,
-            handler_class_name="crawl",
+            trigger_type=TriggerType.DATE,
+            handler_class=JobHandlerType.CRAWL,
             job_data=job_data,
-            run_date=None
+            description=f"单页面爬取任务: {page_id}"
         )
+
+        success = await scheduler.add_job(job_config)
 
         if not success:
             raise HTTPException(

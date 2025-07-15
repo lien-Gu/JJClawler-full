@@ -41,6 +41,5 @@ __all__ = [
     "JobContextModel",
     "JobResultModel",
     "JobConfigModel",
-    "JobInfoModel",
     "PREDEFINED_JOB_CONFIGS",
 ] 
