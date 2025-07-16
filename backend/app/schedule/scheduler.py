@@ -9,9 +9,6 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.job import Job
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.base import BaseTrigger
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import get_settings
 from app.models.schedule import (
@@ -99,11 +96,27 @@ class TaskScheduler:
         self.logger.info("任务调度器已关闭")
 
     async def _load_predefined_jobs(self) -> None:
-        """加载预定义任务"""
+        """加载预定义任务（支持多子任务）"""
         for job_id, job_config in PREDEFINED_JOB_CONFIGS.items():
             try:
-                await self.add_job(job_config)
-                self.logger.info(f"已加载预定义任务: {job_id}")
+                # 检查是否需要分解为多个子任务
+                if job_config.is_single_page_task:
+                    # 单页面任务，直接添加
+                    await self.add_job(job_config)
+                    self.logger.info(f"已加载预定义任务: {job_id}")
+                else:
+                    # 多页面任务，使用批量任务功能分解
+                    result = await self.add_batch_jobs(
+                        page_ids=job_config.page_ids,
+                        force=job_config.force,
+                        batch_id=f"predefined_{job_id}"
+                    )
+                    
+                    if result["success"]:
+                        self.logger.info(f"已加载预定义批量任务: {job_id}, 包含 {result['successful_tasks']} 个子任务")
+                    else:
+                        self.logger.error(f"加载预定义批量任务失败 {job_id}: {result['message']}")
+                        
             except Exception as e:
                 self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
 
@@ -138,6 +151,68 @@ class TaskScheduler:
             self.logger.error(f"添加任务失败 {job_config.job_id}: {e}")
             return False
 
+    async def add_batch_jobs(self, page_ids: List[str], force: bool = False, batch_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        添加批量任务，为每个页面创建独立的任务
+        
+        Args:
+            page_ids: 页面ID列表
+            force: 是否强制执行
+            batch_id: 批量任务ID，如果不提供则自动生成
+            
+        Returns:
+            Dict[str, Any]: 包含批量任务信息的字典
+        """
+        from app.crawl.base import CrawlConfig
+
+        if not batch_id:
+            batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        # 使用CrawlConfig来处理特殊字符
+        config = CrawlConfig()
+        resolved_page_ids = config.determine_page_ids(page_ids)
+
+        if not resolved_page_ids:
+            return {
+                "success": False,
+                "message": "没有找到有效的页面ID",
+                "batch_id": batch_id,
+                "task_ids": []
+            }
+
+        # 为每个页面创建独立的任务
+        task_ids = []
+        successful_tasks = 0
+
+        for page_id in resolved_page_ids:
+            job_config = JobConfigModel(
+                job_id=f"crawl_{page_id}_{batch_id}",
+                trigger_type=TriggerType.DATE,
+                handler_class=JobHandlerType.CRAWL,
+                page_ids=[page_id],
+                batch_id=batch_id,
+                force=force,
+                description=f"批量任务 {batch_id} 中的页面: {page_id}"
+            )
+
+            success = await self.add_job(job_config)
+            task_ids.append(job_config.job_id)
+
+            if success:
+                successful_tasks += 1
+            else:
+                self.logger.error(f"添加任务失败: {job_config.job_id}")
+
+        return {
+            "success": successful_tasks > 0,
+            "message": f"批量任务 {batch_id}: 成功添加 {successful_tasks}/{len(resolved_page_ids)} 个任务",
+            "batch_id": batch_id,
+            "task_ids": task_ids,
+            "total_pages": len(resolved_page_ids),
+            "successful_tasks": successful_tasks,
+            "failed_tasks": len(resolved_page_ids) - successful_tasks
+        }
+
     async def _execute_job(self, job_config: JobConfigModel) -> None:
         """统一的任务执行函数"""
         # 获取处理器类
@@ -156,7 +231,7 @@ class TaskScheduler:
             scheduled_time=datetime.now()
         )
 
-        # 获取任务数据（统一使用job_config.job_data）
+        # 获取任务数据
         page_ids = job_config.page_ids or []
 
         # 执行任务
@@ -167,17 +242,11 @@ class TaskScheduler:
 
     def get_jobs(self) -> List[Job]:
         """获取所有任务"""
-        if self.scheduler is None:
-            return []
-
-        return self.scheduler.get_jobs()
+        return self.scheduler.get_jobs() if self.scheduler else []
 
     def get_job(self, job_id: str) -> Optional[Job]:
         """获取指定任务"""
-        if self.scheduler is None:
-            return None
-
-        return self.scheduler.get_job(job_id)
+        return self.scheduler.get_job(job_id) if self.scheduler else None
 
     def is_running(self) -> bool:
         """检查调度器是否运行中"""
@@ -195,33 +264,53 @@ class TaskScheduler:
             }
 
         jobs = self.get_jobs()
-        running_jobs = len([job for job in jobs if job.next_run_time is not None])
-        paused_jobs = len([job for job in jobs if job.next_run_time is None])
-
-        uptime = 0.0
-        if self.start_time:
-            uptime = (datetime.now() - self.start_time).total_seconds()
+        running_jobs = sum(1 for job in jobs if job.next_run_time is not None)
+        paused_jobs = len(jobs) - running_jobs
+        uptime = (datetime.now() - self.start_time).total_seconds() if self.start_time else 0.0
 
         return {
             "status": "running" if self.scheduler.running else "paused",
-            "timezone": str(self.scheduler.timezone),
             "job_count": len(jobs),
             "running_jobs": running_jobs,
             "paused_jobs": paused_jobs,
-            "state": str(self.scheduler.state),
             "uptime": uptime
         }
 
-    def get_metrics(self) -> Dict[str, Any]:
-        """获取调度器指标"""
-        status = self.get_status()
+
+    def get_batch_jobs(self, batch_id: str) -> List[Job]:
+        """获取批量任务中的所有任务"""
+        return [job for job in self.get_jobs() if batch_id in job.id]
+
+    def get_batch_status(self, batch_id: str) -> Dict[str, Any]:
+        """获取批量任务的整体状态"""
+        batch_jobs = self.get_batch_jobs(batch_id)
+
+        if not batch_jobs:
+            return {
+                "batch_id": batch_id,
+                "status": "not_found",
+                "total_jobs": 0,
+                "running_jobs": 0,
+                "completed_jobs": 0
+            }
+
+        running_jobs = sum(1 for job in batch_jobs if job.next_run_time is not None)
+        completed_jobs = len(batch_jobs) - running_jobs
+
+        # 简化状态判断
+        if running_jobs > 0:
+            batch_status = "running"
+        elif completed_jobs == len(batch_jobs):
+            batch_status = "completed"
+        else:
+            batch_status = "partial"
 
         return {
-            "total_jobs": status["job_count"],
-            "running_jobs": status["running_jobs"],
-            "paused_jobs": status["paused_jobs"],
-            "scheduler_status": status["status"],
-            "uptime": status["uptime"]
+            "batch_id": batch_id,
+            "status": batch_status,
+            "total_jobs": len(batch_jobs),
+            "running_jobs": running_jobs,
+            "completed_jobs": completed_jobs
         }
 
 

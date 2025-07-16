@@ -5,7 +5,7 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List
 
 from app.config import get_settings
 from app.crawl.base import CrawlConfig
@@ -106,136 +106,57 @@ class CrawlJobHandler(BaseJobHandler):
 
     async def execute(self, page_ids: List[str] = None) -> JobResultModel:
         """
-        执行爬虫任务（重构后支持多页面管理）
+        执行单页面爬虫任务（重构后只处理单个页面）
         
         Args:
-            page_ids: 页面列表
+            page_ids: 页面列表，应该只包含一个页面ID
                 
         Returns:
             JobResultModel: 任务执行结果
         """
-        if page_ids is None:
+        if not page_ids:
             return JobResultModel.error_result("任务数据为空")
+        
+        if len(page_ids) != 1:
+            return JobResultModel.error_result(f"单页面任务应该只包含一个页面ID，但收到了 {len(page_ids)} 个")
 
+        page_id = page_ids[0]
+        
         try:
-            # 确定要爬取的页面列表
-            page_ids = await self._determine_page_ids(page_ids)
+            # 验证页面ID是否有效
+            if not self.config.validate_page_id(page_id):
+                return JobResultModel.error_result(f"无效的页面ID: {page_id}")
 
-            if not page_ids:
-                return JobResultModel.error_result("没有找到需要爬取的页面")
-
-            # 执行多页面爬取（调度模块负责并发控制）
-            results = await self._crawl_multiple_pages(page_ids)
-
-            # 统计结果
-            total_pages = len(page_ids)
-            successful_pages = len([r for r in results if r.get('success', False)])
-            total_books = sum(r.get('books_crawled', 0) for r in results if r.get('success', False))
-
-            if successful_pages > 0:
-                return JobResultModel.success_result(
-                    f"完成 {total_pages} 个页面爬取，成功 {successful_pages} 个，共爬取 {total_books} 本书籍",
-                    {
-                        "total_pages": total_pages,
-                        "successful_pages": successful_pages,
-                        "failed_pages": total_pages - successful_pages,
-                        "total_books": total_books,
-                        "results": results
-                    }
-                )
-            else:
-                return JobResultModel.error_result(f"所有 {total_pages} 个页面爬取都失败")
+            # 执行单页面爬取
+            crawler = CrawlFlow()
+            try:
+                self.logger.info(f"开始爬取页面: {page_id}")
+                crawl_result = await crawler.execute_crawl_task(page_id)
+                
+                if crawl_result.get('success', False):
+                    books_crawled = crawl_result.get('books_crawled', 0)
+                    self.logger.info(f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍")
+                    
+                    return JobResultModel.success_result(
+                        f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍",
+                        {
+                            "page_id": page_id,
+                            "books_crawled": books_crawled,
+                            "crawl_result": crawl_result
+                        }
+                    )
+                else:
+                    error_msg = crawl_result.get('error_message', '未知错误')
+                    return JobResultModel.error_result(f"页面 {page_id} 爬取失败: {error_msg}")
+                    
+            finally:
+                await crawler.close()
 
         except Exception as e:
-            return JobResultModel.error_result(f"爬虫任务执行异常: {str(e)}", e)
-
-    async def _determine_page_ids(self, page_ids: List[str]) -> List[str]:
-        """
-        根据任务数据确定需要爬取的页面ID列表
-        
-        Args:
-            page_ids: 任务数据
-            
-        Returns:
-            List[str]: 页面ID列表
-        """
-        # 特殊字符任务类型
-        if len(page_ids) == 1 and page_ids[0] in ["all", "jiazi", "category"]:
-            special_word = page_ids[0]
-            if special_word == "jiazi":
-                # 夹子榜任务
-                return ["jiazi"]
-            elif special_word == "category":
-                # 所有分类任务
-                return self._get_category_page_ids()
-            else:
-                return self._get_all_page_ids()
-        return [pid for pid in page_ids if self._validate_page_id(pid)]
+            self.logger.error(f"页面 {page_id} 爬取异常: {str(e)}")
+            return JobResultModel.error_result(f"页面 {page_id} 爬取异常: {str(e)}", e)
 
 
-    def _get_category_page_ids(self) -> List[str]:
-        """获取所有分类页面ID列表（排除夹子榜）"""
-        all_tasks = self.config.get_all_tasks()
-        category_ids = []
-        
-        for task in all_tasks:
-            task_id = task.get('id', '')
-            if not ('jiazi' in task_id.lower() or task.get('category') == 'jiazi'):
-                category_ids.append(task_id)
-        
-        self.logger.info(f"找到分类页面 {len(category_ids)} 个")
-        return category_ids
-
-    def _get_all_page_ids(self) -> List[str]:
-        """获取所欧页面id"""
-        all_tasks = self.config.get_all_tasks()
-        return [i.get("id") for i in all_tasks]
-
-    def _validate_page_id(self, page_id: str) -> bool:
-        """验证页面ID是否在配置中"""
-        all_tasks = self.config.get_all_tasks()
-        available_ids = {task.get('id', '') for task in all_tasks}
-        return page_id in available_ids
-
-    async def _crawl_multiple_pages(self, page_ids: List[str]) -> List[Dict[str, Any]]:
-        """
-        并发爬取多个页面（调度模块负责并发控制）
-
-        Args:
-            page_ids: 页面ID列表
-
-        Returns:
-            List[Dict[str, Any]]: 爬取结果列表
-        """
-        semaphore = asyncio.Semaphore(self.settings.scheduler.max_workers)
-
-        async def crawl_single_page_with_semaphore(page_id: str) -> Dict[str, Any]:
-            async with semaphore:
-                crawler = CrawlFlow()
-                try:
-                    crawl_result = await crawler.execute_crawl_task(page_id)
-                    return crawl_result
-                finally:
-                    await crawler.close()
-
-        # 并发执行所有页面爬取
-        tasks = [crawl_single_page_with_semaphore(page_id) for page_id in page_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # 处理异常结果
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                processed_results.append({
-                    "success": False,
-                    "page_id": page_ids[i],
-                    "books_crawled": 0,
-                    "error_message": f"页面爬取异常: {str(result)}"
-                })
-            else:
-                processed_results.append(result)
-
-        return processed_results
 
 
 class ReportJobHandler(BaseJobHandler):

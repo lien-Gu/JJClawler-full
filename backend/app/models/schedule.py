@@ -99,7 +99,14 @@ class JobConfigModel(BaseModel):
 
     # 任务数据
     page_ids: List[str] = Field(default_factory=list, description="页面id列表，可以是特殊字符all/jiazi/category")
+    batch_id: Optional[str] = Field(None, description="批量任务ID，用于跟踪相关任务")
+    parent_task_id: Optional[str] = Field(None, description="父任务ID，用于任务依赖关系")
 
+    @property
+    def is_single_page_task(self) -> bool:
+        """判断是否为单页面任务"""
+        return len(self.page_ids) == 1 and self.page_ids[0] not in ["all", "jiazi", "category"]
+    
     def build_trigger(self) -> None | DateTrigger | IntervalTrigger | CronTrigger:
         """创建触发器"""
         if self.trigger_type == TriggerType.DATE:

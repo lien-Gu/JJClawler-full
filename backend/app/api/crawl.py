@@ -29,46 +29,30 @@ async def crawl_all_pages(
         DataResponse[str]: 批次任务ID
     """
     try:
-        # 获取所有页面ID
-        config = CrawlConfig()
-        all_tasks = config.get_all_tasks()
-        page_ids = []
-
-        for task in all_tasks:
-            task_id = task.get('id', '')
-            page_ids.append(task_id)
-
-        if not page_ids:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="没有找到可用的页面任务"
-            )
-
         # 获取调度器并添加批量任务
         scheduler = get_scheduler()
-        batch_id = f"crawl_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        # 添加批量任务到调度器（统计逻辑在调度模块中处理）
-        job_config = JobConfigModel(
-            job_id=batch_id,
-            trigger_type=TriggerType.DATE,
-            handler_class=JobHandlerType.CRAWL,
-            force=force,
-            page_ids=page_ids,
+        
+        # 使用新的批量任务功能，为每个页面创建独立任务
+        result = await scheduler.add_batch_jobs(
+            page_ids=["all"],  # 使用特殊字符
+            force=force
         )
 
-        success = await scheduler.add_job(job_config)
-
-        if not success:
+        if not result["success"]:
             raise HTTPException(
                 status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="任务添加失败"
+                detail=result["message"]
             )
 
         return DataResponse(
             success=True,
-            message=f"已添加批量爬取任务，包含 {len(page_ids)} 个页面，批次ID: {batch_id}",
-            data=batch_id
+            message=result["message"],
+            data={
+                "batch_id": result["batch_id"],
+                "task_ids": result["task_ids"],
+                "total_pages": result["total_pages"],
+                "successful_tasks": result["successful_tasks"]
+            }
         )
 
     except HTTPException:
@@ -102,43 +86,30 @@ async def crawl_specific_pages(
                 detail="页面ID列表不能为空"
             )
 
-        # 验证页面ID
-        config = CrawlConfig()
-        all_tasks = config.get_all_tasks()
-        available_ids = {task.get('id', '') for task in all_tasks}
-        valid_page_ids = [pid for pid in page_ids if pid in available_ids]
-
-        if not valid_page_ids:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="没有有效的页面ID"
-            )
-
-        # 获取调度器并添加任务
+        # 获取调度器并添加批量任务
         scheduler = get_scheduler()
-        batch_id = f"crawl_pages_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        job_config = JobConfigModel(
-            job_id=batch_id,
-            trigger_type=TriggerType.DATE,
-            handler_class=JobHandlerType.CRAWL,
-            page_ids=valid_page_ids,
-            force=force,
-            description=f"指定页面爬取任务: {len(valid_page_ids)} 个页面"
+        
+        # 使用新的批量任务功能，为每个页面创建独立任务
+        result = await scheduler.add_batch_jobs(
+            page_ids=page_ids,
+            force=force
         )
 
-        success = await scheduler.add_job(job_config)
-
-        if not success:
+        if not result["success"]:
             raise HTTPException(
                 status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="任务添加失败"
+                detail=result["message"]
             )
 
         return DataResponse(
             success=True,
-            message=f"已添加批量爬取任务，包含 {len(valid_page_ids)} 个指定页面，批次ID: {batch_id}",
-            data=batch_id
+            message=result["message"],
+            data={
+                "batch_id": result["batch_id"],
+                "task_ids": result["task_ids"],
+                "total_pages": result["total_pages"],
+                "successful_tasks": result["successful_tasks"]
+            }
         )
 
     except HTTPException:
@@ -166,42 +137,29 @@ async def crawl_single_page(
         DataResponse[str]: 任务ID
     """
     try:
-        # 验证页面ID
-        config = CrawlConfig()
-        all_tasks = config.get_all_tasks()
-        available_ids = {task.get('id', '') for task in all_tasks}
-
-        if page_id not in available_ids:
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"页面ID不存在: {page_id}"
-            )
-
         # 获取调度器并添加任务
         scheduler = get_scheduler()
-        job_id = f"crawl_single_{page_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        job_config = JobConfigModel(
-            job_id=job_id,
-            trigger_type=TriggerType.DATE,
-            handler_class=JobHandlerType.CRAWL,
+        
+        # 使用新的批量任务功能，即使只有一个页面也能统一处理
+        result = await scheduler.add_batch_jobs(
             page_ids=[page_id],
-            force=force,
-            description=f"单页面爬取任务: {page_id}"
+            force=force
         )
 
-        success = await scheduler.add_job(job_config)
-
-        if not success:
+        if not result["success"]:
             raise HTTPException(
                 status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="任务添加失败"
+                detail=result["message"]
             )
 
         return DataResponse(
             success=True,
             message=f"已添加单页面爬取任务: {page_id}",
-            data=job_id
+            data={
+                "batch_id": result["batch_id"],
+                "task_ids": result["task_ids"],
+                "page_id": page_id
+            }
         )
 
     except HTTPException:
@@ -267,4 +225,52 @@ async def get_scheduler_status():
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取调度器状态失败: {str(e)}"
+        )
+
+
+@router.get("/batch/{batch_id}/status")
+async def get_batch_status(batch_id: str):
+    """
+    获取批量任务状态
+    
+    Args:
+        batch_id: 批量任务ID
+        
+    Returns:
+        DataResponse: 批量任务状态信息
+    """
+    try:
+        scheduler = get_scheduler()
+        
+        # 获取批量任务状态
+        batch_status = scheduler.get_batch_status(batch_id)
+        
+        # 获取详细的任务信息
+        batch_jobs = scheduler.get_batch_jobs(batch_id)
+        job_details = []
+        
+        for job in batch_jobs:
+            job_info = {
+                "job_id": job.id,
+                "page_id": job.id.split("_")[1] if "_" in job.id else "unknown",
+                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+                "status": "running" if job.next_run_time else "completed"
+            }
+            job_details.append(job_info)
+        
+        response_data = {
+            **batch_status,
+            "jobs": job_details
+        }
+        
+        return DataResponse(
+            success=True,
+            message=f"获取批量任务 {batch_id} 状态成功",
+            data=response_data
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取批量任务状态失败: {str(e)}"
         )
