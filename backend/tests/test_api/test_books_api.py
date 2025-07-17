@@ -29,10 +29,10 @@ class TestGetBooksList:
         
         # 验证数据格式
         assert data["data"][0]["id"] == 1
-        assert data["data"][0]["book_id"] == 12345
+        assert data["data"][0]["novel_id"] == 12345
         assert data["data"][0]["title"] == "测试小说1"
         assert data["data"][1]["id"] == 2
-        assert data["data"][1]["book_id"] == 12346
+        assert data["data"][1]["novel_id"] == 12346
         assert data["data"][1]["title"] == "测试小说2"
         
         # 验证service被调用
