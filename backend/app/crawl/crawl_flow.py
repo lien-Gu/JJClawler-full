@@ -234,14 +234,8 @@ class CrawlFlow:
             for db in get_db():
                 try:
                     snapshot_time = datetime.now()
-                    
-                    # 保存榜单数据
-                    if rankings:
-                        await self._save_rankings(db, rankings, snapshot_time)
-                    
-                    # 保存书籍数据
-                    if books:
-                        await self._save_books(db, books, snapshot_time)
+                    await self._save_rankings(db, rankings, snapshot_time)
+                    await self._save_books(db, books, snapshot_time)
                     
                     # 提交事务
                     db.commit()
@@ -263,6 +257,8 @@ class CrawlFlow:
 
     async def _save_rankings(self, db, rankings_data: List[Dict], snapshot_time: datetime) -> None:
         """保存榜单数据"""
+        if not rankings_data:
+            return
         for ranking_data in rankings_data:
             try:
                 # 创建或更新榜单
@@ -309,6 +305,8 @@ class CrawlFlow:
 
     async def _save_books(self, db, books_data: List[Dict], snapshot_time: datetime) -> None:
         """保存书籍数据"""
+        if not books_data:
+            return
         book_snapshots = []
         
         for book_data in books_data:
