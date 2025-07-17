@@ -20,7 +20,6 @@ class BookTrendPoint(BaseModel):
     clicks: Optional[int] = Field(None, description="点击数")
     favorites: Optional[int] = Field(None, description="收藏数")
     comments: Optional[int] = Field(None, description="评论数")
-    recommendations: Optional[int] = Field(None, description="推荐数")
 
 
 class BookTrendAggregatedPoint(BaseModel):
@@ -29,7 +28,6 @@ class BookTrendAggregatedPoint(BaseModel):
     avg_favorites: float = Field(..., description="平均收藏数")
     avg_clicks: float = Field(..., description="平均点击数")
     avg_comments: float = Field(..., description="平均评论数")
-    avg_recommendations: float = Field(..., description="平均推荐数")
     max_favorites: int = Field(..., description="最大收藏数")
     max_clicks: int = Field(..., description="最大点击数")
     min_favorites: int = Field(..., description="最小收藏数")

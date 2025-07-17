@@ -282,7 +282,7 @@ class CrawlFlow:
                 for book in books:
                     # 先确保书籍存在
                     book_info = {
-                        "novel_id": book.get("book_id"),
+                        "book_id": book.get("book_id"),
                         "title": book.get("title", "")
                     }
                     book_obj = self.book_service.create_or_update_book(db, book_info)
@@ -315,7 +315,7 @@ class CrawlFlow:
             try:
                 # 创建或更新书籍基本信息
                 book_info = {
-                    "novel_id": book_data.get("novel_id"),
+                    "book_id": book_data.get("book_id"),
                     "title": book_data.get("title", "")
                 }
                 
@@ -323,11 +323,10 @@ class CrawlFlow:
                 
                 # 创建书籍快照数据
                 snapshot_data = {
-                    "novel_id": book.id,
+                    "book_id": book.id,
                     "clicks": book_data.get("clicks", 0),
                     "favorites": book_data.get("favorites", 0),
                     "comments": book_data.get("comments", 0),
-                    "recommendations": book_data.get("recommendations", 0),
                     "word_count": book_data.get("word_count"),
                     "status": book_data.get("status"),
                     "snapshot_time": snapshot_time
@@ -348,7 +347,7 @@ class CrawlFlow:
         try:
             # 构建书籍详情URL
             book_url = self.config.templates['novel_detail'].format(
-                novel_id=book_id,
+                book_id=book_id,
                 **self.config.params
             )
 

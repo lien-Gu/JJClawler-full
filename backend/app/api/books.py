@@ -120,8 +120,7 @@ async def get_book_detail(
             snapshot_time=latest_snapshot.snapshot_time if latest_snapshot else datetime.now(),
             clicks=latest_snapshot.clicks if latest_snapshot else None,
             favorites=latest_snapshot.favorites if latest_snapshot else None,
-            comments=latest_snapshot.comments if latest_snapshot else None,
-            recommendations=latest_snapshot.recommendations if latest_snapshot else None
+            comments=latest_snapshot.comments if latest_snapshot else None
         )
         
         return DataResponse(
@@ -166,8 +165,7 @@ async def get_book_trend(
                 snapshot_time=snapshot.snapshot_time,
                 clicks=snapshot.clicks,
                 favorites=snapshot.favorites,
-                comments=snapshot.comments,
-                recommendations=snapshot.recommendations
+                comments=snapshot.comments
             ))
         
         return ListResponse(
@@ -408,7 +406,6 @@ def _convert_to_aggregated_points(trend_data: List[Dict[str, Any]]) -> List[Book
             avg_favorites=data_point["avg_favorites"],
             avg_clicks=data_point["avg_clicks"],
             avg_comments=data_point["avg_comments"],
-            avg_recommendations=data_point["avg_recommendations"],
             max_favorites=data_point["max_favorites"],
             max_clicks=data_point["max_clicks"],
             min_favorites=data_point["min_favorites"],

@@ -65,11 +65,10 @@ def sample_book_data():
 def sample_book_snapshot_data():
     """样本书籍快照数据"""
     return {
-        "novel_id": 12345,
+        "book_id": 1,  # 指向Book表的主键id
         "clicks": 50000,
         "favorites": 1500,
         "comments": 800,
-        "recommendations": 120,
         "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
     }
 
@@ -91,7 +90,7 @@ def sample_ranking_snapshot_data():
     """样本榜单快照数据"""
     return {
         "ranking_id": 1,
-        "novel_id": 12345,
+        "book_id": 1,  # 指向Book表的主键id
         "position": 1,
         "score": 95.5,
         "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
@@ -114,7 +113,7 @@ def create_test_book(db_session, sample_book_data):
 def create_test_book_snapshot(db_session, create_test_book, sample_book_snapshot_data):
     """创建测试书籍快照记录"""
     snapshot_data = sample_book_snapshot_data.copy()
-    snapshot_data["novel_id"] = create_test_book.novel_id
+    snapshot_data["book_id"] = create_test_book.id
     
     snapshot = BookSnapshot(**snapshot_data)
     db_session.add(snapshot)
@@ -138,7 +137,7 @@ def create_test_ranking_snapshot(db_session, create_test_ranking, create_test_bo
     """创建测试榜单快照记录"""
     snapshot_data = sample_ranking_snapshot_data.copy()
     snapshot_data["ranking_id"] = create_test_ranking.id
-    snapshot_data["novel_id"] = create_test_book.novel_id
+    snapshot_data["book_id"] = create_test_book.id
     
     snapshot = RankingSnapshot(**snapshot_data)
     db_session.add(snapshot)
@@ -197,30 +196,27 @@ def create_multiple_books(db_session):
 def create_multiple_snapshots(db_session, create_multiple_books, create_test_book):
     """创建多个书籍快照"""
     snapshots_data = [
-        # 为create_test_book (novel_id=12345) 创建快照
+        # 为create_test_book创建快照
         {
-            "novel_id": 12345,
+            "book_id": create_test_book.id,
             "clicks": 50000,
             "favorites": 1500,
             "comments": 800,
-            "recommendations": 120,
-            "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
+                "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
         },
         {
-            "novel_id": 12345,
+            "book_id": create_test_book.id,
             "clicks": 52000,
             "favorites": 1600,
             "comments": 850,
-            "recommendations": 125,
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         },
-        # 为create_multiple_books 创建快照
+        # 为create_multiple_books创建快照
         {
-            "novel_id": 12348,
+            "book_id": create_multiple_books[0].id,
             "clicks": 30000,
             "favorites": 800,
             "comments": 400,
-            "recommendations": 60,
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         }
     ]
@@ -320,7 +316,7 @@ def mock_statistics_data():
             "total_snapshots": 50,
             "unique_books": 25,
             "avg_books_per_snapshot": 20.5,
-            "most_stable_book": {"novel_id": 12345, "title": "稳定书籍"},
+            "most_stable_book": {"book_id": 12345, "title": "稳定书籍"},
             "first_snapshot_time": datetime(2024, 1, 1, 12, 0, 0),
             "last_snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         }
@@ -339,8 +335,7 @@ def assert_book_equal(book1: Book, book2: Book):
 
 def assert_snapshot_equal(snapshot1: BookSnapshot, snapshot2: BookSnapshot):
     """验证两个快照对象相等"""
-    assert snapshot1.novel_id == snapshot2.novel_id
+    assert snapshot1.book_id == snapshot2.book_id
     assert snapshot1.clicks == snapshot2.clicks
     assert snapshot1.favorites == snapshot2.favorites
     assert snapshot1.comments == snapshot2.comments
-    assert snapshot1.recommendations == snapshot2.recommendations

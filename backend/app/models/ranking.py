@@ -29,7 +29,6 @@ class BookInRanking(BaseModel):
     clicks: Optional[int] = Field(None, description="点击数")
     favorites: Optional[int] = Field(None, description="收藏数")
     comments: Optional[int] = Field(None, description="评论数")
-    recommendations: Optional[int] = Field(None, description="推荐数")
     word_count: Optional[int] = Field(None, description="字数")
 
 

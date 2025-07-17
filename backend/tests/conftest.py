@@ -312,32 +312,29 @@ def mock_book_snapshot_data():
     return {
         "latest_snapshot": {
             "id": 1,
-            "novel_id": 12345,
+            "book_id": 1,
             "clicks": 50000,
             "favorites": 1200,
             "comments": 800,
-            "recommendations": 300,
             "word_count": 120000,
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         },
         "trend_snapshots": [
             {
                 "id": 1,
-                "novel_id": 12345,
+                "book_id": 1,
                 "clicks": 48000,
                 "favorites": 1150,
                 "comments": 750,
-                "recommendations": 280,
                 "word_count": 118000,
                 "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
             },
             {
                 "id": 2,
-                "novel_id": 12345,
+                "book_id": 1,
                 "clicks": 50000,
                 "favorites": 1200,
                 "comments": 800,
-                "recommendations": 300,
                 "word_count": 120000,
                 "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
             }

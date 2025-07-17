@@ -209,11 +209,11 @@ class TestBookSnapshotDAO:
     def test_get_latest_by_book_id_success(self, db_session, snapshot_dao, book_entity, create_multiple_snapshots):
         """测试成功获取书籍最新快照"""
         # Act
-        result = snapshot_dao.get_latest_by_book_id(db_session, book_entity.novel_id)
+        result = snapshot_dao.get_latest_by_book_id(db_session, book_entity.id)
         
         # Assert
         assert result is not None
-        assert result.novel_id == book_entity.novel_id
+        assert result.book_id == book_entity.id
         # 应该是最新的快照（时间最大）
         assert result.snapshot_time == datetime(2024, 1, 15, 12, 0, 0)
         assert result.clicks == 52000  # 最新快照的点击数
@@ -229,7 +229,7 @@ class TestBookSnapshotDAO:
     def test_get_trend_by_book_id_success(self, db_session, snapshot_dao, book_entity, create_multiple_snapshots):
         """测试成功获取书籍趋势数据"""
         # Act
-        results = snapshot_dao.get_trend_by_book_id(db_session, book_entity.novel_id, limit=10)
+        results = snapshot_dao.get_trend_by_book_id(db_session, book_entity.id, limit=10)
         
         # Assert
         assert len(results) >= 2  # 至少有2个快照
@@ -245,7 +245,7 @@ class TestBookSnapshotDAO:
         
         # Act
         results = snapshot_dao.get_trend_by_book_id(
-            db_session, book_entity.novel_id, start_time, end_time, limit=10
+            db_session, book_entity.id, start_time, end_time, limit=10
         )
         
         # Assert
@@ -256,7 +256,7 @@ class TestBookSnapshotDAO:
     def test_get_trend_by_book_id_with_limit(self, db_session, snapshot_dao, book_entity, create_multiple_snapshots):
         """测试限制返回数量"""
         # Act
-        results = snapshot_dao.get_trend_by_book_id(db_session, book_entity.novel_id, limit=1)
+        results = snapshot_dao.get_trend_by_book_id(db_session, book_entity.id, limit=1)
         
         # Assert
         assert len(results) == 1
@@ -268,7 +268,7 @@ class TestBookSnapshotDAO:
         end_time = datetime(2024, 1, 15, 23, 59, 59)
         
         # Act
-        results = snapshot_dao.get_hourly_trend_by_book_id(db_session, book_entity.novel_id, start_time, end_time)
+        results = snapshot_dao.get_hourly_trend_by_book_id(db_session, book_entity.id, start_time, end_time)
         
         # Assert
         assert isinstance(results, list)
@@ -288,7 +288,7 @@ class TestBookSnapshotDAO:
         end_time = datetime(2024, 1, 31, 23, 59, 59)
         
         # Act
-        results = snapshot_dao.get_daily_trend_by_book_id(db_session, book_entity.novel_id, start_time, end_time)
+        results = snapshot_dao.get_daily_trend_by_book_id(db_session, book_entity.id, start_time, end_time)
         
         # Assert
         assert isinstance(results, list)
@@ -305,7 +305,7 @@ class TestBookSnapshotDAO:
         end_time = datetime(2024, 1, 31, 23, 59, 59)
         
         # Act
-        results = snapshot_dao.get_weekly_trend_by_book_id(db_session, book_entity.novel_id, start_time, end_time)
+        results = snapshot_dao.get_weekly_trend_by_book_id(db_session, book_entity.id, start_time, end_time)
         
         # Assert
         assert isinstance(results, list)
@@ -317,7 +317,7 @@ class TestBookSnapshotDAO:
         end_time = datetime(2024, 3, 31, 23, 59, 59)
         
         # Act
-        results = snapshot_dao.get_monthly_trend_by_book_id(db_session, book_entity.novel_id, start_time, end_time)
+        results = snapshot_dao.get_monthly_trend_by_book_id(db_session, book_entity.id, start_time, end_time)
         
         # Assert
         assert isinstance(results, list)
@@ -330,7 +330,7 @@ class TestBookSnapshotDAO:
         
         # Act
         results = snapshot_dao.get_trend_by_book_id_with_interval(
-            db_session, book_entity.novel_id, start_time, end_time, "hour"
+            db_session, book_entity.id, start_time, end_time, "hour"
         )
         
         # Assert
@@ -344,7 +344,7 @@ class TestBookSnapshotDAO:
         
         # Act
         results = snapshot_dao.get_trend_by_book_id_with_interval(
-            db_session, book_entity.novel_id, start_time, end_time, "day"
+            db_session, book_entity.id, start_time, end_time, "day"
         )
         
         # Assert
@@ -359,13 +359,13 @@ class TestBookSnapshotDAO:
         # Act & Assert
         with pytest.raises(ValueError, match="不支持的时间间隔"):
             snapshot_dao.get_trend_by_book_id_with_interval(
-                db_session, book_entity.novel_id, start_time, end_time, "invalid"
+                db_session, book_entity.id, start_time, end_time, "invalid"
             )
     
     def test_get_statistics_by_book_id_success(self, db_session, snapshot_dao, book_entity, create_multiple_snapshots):
         """测试成功获取书籍统计信息"""
         # Act
-        stats = snapshot_dao.get_statistics_by_book_id(db_session, book_entity.novel_id)
+        stats = snapshot_dao.get_statistics_by_book_id(db_session, book_entity.id)
         
         # Assert
         assert isinstance(stats, dict)
@@ -393,19 +393,17 @@ class TestBookSnapshotDAO:
         # Arrange
         snapshots_data = [
             {
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "clicks": 60000,
                 "favorites": 2000,
                 "comments": 1000,
-                "recommendations": 150,
                 "snapshot_time": datetime(2024, 1, 16, 12, 0, 0)
             },
             {
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "clicks": 65000,
                 "favorites": 2100,
                 "comments": 1050,
-                "recommendations": 160,
                 "snapshot_time": datetime(2024, 1, 17, 12, 0, 0)
             }
         ]
@@ -416,7 +414,7 @@ class TestBookSnapshotDAO:
         # Assert
         assert len(results) == 2
         for i, snapshot in enumerate(results):
-            assert snapshot.novel_id == book_entity.novel_id
+            assert snapshot.book_id == book_entity.id
             assert snapshot.clicks == snapshots_data[i]["clicks"]
             assert snapshot.favorites == snapshots_data[i]["favorites"]
     
@@ -425,11 +423,10 @@ class TestBookSnapshotDAO:
         # Arrange - 创建更多快照
         old_snapshots_data = [
             {
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "clicks": 40000 + i * 1000,
                 "favorites": 1000 + i * 50,
                 "comments": 500 + i * 20,
-                "recommendations": 80 + i * 5,
                 "snapshot_time": datetime(2024, 1, 10, 12, 0, 0) + timedelta(hours=i)
             }
             for i in range(5)
@@ -437,21 +434,21 @@ class TestBookSnapshotDAO:
         snapshot_dao.bulk_create(db_session, old_snapshots_data)
         
         # 验证快照总数
-        all_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.novel_id, limit=100)
+        all_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.id, limit=100)
         initial_count = len(all_snapshots)
         assert initial_count >= 7  # 至少有7个快照
         
         # Act - 删除2024-1-13之前的快照，但保留最新的3个
         before_time = datetime(2024, 1, 13, 0, 0, 0)
         deleted_count = snapshot_dao.delete_old_snapshots(
-            db_session, book_entity.novel_id, before_time, keep_count=3
+            db_session, book_entity.id, before_time, keep_count=3
         )
         
         # Assert
         assert deleted_count >= 0  # 删除了一些快照
         
         # 验证剩余快照数量
-        remaining_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.novel_id, limit=100)
+        remaining_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.id, limit=100)
         # 应该保留至少3个最新快照，加上2024-1-13之后的快照
         assert len(remaining_snapshots) >= 3
     
@@ -462,11 +459,11 @@ class TestBookSnapshotDAO:
         
         # Act
         deleted_count = snapshot_dao.delete_old_snapshots(
-            db_session, book_entity.novel_id, before_time, keep_count=2
+            db_session, book_entity.id, before_time, keep_count=2
         )
         
         # Assert
-        remaining_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.novel_id, limit=100)
+        remaining_snapshots = snapshot_dao.get_trend_by_book_id(db_session, book_entity.id, limit=100)
         assert len(remaining_snapshots) == 2  # 应该保留2个最新快照
         
         # 验证保留的是最新的快照
@@ -498,20 +495,19 @@ class TestBookDAOIntegration:
         
         # 2. 创建快照
         snapshot_data = {
-            "novel_id": book.novel_id,
+            "book_id": book.id,
             "clicks": 10000,
             "favorites": 500,
             "comments": 200,
-            "recommendations": 50,
             "snapshot_time": datetime.now()
         }
         snapshot = snapshot_dao.create(db_session, snapshot_data)
-        assert snapshot.novel_id == book.novel_id
+        assert snapshot.book_id == book.id
         
         # 3. 获取书籍的最新快照
-        latest_snapshot = snapshot_dao.get_latest_by_book_id(db_session, book.novel_id)
+        latest_snapshot = snapshot_dao.get_latest_by_book_id(db_session, book.id)
         assert latest_snapshot is not None
-        assert latest_snapshot.novel_id == book.novel_id
+        assert latest_snapshot.book_id == book.id
         assert latest_snapshot.clicks == 10000
         
         # 4. 更新书籍信息
@@ -525,6 +521,6 @@ class TestBookDAOIntegration:
         assert updated_book.tags == "都市,完结"
         
         # 5. 获取统计信息
-        stats = snapshot_dao.get_statistics_by_book_id(db_session, book.novel_id)
+        stats = snapshot_dao.get_statistics_by_book_id(db_session, book.id)
         assert stats["total_snapshots"] == 1
         assert stats["max_clicks"] == 10000

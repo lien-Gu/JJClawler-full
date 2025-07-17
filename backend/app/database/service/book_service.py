@@ -74,12 +74,12 @@ class BookService:
         if not book:
             return None
         
-        latest_snapshot = self.book_snapshot_dao.get_latest_by_book_id(db, book.novel_id)
+        latest_snapshot = self.book_snapshot_dao.get_latest_by_book_id(db, book.id)
         
         return {
             "book": book,
             "latest_snapshot": latest_snapshot,
-            "statistics": self.book_snapshot_dao.get_statistics_by_book_id(db, book.novel_id)
+            "statistics": self.book_snapshot_dao.get_statistics_by_book_id(db, book.id)
         }
     
     def get_book_trend(
@@ -95,7 +95,7 @@ class BookService:
         
         start_time = datetime.now() - timedelta(days=days)
         return self.book_snapshot_dao.get_trend_by_book_id(
-            db, book.novel_id, start_time=start_time, limit=days * 24  # 假设每小时一个快照
+            db, book.id, start_time=start_time, limit=days * 24  # 假设每小时一个快照
         )
 
     def get_book_trend_hourly(
@@ -123,7 +123,7 @@ class BookService:
         start_time = end_time - timedelta(hours=hours)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book.novel_id, start_time, end_time, "hour"
+            db, book.id, start_time, end_time, "hour"
         )
 
     def get_book_trend_daily(
@@ -151,7 +151,7 @@ class BookService:
         start_time = end_time - timedelta(days=days)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book.novel_id, start_time, end_time, "day"
+            db, book.id, start_time, end_time, "day"
         )
 
     def get_book_trend_weekly(
@@ -179,7 +179,7 @@ class BookService:
         start_time = end_time - timedelta(weeks=weeks)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book.novel_id, start_time, end_time, "week"
+            db, book.id, start_time, end_time, "week"
         )
 
     def get_book_trend_monthly(
@@ -208,7 +208,7 @@ class BookService:
         start_time = end_time - timedelta(days=months * 30)  # 近似计算
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book.novel_id, start_time, end_time, "month"
+            db, book.id, start_time, end_time, "month"
         )
 
     def get_book_trend_with_interval(
@@ -275,7 +275,7 @@ class BookService:
         book = self.book_dao.get_by_id(db, book_id)
         if not book:
             return {}
-        return self.book_snapshot_dao.get_statistics_by_book_id(db, book.novel_id)
+        return self.book_snapshot_dao.get_statistics_by_book_id(db, book.id)
     
     def get_books_with_pagination(
         self, 

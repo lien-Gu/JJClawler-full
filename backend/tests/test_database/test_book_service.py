@@ -58,11 +58,10 @@ class TestBookService:
         """样本快照数据"""
         return BookSnapshot(
             id=1,
-            novel_id=12345,
+            book_id=1,  # 指向Book表的主键id
             clicks=50000,
             favorites=1500,
             comments=800,
-            recommendations=120,
             snapshot_time=datetime(2024, 1, 15, 12, 0, 0)
         )
     
@@ -165,10 +164,10 @@ class TestBookService:
         assert result["latest_snapshot"] == sample_snapshot
         assert result["statistics"] == {"total_snapshots": 10}
         
-        # 验证DAO调用 - 使用sample_book的novel_id
+        # 验证DAO调用 - 使用sample_book的id
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_latest_by_book_id.assert_called_once_with(db_session, sample_book.novel_id)
-        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.novel_id)
+        mock_book_snapshot_dao.get_latest_by_book_id.assert_called_once_with(db_session, sample_book.id)
+        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.id)
     
     def test_get_book_detail_with_latest_snapshot_book_not_found(self, book_service_with_mocks, mock_book_dao, db_session):
         """测试书籍不存在时返回None"""
@@ -202,7 +201,7 @@ class TestBookService:
         expected_start_time = now - timedelta(days=7)
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
         mock_book_snapshot_dao.get_trend_by_book_id.assert_called_once_with(
-            db_session, sample_book.novel_id, start_time=expected_start_time, limit=168  # 7 * 24
+            db_session, sample_book.id, start_time=expected_start_time, limit=168  # 7 * 24
         )
     
     @patch('app.database.service.book_service.datetime')
@@ -225,7 +224,7 @@ class TestBookService:
         expected_start_time = now - timedelta(hours=24)
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
         mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.novel_id, expected_start_time, now, "hour"
+            db_session, sample_book.id, expected_start_time, now, "hour"
         )
     
     @patch('app.database.service.book_service.datetime')
@@ -248,7 +247,7 @@ class TestBookService:
         expected_start_time = now - timedelta(days=7)
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
         mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.novel_id, expected_start_time, now, "day"
+            db_session, sample_book.id, expected_start_time, now, "day"
         )
     
     @patch('app.database.service.book_service.datetime')
@@ -271,7 +270,7 @@ class TestBookService:
         expected_start_time = now - timedelta(weeks=4)
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
         mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.novel_id, expected_start_time, now, "week"
+            db_session, sample_book.id, expected_start_time, now, "week"
         )
     
     @patch('app.database.service.book_service.datetime')
@@ -294,7 +293,7 @@ class TestBookService:
         expected_start_time = now - timedelta(days=90)  # 3 * 30
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
         mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.novel_id, expected_start_time, now, "month"
+            db_session, sample_book.id, expected_start_time, now, "month"
         )
     
     def test_get_book_trend_with_interval_hour(self, book_service_with_mocks, mocker, db_session):
@@ -347,7 +346,7 @@ class TestBookService:
     def test_create_book_snapshot_success(self, book_service_with_mocks, mock_book_snapshot_dao, sample_snapshot, db_session):
         """测试成功创建书籍快照"""
         # Arrange
-        snapshot_data = {"novel_id": 12345, "clicks": 50000, "favorites": 1500}
+        snapshot_data = {"book_id": 1, "clicks": 50000, "favorites": 1500}
         mock_book_snapshot_dao.create.return_value = sample_snapshot
         
         # Act
@@ -361,8 +360,8 @@ class TestBookService:
         """测试成功批量创建书籍快照"""
         # Arrange
         snapshots_data = [
-            {"novel_id": 12345, "clicks": 50000, "favorites": 1500},
-            {"novel_id": 12345, "clicks": 52000, "favorites": 1600}
+            {"book_id": 1, "clicks": 50000, "favorites": 1500},
+            {"book_id": 1, "clicks": 52000, "favorites": 1600}
         ]
         mock_book_snapshot_dao.bulk_create.return_value = [sample_snapshot, sample_snapshot]
         
@@ -406,7 +405,7 @@ class TestBookService:
         # Assert
         assert result == stats
         mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.novel_id)
+        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.id)
     
     def test_get_books_by_ids_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
         """测试成功根据ID列表获取书籍"""
@@ -468,16 +467,15 @@ class TestBookServiceIntegration:
         
         # 3. 创建快照
         snapshot_data = {
-            "novel_id": 77777,
+            "book_id": book.id,
             "clicks": 10000,
             "favorites": 500,
             "comments": 200,
-            "recommendations": 50,
             "snapshot_time": datetime.now()
         }
         
         snapshot = book_service.create_book_snapshot(db_session, snapshot_data)
-        assert snapshot.novel_id == 77777
+        assert snapshot.book_id == book.id
         assert snapshot.clicks == 10000
         
         # 4. 获取书籍详情和最新快照

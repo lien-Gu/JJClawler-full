@@ -183,21 +183,21 @@ class TestRankingSnapshotDAO:
         snapshots_data = [
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "position": 1,
                 "score": 95.0,
                 "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
             },
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "position": 2,
                 "score": 92.0,
                 "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
             },
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "position": 1,
                 "score": 96.0,
                 "snapshot_time": datetime(2024, 1, 16, 12, 0, 0)  # 最新快照
@@ -220,13 +220,13 @@ class TestRankingSnapshotDAO:
     def test_get_latest_by_ranking_id_success(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试成功获取榜单最新快照"""
         # Act
-        results = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking_entity.rank_id, limit=10)
+        results = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking_entity.id, limit=10)
         
         # Assert
         assert len(results) >= 1
         # 验证获取的是最新时间的快照
         for snapshot in results:
-            assert snapshot.ranking_id == ranking_entity.rank_id
+            assert snapshot.ranking_id == ranking_entity.id
             assert snapshot.snapshot_time == datetime(2024, 1, 16, 12, 0, 0)  # 最新时间
         
         # 验证按位置排序
@@ -245,7 +245,7 @@ class TestRankingSnapshotDAO:
     def test_get_latest_by_ranking_id_with_limit(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试限制返回数量"""
         # Act
-        results = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking_entity.rank_id, limit=1)
+        results = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking_entity.id, limit=1)
         
         # Assert
         assert len(results) <= 1
@@ -254,19 +254,19 @@ class TestRankingSnapshotDAO:
         """测试成功获取指定日期的榜单快照"""
         # Act
         target_date = date(2024, 1, 15)
-        results = ranking_snapshot_dao.get_by_ranking_and_date(db_session, ranking_entity.rank_id, target_date)
+        results = ranking_snapshot_dao.get_by_ranking_and_date(db_session, ranking_entity.id, target_date)
         
         # Assert
         assert len(results) >= 1
         for snapshot in results:
-            assert snapshot.ranking_id == ranking_entity.rank_id
+            assert snapshot.ranking_id == ranking_entity.id
             assert snapshot.snapshot_time.date() == target_date
     
     def test_get_by_ranking_and_date_not_found(self, db_session, ranking_snapshot_dao, ranking_entity):
         """测试获取不存在日期的榜单快照"""
         # Act
         target_date = date(2024, 12, 31)  # 不存在的日期
-        results = ranking_snapshot_dao.get_by_ranking_and_date(db_session, ranking_entity.rank_id, target_date)
+        results = ranking_snapshot_dao.get_by_ranking_and_date(db_session, ranking_entity.id, target_date)
         
         # Assert
         assert results == []
@@ -274,12 +274,12 @@ class TestRankingSnapshotDAO:
     def test_get_book_ranking_history_success(self, db_session, ranking_snapshot_dao, book_entity, multiple_ranking_snapshots):
         """测试成功获取书籍排名历史"""
         # Act
-        results = ranking_snapshot_dao.get_book_ranking_history(db_session, book_entity.novel_id)
+        results = ranking_snapshot_dao.get_book_ranking_history(db_session, book_entity.id)
         
         # Assert
         assert len(results) >= 3  # 至少有3个快照
         for snapshot in results:
-            assert snapshot.novel_id == book_entity.novel_id
+            assert snapshot.book_id == book_entity.id
         
         # 验证按时间倒序排列
         for i in range(len(results) - 1):
@@ -289,14 +289,14 @@ class TestRankingSnapshotDAO:
         """测试指定榜单ID获取书籍排名历史"""
         # Act
         results = ranking_snapshot_dao.get_book_ranking_history(
-            db_session, book_entity.novel_id, ranking_id=ranking_entity.rank_id
+            db_session, book_entity.id, ranking_id=ranking_entity.id
         )
         
         # Assert
         assert len(results) >= 3
         for snapshot in results:
-            assert snapshot.novel_id == book_entity.novel_id
-            assert snapshot.ranking_id == ranking_entity.rank_id
+            assert snapshot.book_id == book_entity.id
+            assert snapshot.ranking_id == ranking_entity.id
     
     def test_get_book_ranking_history_with_time_range(self, db_session, ranking_snapshot_dao, book_entity, multiple_ranking_snapshots):
         """测试指定时间范围获取书籍排名历史"""
@@ -306,7 +306,7 @@ class TestRankingSnapshotDAO:
         
         # Act
         results = ranking_snapshot_dao.get_book_ranking_history(
-            db_session, book_entity.novel_id, start_time=start_time, end_time=end_time
+            db_session, book_entity.id, start_time=start_time, end_time=end_time
         )
         
         # Assert
@@ -317,7 +317,7 @@ class TestRankingSnapshotDAO:
     def test_get_book_ranking_history_with_limit(self, db_session, ranking_snapshot_dao, book_entity, multiple_ranking_snapshots):
         """测试限制返回数量"""
         # Act
-        results = ranking_snapshot_dao.get_book_ranking_history(db_session, book_entity.novel_id, limit=2)
+        results = ranking_snapshot_dao.get_book_ranking_history(db_session, book_entity.id, limit=2)
         
         # Assert
         assert len(results) <= 2
@@ -333,7 +333,7 @@ class TestRankingSnapshotDAO:
     def test_get_ranking_statistics_success(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试成功获取榜单统计信息"""
         # Act
-        stats = ranking_snapshot_dao.get_ranking_statistics(db_session, ranking_entity.rank_id)
+        stats = ranking_snapshot_dao.get_ranking_statistics(db_session, ranking_entity.id)
         
         # Assert
         assert isinstance(stats, dict)
@@ -364,7 +364,7 @@ class TestRankingSnapshotDAO:
     def test_get_ranking_trend_success(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试成功获取榜单变化趋势"""
         # Act
-        trend_data = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.rank_id)
+        trend_data = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.id)
         
         # Assert
         assert isinstance(trend_data, list)
@@ -387,7 +387,7 @@ class TestRankingSnapshotDAO:
         
         # Act
         trend_data = ranking_snapshot_dao.get_ranking_trend(
-            db_session, ranking_entity.rank_id, start_time, end_time
+            db_session, ranking_entity.id, start_time, end_time
         )
         
         # Assert
@@ -409,14 +409,14 @@ class TestRankingSnapshotDAO:
         snapshots_data = [
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "position": 5,
                 "score": 90.0,
                 "snapshot_time": datetime(2024, 1, 20, 12, 0, 0)
             },
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": book_entity.novel_id,
+                "book_id": book_entity.id,
                 "position": 4,
                 "score": 91.0,
                 "snapshot_time": datetime(2024, 1, 21, 12, 0, 0)
@@ -429,8 +429,8 @@ class TestRankingSnapshotDAO:
         # Assert
         assert len(results) == 2
         for i, snapshot in enumerate(results):
-            assert snapshot.ranking_id == ranking_entity.rank_id
-            assert snapshot.novel_id == book_entity.novel_id
+            assert snapshot.ranking_id == ranking_entity.id
+            assert snapshot.book_id == book_entity.id
             assert snapshot.position == snapshots_data[i]["position"]
             assert snapshot.score == snapshots_data[i]["score"]
     
@@ -440,7 +440,7 @@ class TestRankingSnapshotDAO:
         old_snapshots_data = [
             {
                 "ranking_id": ranking_entity.id,
-                "novel_id": multiple_ranking_snapshots[0].novel_id,
+                "book_id": multiple_ranking_snapshots[0].book_id,
                 "position": 3,
                 "score": 88.0,
                 "snapshot_time": datetime(2024, 1, 5, 12, 0, 0) + timedelta(days=i)
@@ -450,21 +450,21 @@ class TestRankingSnapshotDAO:
         ranking_snapshot_dao.bulk_create(db_session, old_snapshots_data)
         
         # 验证快照总数
-        trend_data = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.rank_id)
+        trend_data = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.id)
         initial_count = len(trend_data)
         assert initial_count >= 8  # 至少有8个时间点
         
         # Act - 删除2024-1-13之前的快照，但保留最新的5天
         before_time = datetime(2024, 1, 13, 0, 0, 0)
         deleted_count = ranking_snapshot_dao.delete_old_snapshots(
-            db_session, ranking_entity.rank_id, before_time, keep_days=5
+            db_session, ranking_entity.id, before_time, keep_days=5
         )
         
         # Assert
         assert deleted_count >= 0  # 删除了一些快照
         
         # 验证剩余快照
-        remaining_trend = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.rank_id)
+        remaining_trend = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.id)
         # 应该保留至少5天的快照，加上2024-1-13之后的快照
         assert len(remaining_trend) >= 3
     
@@ -475,34 +475,34 @@ class TestRankingSnapshotDAO:
         
         # Act
         deleted_count = ranking_snapshot_dao.delete_old_snapshots(
-            db_session, ranking_entity.rank_id, before_time, keep_days=2
+            db_session, ranking_entity.id, before_time, keep_days=2
         )
         
         # Assert
-        remaining_trend = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.rank_id)
+        remaining_trend = ranking_snapshot_dao.get_ranking_trend(db_session, ranking_entity.id)
         assert len(remaining_trend) == 2  # 应该保留2天的快照
     
     def test_get_books_comparison_latest(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试获取多个榜单的最新书籍对比数据"""
         # Arrange
-        ranking_ids = [ranking_entity.rank_id]
+        ranking_ids = [ranking_entity.id]
         
         # Act
         comparison_data = ranking_snapshot_dao.get_books_comparison(db_session, ranking_ids)
         
         # Assert
         assert isinstance(comparison_data, dict)
-        assert ranking_entity.rank_id in comparison_data
-        assert len(comparison_data[ranking_entity.rank_id]) >= 1
+        assert ranking_entity.id in comparison_data
+        assert len(comparison_data[ranking_entity.id]) >= 1
         
         # 验证是最新数据
-        for snapshot in comparison_data[ranking_entity.rank_id]:
+        for snapshot in comparison_data[ranking_entity.id]:
             assert snapshot.snapshot_time == datetime(2024, 1, 16, 12, 0, 0)  # 最新时间
     
     def test_get_books_comparison_with_date(self, db_session, ranking_snapshot_dao, ranking_entity, multiple_ranking_snapshots):
         """测试获取指定日期的多个榜单对比数据"""
         # Arrange
-        ranking_ids = [ranking_entity.rank_id]
+        ranking_ids = [ranking_entity.id]
         target_date = date(2024, 1, 15)
         
         # Act
@@ -510,16 +510,16 @@ class TestRankingSnapshotDAO:
         
         # Assert
         assert isinstance(comparison_data, dict)
-        assert ranking_entity.rank_id in comparison_data
+        assert ranking_entity.id in comparison_data
         
         # 验证是指定日期的数据
-        for snapshot in comparison_data[ranking_entity.rank_id]:
+        for snapshot in comparison_data[ranking_entity.id]:
             assert snapshot.snapshot_time.date() == target_date
     
     def test_get_books_comparison_multiple_rankings(self, db_session, ranking_snapshot_dao, ranking_entity):
         """测试多个榜单对比（包含不存在的榜单）"""
         # Arrange
-        ranking_ids = [ranking_entity.rank_id, 99999]  # 包含一个不存在的榜单
+        ranking_ids = [ranking_entity.id, 99999]  # 包含一个不存在的榜单
         
         # Act
         comparison_data = ranking_snapshot_dao.get_books_comparison(db_session, ranking_ids)
@@ -527,7 +527,7 @@ class TestRankingSnapshotDAO:
         # Assert
         assert isinstance(comparison_data, dict)
         assert len(comparison_data) == 2
-        assert ranking_entity.rank_id in comparison_data
+        assert ranking_entity.id in comparison_data
         assert 99999 in comparison_data
         assert len(comparison_data[99999]) == 0  # 不存在的榜单返回空列表
 
@@ -562,19 +562,19 @@ class TestRankingDAOIntegration:
         
         # 2. 创建快照
         snapshot_data = {
-            "ranking_id": ranking.rank_id,
-            "novel_id": book_entity.novel_id,
+            "ranking_id": ranking.id,
+            "book_id": book_entity.id,
             "position": 1,
             "score": 95.5,
             "snapshot_time": datetime.now()
         }
         snapshot = ranking_snapshot_dao.create(db_session, snapshot_data)
-        assert snapshot.ranking_id == ranking.rank_id
+        assert snapshot.ranking_id == ranking.id
         
         # 3. 获取榜单的最新快照
-        latest_snapshots = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking.rank_id)
+        latest_snapshots = ranking_snapshot_dao.get_latest_by_ranking_id(db_session, ranking.id)
         assert len(latest_snapshots) == 1
-        assert latest_snapshots[0].novel_id == book_entity.novel_id
+        assert latest_snapshots[0].book_id == book_entity.id
         assert latest_snapshots[0].position == 1
         
         # 4. 更新榜单信息
@@ -584,7 +584,7 @@ class TestRankingDAOIntegration:
         updated_ranking = ranking_dao.create_or_update_by_rank_id(db_session, update_data)
         
         # 5. 获取统计信息
-        stats = ranking_snapshot_dao.get_ranking_statistics(db_session, ranking.rank_id)
+        stats = ranking_snapshot_dao.get_ranking_statistics(db_session, ranking.id)
         assert stats["total_snapshots"] == 1
         assert stats["unique_books"] == 1
     
@@ -611,15 +611,15 @@ class TestRankingDAOIntegration:
         now = datetime.now()
         snapshots_data = [
             {
-                "ranking_id": ranking1.rank_id,
-                "novel_id": book_entity.novel_id,
+                "ranking_id": ranking1.id,
+                "book_id": book_entity.id,
                 "position": 1,
                 "score": 95.0,
                 "snapshot_time": now
             },
             {
-                "ranking_id": ranking2.rank_id,
-                "novel_id": book_entity.novel_id,
+                "ranking_id": ranking2.id,
+                "book_id": book_entity.id,
                 "position": 3,
                 "score": 90.0,
                 "snapshot_time": now
@@ -629,19 +629,19 @@ class TestRankingDAOIntegration:
         
         # 进行对比
         comparison_data = ranking_snapshot_dao.get_books_comparison(
-            db_session, [ranking1.rank_id, ranking2.rank_id]
+            db_session, [ranking1.id, ranking2.id]
         )
         
         # 验证对比结果
         assert len(comparison_data) == 2
-        assert ranking1.rank_id in comparison_data
-        assert ranking2.rank_id in comparison_data
-        assert len(comparison_data[ranking1.rank_id]) == 1
-        assert len(comparison_data[ranking2.rank_id]) == 1
+        assert ranking1.id in comparison_data
+        assert ranking2.id in comparison_data
+        assert len(comparison_data[ranking1.id]) == 1
+        assert len(comparison_data[ranking2.id]) == 1
         
         # 验证同一本书在不同榜单的位置
-        book_in_ranking1 = comparison_data[ranking1.rank_id][0]
-        book_in_ranking2 = comparison_data[ranking2.rank_id][0]
-        assert book_in_ranking1.novel_id == book_in_ranking2.novel_id
+        book_in_ranking1 = comparison_data[ranking1.id][0]
+        book_in_ranking2 = comparison_data[ranking2.id][0]
+        assert book_in_ranking1.book_id == book_in_ranking2.book_id
         assert book_in_ranking1.position == 1
         assert book_in_ranking2.position == 3

@@ -57,7 +57,6 @@ def mock_book_snapshot_data():
             "clicks": 50000,
             "favorites": 1500,
             "comments": 800,
-            "recommendations": 120,
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         },
         "trend_snapshots": [
@@ -67,7 +66,6 @@ def mock_book_snapshot_data():
                 "clicks": 48000,
                 "favorites": 1400,
                 "comments": 750,
-                "recommendations": 100,
                 "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
             },
             {
@@ -76,8 +74,7 @@ def mock_book_snapshot_data():
                 "clicks": 50000,
                 "favorites": 1500,
                 "comments": 800,
-                "recommendations": 120,
-                "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+                    "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
             }
         ],
         "aggregated_data": [
@@ -86,7 +83,6 @@ def mock_book_snapshot_data():
                 "avg_favorites": 1400.0,
                 "avg_clicks": 48000.0,
                 "avg_comments": 750.0,
-                "avg_recommendations": 100.0,
                 "max_favorites": 1400,
                 "max_clicks": 48000,
                 "min_favorites": 1400,
@@ -237,7 +233,7 @@ def mock_book_models(mock_book_data):
     book_data = mock_book_data["book"]
     book = Book(
         id=book_data["id"],
-        novel_id=book_data["novel_id"],
+        book_id=book_data["book_id"],
         title=book_data["title"],
         author_id=book_data["author_id"],
         novel_class=book_data["novel_class"],
@@ -258,7 +254,6 @@ def mock_book_snapshot_models(mock_book_snapshot_data):
         clicks=snapshot_data["clicks"],
         favorites=snapshot_data["favorites"],
         comments=snapshot_data["comments"],
-        recommendations=snapshot_data["recommendations"],
         snapshot_time=snapshot_data["snapshot_time"]
     )
     return snapshot

@@ -81,9 +81,9 @@ class RankingService:
         books_data = []
         for snapshot in snapshots:
             # 获取书籍信息
-            book = self.book_dao.get_by_novel_id(db, snapshot.novel_id)
+            book = self.book_dao.get_by_id(db, snapshot.book_id)
             book_data = {
-                "novel_id": snapshot.novel_id,
+                "book_id": snapshot.book_id,
                 "title": book.title if book else "未知书籍",
                 "position": snapshot.position,
                 "score": snapshot.score,
@@ -132,7 +132,7 @@ class RankingService:
     def get_book_ranking_history(
         self, 
         db: Session, 
-        novel_id: int, 
+        book_id: int, 
         ranking_id: Optional[int] = None,
         days: int = 30
     ) -> List[Dict[str, Any]]:
@@ -140,7 +140,7 @@ class RankingService:
         start_time = datetime.now() - timedelta(days=days)
         
         snapshots = self.ranking_snapshot_dao.get_book_ranking_history(
-            db, novel_id, ranking_id, start_time
+            db, book_id, ranking_id, start_time
         )
         
         history_data = []
@@ -200,24 +200,24 @@ class RankingService:
         )
         
         # 分析共同书籍
-        all_books = {}  # novel_id -> book_info
-        ranking_books = {}  # ranking_id -> set of novel_ids
+        all_books = {}  # book_id -> book_info
+        ranking_books = {}  # ranking_id -> set of book_ids
         
         for ranking_id, snapshots in comparison_data.items():
-            novel_ids = set()
+            book_ids = set()
             for snapshot in snapshots:
-                novel_ids.add(snapshot.novel_id)
+                book_ids.add(snapshot.book_id)
                 # 获取书籍信息
-                book = self.book_dao.get_by_novel_id(db, snapshot.novel_id)
-                all_books[snapshot.novel_id] = {
+                book = self.book_dao.get_by_id(db, snapshot.book_id)
+                all_books[snapshot.book_id] = {
                     "id": book.id if book else None,
-                    "novel_id": snapshot.novel_id,
+                    "book_id": snapshot.book_id,
                     "title": book.title if book else "未知书籍"
                 }
-            ranking_books[ranking_id] = novel_ids
+            ranking_books[ranking_id] = book_ids
         
         # 找出共同书籍
-        common_novel_ids = set.intersection(*ranking_books.values()) if ranking_books else set()
+        common_book_ids = set.intersection(*ranking_books.values()) if ranking_books else set()
         
         return {
             "rankings": [
@@ -231,19 +231,19 @@ class RankingService:
             "ranking_data": {
                 ranking_id: [
                     {
-                        "novel_id": s.novel_id,
-                        "title": all_books.get(s.novel_id, {}).get("title", "未知书籍"),
+                        "book_id": s.book_id,
+                        "title": all_books.get(s.book_id, {}).get("title", "未知书籍"),
                         "position": s.position,
                         "score": s.score
                     } for s in snapshots
                 ] for ranking_id, snapshots in comparison_data.items()
             },
             "common_books": [
-                all_books[novel_id] for novel_id in common_novel_ids
+                all_books[book_id] for book_id in common_book_ids
             ],
             "stats": {
                 "total_unique_books": len(all_books),
-                "common_books_count": len(common_novel_ids)
+                "common_books_count": len(common_book_ids)
             }
         }
     

@@ -57,7 +57,7 @@ class Parser:
             return DataType.RANKING
 
         # 检查是否为书籍详情数据
-        if "novelId" in data or "novel_id" in data:
+        if "novelId" in data or "book_id" in data:
             return DataType.BOOK
         # 默认返回页面类型
         return DataType.PAGE
@@ -118,7 +118,7 @@ class Parser:
         """解析书籍详情数据"""
         try:
             book_info = {
-                "novel_id": self._get_field(raw_data, ["novelId", "novel_id"]),
+                "book_id": self._get_field(raw_data, ["novelId", "book_id"]),
                 "title": self._get_field(raw_data, ["novelName", "novel_name"]),
                 # "author_id": self._get_field(raw_data, ["authorId", "author_id"]),
                 # "author_name": self._get_field(raw_data, ["authorName", "author_name"]),
@@ -144,7 +144,7 @@ class Parser:
         """解析书籍基础信息"""
         try:
             return {
-                "book_id": self._get_field(book_item, ["novelId", "novel_id"]),
+                "book_id": self._get_field(book_item, ["novelId", "book_id"]),
                 "title": self._get_field(book_item, ["novelName", "novel_name"]),
                 "position": position,
                 "clicks": self._get_field(book_item, ["novelClickCount", "novel_click_count"], 0),

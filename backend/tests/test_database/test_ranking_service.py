@@ -73,7 +73,7 @@ class TestRankingService:
         snapshot = RankingSnapshot(
             id=1,
             ranking_id=1,
-            novel_id=12345,
+            book_id=1,  # 指向Book表的主键id
             position=1,
             score=95.5,
             snapshot_time=datetime(2024, 1, 15, 12, 0, 0)
@@ -188,7 +188,7 @@ class TestRankingService:
         mock_ranking_snapshot_dao.get_latest_by_ranking_id.return_value = [sample_ranking_snapshot]
         mock_ranking_snapshot_dao.get_ranking_statistics.return_value = {"total_snapshots": 10}
         # Mock book_dao
-        ranking_service_with_mocks.book_dao.get_by_novel_id.return_value = sample_book
+        ranking_service_with_mocks.book_dao.get_by_id.return_value = sample_book
         
         # Act
         result = ranking_service_with_mocks.get_ranking_detail(db_session, 1)
@@ -198,7 +198,7 @@ class TestRankingService:
         assert result["ranking"] == sample_ranking
         assert len(result["books"]) == 1
         assert result["books"][0]["title"] == "测试小说"
-        assert result["books"][0]["novel_id"] == 12345
+        assert result["books"][0]["book_id"] == 1
         assert result["books"][0]["position"] == 1
         assert result["total_books"] == 1
         assert result["statistics"] == {"total_snapshots": 10}
@@ -321,7 +321,7 @@ class TestRankingService:
         ranking_service_with_mocks.ranking_dao.get_by_id.return_value = sample_ranking
         
         # Act
-        result = ranking_service_with_mocks.get_book_ranking_history(db_session, 12345, ranking_id=1, days=30)
+        result = ranking_service_with_mocks.get_book_ranking_history(db_session, 1, ranking_id=1, days=30)
         
         # Assert
         assert len(result) == 1
@@ -333,7 +333,7 @@ class TestRankingService:
         # 验证DAO调用
         expected_start_time = now - timedelta(days=30)
         mock_ranking_snapshot_dao.get_book_ranking_history.assert_called_once_with(
-            db_session, 12345, 1, expected_start_time
+            db_session, 1, 1, expected_start_time
         )
     
     def test_create_or_update_ranking_success(self, ranking_service_with_mocks, mock_ranking_dao, sample_ranking, db_session):
@@ -352,7 +352,7 @@ class TestRankingService:
     def test_create_ranking_snapshot_success(self, ranking_service_with_mocks, mock_ranking_snapshot_dao, sample_ranking_snapshot, db_session):
         """测试成功创建榜单快照"""
         # Arrange
-        snapshot_data = {"ranking_id": 1, "novel_id": 12345, "position": 1, "score": 95.5}
+        snapshot_data = {"ranking_id": 1, "book_id": 1, "position": 1, "score": 95.5}
         mock_ranking_snapshot_dao.create.return_value = sample_ranking_snapshot
         
         # Act
@@ -366,8 +366,8 @@ class TestRankingService:
         """测试成功批量创建榜单快照"""
         # Arrange
         snapshots_data = [
-            {"ranking_id": 1, "novel_id": 12345, "position": 1, "score": 95.5},
-            {"ranking_id": 1, "novel_id": 54321, "position": 2, "score": 90.0}
+            {"ranking_id": 1, "book_id": 1, "position": 1, "score": 95.5},
+            {"ranking_id": 1, "book_id": 2, "position": 2, "score": 90.0}
         ]
         mock_ranking_snapshot_dao.bulk_create.return_value = [sample_ranking_snapshot, sample_ranking_snapshot]
         
@@ -398,14 +398,14 @@ class TestRankingService:
         
         # 模拟快照数据
         snapshot1 = Mock()
-        snapshot1.book_id = 12345
+        snapshot1.book_id = 1
         snapshot1.book.id = 1
         snapshot1.book.title = "书籍1"
         snapshot1.position = 1
         snapshot1.score = 95.5
         
         snapshot2 = Mock()
-        snapshot2.book_id = 54321
+        snapshot2.book_id = 2
         snapshot2.book.id = 2
         snapshot2.book.title = "书籍2"
         snapshot2.position = 1
@@ -453,12 +453,12 @@ class TestRankingService:
         
         # 两个榜单都有同一本书
         snapshot1 = Mock()
-        snapshot1.novel_id = 12345
+        snapshot1.book_id = 1
         snapshot1.position = 1
         snapshot1.score = 95.5
         
         snapshot2 = Mock()
-        snapshot2.novel_id = 12345  # 同一本书
+        snapshot2.book_id = 1  # 同一本书
         snapshot2.position = 3
         snapshot2.score = 90.0
         
@@ -468,8 +468,8 @@ class TestRankingService:
         }
         mock_ranking_snapshot_dao.get_books_comparison.return_value = comparison_data
         
-        # Mock book_dao to return the same book for the shared novel_id
-        ranking_service_with_mocks.book_dao.get_by_novel_id.return_value = sample_book
+        # Mock book_dao to return the same book for the shared book_id
+        ranking_service_with_mocks.book_dao.get_by_id.return_value = sample_book
         
         # Act
         result = ranking_service_with_mocks.compare_rankings(db_session, ranking_ids)
@@ -611,14 +611,14 @@ class TestRankingServiceIntegration:
         # 创建快照
         snapshot_data = {
             "ranking_id": ranking.id,
-            "novel_id": book.novel_id,
+            "book_id": book.id,
             "position": 1,
             "score": 95.5,
             "snapshot_time": datetime.now()
         }
         snapshot = ranking_service.create_ranking_snapshot(db_session, snapshot_data)
         assert snapshot.ranking_id == ranking.id
-        assert snapshot.novel_id == book.novel_id
+        assert snapshot.book_id == book.id
         
         # 获取榜单详情（有快照）
         detail = ranking_service.get_ranking_detail(db_session, ranking.id)
@@ -630,7 +630,7 @@ class TestRankingServiceIntegration:
         
         # 获取书籍排名历史
         ranking_history = ranking_service.get_book_ranking_history(
-            db_session, book.novel_id, ranking_id=ranking.id
+            db_session, book.id, ranking_id=ranking.id
         )
         assert len(ranking_history) >= 1
         assert ranking_history[0]["ranking_id"] == ranking.id
@@ -680,21 +680,21 @@ class TestRankingServiceIntegration:
         snapshots_data = [
             {
                 "ranking_id": ranking1.id,
-                "novel_id": book1.novel_id,
+                "book_id": book1.id,
                 "position": 1,
                 "score": 95.0,
                 "snapshot_time": now
             },
             {
                 "ranking_id": ranking1.id,
-                "novel_id": book2.novel_id,
+                "book_id": book2.id,
                 "position": 2,
                 "score": 90.0,
                 "snapshot_time": now
             },
             {
                 "ranking_id": ranking2.id,
-                "novel_id": book2.novel_id,  # 共同书籍
+                "book_id": book2.id,  # 共同书籍
                 "position": 1,
                 "score": 92.0,
                 "snapshot_time": now

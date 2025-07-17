@@ -63,11 +63,11 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
     def __init__(self):
         super().__init__(BookSnapshot)
 
-    def get_latest_by_book_id(self, db: Session, novel_id: int) -> Optional[BookSnapshot]:
+    def get_latest_by_book_id(self, db: Session, book_id: int) -> Optional[BookSnapshot]:
         """获取书籍最新快照"""
         return db.scalar(
             select(BookSnapshot)
-            .where(BookSnapshot.novel_id == novel_id)
+            .where(BookSnapshot.book_id == book_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(1)
         )
@@ -75,13 +75,13 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
     def get_trend_by_book_id(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: Optional[datetime] = None,
             end_time: Optional[datetime] = None,
             limit: int = 30
     ) -> List[BookSnapshot]:
         """获取书籍趋势数据"""
-        query = select(BookSnapshot).where(BookSnapshot.novel_id == novel_id)
+        query = select(BookSnapshot).where(BookSnapshot.book_id == book_id)
 
         if start_time:
             query = query.where(BookSnapshot.snapshot_time >= start_time)
@@ -96,7 +96,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
     def _execute_trend_query(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime,
             time_group: str
@@ -106,7 +106,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             time_group: 时间分组表达式
@@ -121,7 +121,6 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 AVG(favorites) as avg_favorites,
                 AVG(clicks) as avg_clicks,
                 AVG(comments) as avg_comments,
-                AVG(recommendations) as avg_recommendations,
                 MAX(favorites) as max_favorites,
                 MAX(clicks) as max_clicks,
                 MIN(favorites) as min_favorites,
@@ -130,7 +129,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 MIN(snapshot_time) as period_start,
                 MAX(snapshot_time) as period_end
             FROM book_snapshots
-            WHERE novel_id = :book_id 
+            WHERE book_id = :book_id 
                 AND snapshot_time >= :start_time 
                 AND snapshot_time <= :end_time
             GROUP BY {time_group}
@@ -138,7 +137,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         """)
 
         result = db.execute(query, {
-            "book_id": novel_id,
+            "book_id": book_id,
             "start_time": start_time,
             "end_time": end_time
         })
@@ -150,7 +149,6 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 "avg_favorites": round(row.avg_favorites or 0, 2),
                 "avg_clicks": round(row.avg_clicks or 0, 2),
                 "avg_comments": round(row.avg_comments or 0, 2),
-                "avg_recommendations": round(row.avg_recommendations or 0, 2),
                 "max_favorites": row.max_favorites or 0,
                 "max_clicks": row.max_clicks or 0,
                 "min_favorites": row.min_favorites or 0,
@@ -165,7 +163,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
     def get_hourly_trend_by_book_id(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime
     ) -> List[Dict[str, Any]]:
@@ -174,7 +172,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             
@@ -182,12 +180,12 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             List[Dict]: 按小时聚合的趋势数据
         """
         time_group = "strftime('%Y-%m-%d %H', book_snapshots.snapshot_time)"
-        return self._execute_trend_query(db, novel_id, start_time, end_time, time_group)
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_daily_trend_by_book_id(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime
     ) -> List[Dict[str, Any]]:
@@ -196,7 +194,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             
@@ -204,12 +202,12 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             List[Dict]: 按天聚合的趋势数据
         """
         time_group = "strftime('%Y-%m-%d', book_snapshots.snapshot_time)"
-        return self._execute_trend_query(db, novel_id, start_time, end_time, time_group)
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_weekly_trend_by_book_id(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime
     ) -> List[Dict[str, Any]]:
@@ -218,7 +216,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             
@@ -226,12 +224,12 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             List[Dict]: 按周聚合的趋势数据
         """
         time_group = "strftime('%Y-W%W', book_snapshots.snapshot_time)"
-        return self._execute_trend_query(db, novel_id, start_time, end_time, time_group)
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_monthly_trend_by_book_id(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime
     ) -> List[Dict[str, Any]]:
@@ -240,7 +238,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             
@@ -248,12 +246,12 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             List[Dict]: 按月聚合的趋势数据
         """
         time_group = "strftime('%Y-%m', book_snapshots.snapshot_time)"
-        return self._execute_trend_query(db, novel_id, start_time, end_time, time_group)
+        return self._execute_trend_query(db, book_id, start_time, end_time, time_group)
 
     def get_trend_by_book_id_with_interval(
             self,
             db: Session,
-            novel_id: int,
+            book_id: int,
             start_time: datetime,
             end_time: datetime,
             interval: str = "day"
@@ -263,7 +261,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         
         Args:
             db: 数据库会话
-            novel_id: 书籍ID
+            book_id: 书籍ID
             start_time: 开始时间
             end_time: 结束时间
             interval: 时间间隔 ('hour', 'day', 'week', 'month')
@@ -272,17 +270,17 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             List[Dict]: 聚合后的趋势数据
         """
         if interval == "hour":
-            return self.get_hourly_trend_by_book_id(db, novel_id, start_time, end_time)
+            return self.get_hourly_trend_by_book_id(db, book_id, start_time, end_time)
         elif interval == "day":
-            return self.get_daily_trend_by_book_id(db, novel_id, start_time, end_time)
+            return self.get_daily_trend_by_book_id(db, book_id, start_time, end_time)
         elif interval == "week":
-            return self.get_weekly_trend_by_book_id(db, novel_id, start_time, end_time)
+            return self.get_weekly_trend_by_book_id(db, book_id, start_time, end_time)
         elif interval == "month":
-            return self.get_monthly_trend_by_book_id(db, novel_id, start_time, end_time)
+            return self.get_monthly_trend_by_book_id(db, book_id, start_time, end_time)
         else:
             raise ValueError(f"不支持的时间间隔: {interval}")
 
-    def get_statistics_by_book_id(self, db: Session, novel_id: int) -> Dict[str, Any]:
+    def get_statistics_by_book_id(self, db: Session, book_id: int) -> Dict[str, Any]:
         """获取书籍统计信息"""
         result = db.execute(
             select(
@@ -292,7 +290,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
                 func.max(BookSnapshot.comments).label("max_comments"),
                 func.min(BookSnapshot.snapshot_time).label("first_snapshot_time"),
                 func.max(BookSnapshot.snapshot_time).label("last_snapshot_time")
-            ).where(BookSnapshot.novel_id == novel_id)
+            ).where(BookSnapshot.book_id == book_id)
         ).first()
 
         if result and result.total_snapshots > 0:
@@ -313,12 +311,12 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
         db.commit()
         return db_objs
 
-    def delete_old_snapshots(self,db: Session,novel_id: int,before_time: datetime,keep_count: int = 100) -> int:
+    def delete_old_snapshots(self,db: Session,book_id: int,before_time: datetime,keep_count: int = 100) -> int:
         """删除旧快照，保留指定数量的最新记录"""
         # 获取要保留的快照IDs
         result = db.execute(
             select(BookSnapshot.id)
-            .where(BookSnapshot.novel_id == novel_id)
+            .where(BookSnapshot.book_id == book_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(keep_count)
         )
@@ -329,7 +327,7 @@ class BookSnapshotDAO(BaseDAO[BookSnapshot]):
             delete(BookSnapshot)
             .where(
                 and_(
-                    BookSnapshot.novel_id == novel_id,
+                    BookSnapshot.book_id == book_id,
                     BookSnapshot.snapshot_time < before_time,
                     ~BookSnapshot.id.in_(keep_ids)
                 )

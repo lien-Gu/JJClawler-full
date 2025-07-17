@@ -111,7 +111,6 @@ async def get_ranking_detail(
                 clicks=None,  # 这些数据需要从book_snapshot获取
                 favorites=None,
                 comments=None,
-                recommendations=None,
                 word_count=None
             ))
         
@@ -268,7 +267,6 @@ async def compare_rankings(
                     clicks=None,
                     favorites=None,
                     comments=None,
-                    recommendations=None,
                     word_count=None
                 ))
             
@@ -293,7 +291,6 @@ async def compare_rankings(
                 clicks=None,
                 favorites=None,
                 comments=None,
-                recommendations=None,
                 word_count=None
             ))
         
