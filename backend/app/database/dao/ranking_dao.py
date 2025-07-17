@@ -5,7 +5,7 @@ from datetime import datetime, date
 from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy import select, and_, desc, func, distinct, delete
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from .base_dao import BaseDAO
 from ..db.ranking import Ranking, RankingSnapshot
@@ -75,7 +75,6 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         
         result = db.execute(
             select(RankingSnapshot)
-            .options(joinedload(RankingSnapshot.book))
             .where(
                 and_(
                     RankingSnapshot.ranking_id == ranking_id,
@@ -113,7 +112,6 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         
         result = db.execute(
             select(RankingSnapshot)
-            .options(joinedload(RankingSnapshot.book))
             .where(
                 and_(
                     RankingSnapshot.ranking_id == ranking_id,
@@ -128,14 +126,14 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
     def get_book_ranking_history(
         self, 
         db: Session, 
-        book_id: int, 
+        novel_id: int, 
         ranking_id: Optional[int] = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         limit: int = 30
     ) -> List[RankingSnapshot]:
         """获取书籍排名历史"""
-        query = select(RankingSnapshot).where(RankingSnapshot.book_id == book_id)
+        query = select(RankingSnapshot).where(RankingSnapshot.novel_id == novel_id)
         
         if ranking_id:
             query = query.where(RankingSnapshot.ranking_id == ranking_id)
@@ -145,8 +143,7 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
             query = query.where(RankingSnapshot.snapshot_time <= end_time)
         
         result = db.execute(
-            query.options(joinedload(RankingSnapshot.ranking))
-            .order_by(desc(RankingSnapshot.snapshot_time))
+            query.order_by(desc(RankingSnapshot.snapshot_time))
             .limit(limit)
         )
         return list(result.scalars())
@@ -156,7 +153,7 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         result = db.execute(
             select(
                 func.count(distinct(RankingSnapshot.snapshot_time)).label("total_snapshots"),
-                func.count(distinct(RankingSnapshot.book_id)).label("unique_books"),
+                func.count(distinct(RankingSnapshot.novel_id)).label("unique_books"),
                 func.min(RankingSnapshot.snapshot_time).label("first_snapshot_time"),
                 func.max(RankingSnapshot.snapshot_time).label("last_snapshot_time")
             ).where(RankingSnapshot.ranking_id == ranking_id)
@@ -181,7 +178,7 @@ class RankingSnapshotDAO(BaseDAO[RankingSnapshot]):
         """获取榜单变化趋势（每个快照时间的书籍数量）"""
         query = select(
             RankingSnapshot.snapshot_time,
-            func.count(RankingSnapshot.book_id).label("book_count")
+            func.count(RankingSnapshot.novel_id).label("book_count")
         ).where(RankingSnapshot.ranking_id == ranking_id)
         
         if start_time:

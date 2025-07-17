@@ -158,3 +158,37 @@ PREDEFINED_JOB_CONFIGS = {
     )
 
 }
+
+
+# 批量任务响应模型
+class BatchJobResponse(BaseModel):
+    """批量任务响应模型"""
+    batch_id: str = Field(..., description="批次ID")
+    task_ids: List[str] = Field(default_factory=list, description="任务ID列表")
+    total_pages: int = Field(default=0, description="总页面数")
+    successful_tasks: int = Field(default=0, description="成功任务数")
+    
+    
+class SinglePageResponse(BaseModel):
+    """单页面任务响应模型"""
+    batch_id: str = Field(..., description="批次ID")
+    task_ids: List[str] = Field(default_factory=list, description="任务ID列表")
+    page_id: str = Field(..., description="页面ID")
+
+
+# 调度器状态响应模型
+class SchedulerStatusResponse(BaseModel):
+    """调度器状态响应模型"""
+    scheduler_status: Dict[str, Any] = Field(..., description="调度器状态")
+    jobs: List[Dict[str, Any]] = Field(default_factory=list, description="任务列表")
+    job_count: int = Field(default=0, description="任务数量")
+    summary: Dict[str, Any] = Field(default_factory=dict, description="状态汇总")
+
+
+# 批量任务状态响应模型
+class BatchStatusResponse(BaseModel):
+    """批量任务状态响应模型"""
+    batch_id: str = Field(..., description="批次ID")
+    status: str = Field(..., description="状态")
+    total_jobs: int = Field(default=0, description="总任务数")
+    jobs: List[Dict[str, Any]] = Field(default_factory=list, description="任务列表")

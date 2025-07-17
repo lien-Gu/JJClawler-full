@@ -27,8 +27,7 @@ class Ranking(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-    # 关系
-    ranking_snapshots: Mapped[List["RankingSnapshot"]] = relationship("RankingSnapshot", back_populates="ranking", cascade="all, delete-orphan")
+    # 关系在应用层处理，不使用数据库外键
 
     # 索引
     __table_args__ = (
@@ -43,8 +42,8 @@ class RankingSnapshot(Base):
 
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ranking_id: Mapped[int] = mapped_column(Integer, ForeignKey("rankings.id"), index=True)
-    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id"), index=True)
+    ranking_id: Mapped[int] = mapped_column(Integer, index=True)
+    novel_id: Mapped[int] = mapped_column(Integer, index=True)
 
     # 排名信息
     position: Mapped[int] = mapped_column(Integer, index=True)
@@ -53,14 +52,12 @@ class RankingSnapshot(Base):
     # 时间戳
     snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
-    # 关系
-    ranking: Mapped["Ranking"] = relationship("Ranking", back_populates="ranking_snapshots")
-    book: Mapped["Book"] = relationship("Book", back_populates="ranking_snapshots")
+    # 关系在应用层处理，不使用数据库外键
 
     # 复合索引
     __table_args__ = (
         Index("idx_ranking_snapshot_time", "ranking_id", "snapshot_time"),
         Index("idx_ranking_snapshot_position", "ranking_id", "position", "snapshot_time"),
-        Index("idx_book_ranking_snapshot", "book_id", "ranking_id", "snapshot_time"),
-        UniqueConstraint("ranking_id", "book_id", "snapshot_time", name="uq_ranking_book_snapshot"),
+        Index("idx_book_ranking_snapshot", "novel_id", "ranking_id", "snapshot_time"),
+        UniqueConstraint("ranking_id", "novel_id", "snapshot_time", name="uq_ranking_book_snapshot"),
     )

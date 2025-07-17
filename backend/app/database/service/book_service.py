@@ -74,12 +74,12 @@ class BookService:
         if not book:
             return None
         
-        latest_snapshot = self.book_snapshot_dao.get_latest_by_book_id(db, book_id)
+        latest_snapshot = self.book_snapshot_dao.get_latest_by_book_id(db, book.novel_id)
         
         return {
             "book": book,
             "latest_snapshot": latest_snapshot,
-            "statistics": self.book_snapshot_dao.get_statistics_by_book_id(db, book_id)
+            "statistics": self.book_snapshot_dao.get_statistics_by_book_id(db, book.novel_id)
         }
     
     def get_book_trend(
@@ -89,9 +89,13 @@ class BookService:
         days: int = 7
     ) -> List[BookSnapshot]:
         """获取书籍趋势数据（原始快照数据）"""
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return []
+        
         start_time = datetime.now() - timedelta(days=days)
         return self.book_snapshot_dao.get_trend_by_book_id(
-            db, book_id, start_time=start_time, limit=days * 24  # 假设每小时一个快照
+            db, book.novel_id, start_time=start_time, limit=days * 24  # 假设每小时一个快照
         )
 
     def get_book_trend_hourly(
@@ -111,11 +115,15 @@ class BookService:
         Returns:
             List[Dict]: 按小时聚合的趋势数据
         """
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return []
+        
         end_time = datetime.now()
         start_time = end_time - timedelta(hours=hours)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book_id, start_time, end_time, "hour"
+            db, book.novel_id, start_time, end_time, "hour"
         )
 
     def get_book_trend_daily(
@@ -135,11 +143,15 @@ class BookService:
         Returns:
             List[Dict]: 按天聚合的趋势数据
         """
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return []
+        
         end_time = datetime.now()
         start_time = end_time - timedelta(days=days)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book_id, start_time, end_time, "day"
+            db, book.novel_id, start_time, end_time, "day"
         )
 
     def get_book_trend_weekly(
@@ -159,11 +171,15 @@ class BookService:
         Returns:
             List[Dict]: 按周聚合的趋势数据
         """
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return []
+        
         end_time = datetime.now()
         start_time = end_time - timedelta(weeks=weeks)
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book_id, start_time, end_time, "week"
+            db, book.novel_id, start_time, end_time, "week"
         )
 
     def get_book_trend_monthly(
@@ -183,12 +199,16 @@ class BookService:
         Returns:
             List[Dict]: 按月聚合的趋势数据
         """
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return []
+        
         end_time = datetime.now()
         # 使用更精确的月份计算
         start_time = end_time - timedelta(days=months * 30)  # 近似计算
         
         return self.book_snapshot_dao.get_trend_by_book_id_with_interval(
-            db, book_id, start_time, end_time, "month"
+            db, book.novel_id, start_time, end_time, "month"
         )
 
     def get_book_trend_with_interval(
@@ -252,7 +272,10 @@ class BookService:
     
     def get_book_statistics(self, db: Session, book_id: int) -> Dict[str, Any]:
         """获取书籍统计信息"""
-        return self.book_snapshot_dao.get_statistics_by_book_id(db, book_id)
+        book = self.book_dao.get_by_id(db, book_id)
+        if not book:
+            return {}
+        return self.book_snapshot_dao.get_statistics_by_book_id(db, book.novel_id)
     
     def get_books_with_pagination(
         self, 

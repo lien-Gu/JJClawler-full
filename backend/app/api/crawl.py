@@ -9,13 +9,13 @@ from fastapi import status as http_status
 
 from ..crawl.base import CrawlConfig
 from ..models.base import DataResponse
-from ..models.schedule import JobHandlerType, JobConfigModel, TriggerType
+from ..models.schedule import JobHandlerType, JobConfigModel, TriggerType, BatchJobResponse, SinglePageResponse, SchedulerStatusResponse, BatchStatusResponse
 from ..schedule import get_scheduler
 
 router = APIRouter()
 
 
-@router.post("/all", response_model=DataResponse[str])
+@router.post("/all", response_model=DataResponse[BatchJobResponse])
 async def crawl_all_pages(
         force: bool = Query(False, description="是否强制爬取（忽略间隔限制）")
 ):
@@ -47,12 +47,12 @@ async def crawl_all_pages(
         return DataResponse(
             success=True,
             message=result["message"],
-            data={
-                "batch_id": result["batch_id"],
-                "task_ids": result["task_ids"],
-                "total_pages": result["total_pages"],
-                "successful_tasks": result["successful_tasks"]
-            }
+            data=BatchJobResponse(
+                batch_id=result["batch_id"],
+                task_ids=result["task_ids"],
+                total_pages=result["total_pages"],
+                successful_tasks=result["successful_tasks"]
+            )
         )
 
     except HTTPException:
@@ -64,7 +64,7 @@ async def crawl_all_pages(
         )
 
 
-@router.post("/pages", response_model=DataResponse[str])
+@router.post("/pages", response_model=DataResponse[BatchJobResponse])
 async def crawl_specific_pages(
         page_ids: List[str],
         force: bool = Query(False, description="是否强制爬取（忽略间隔限制）")
@@ -104,12 +104,12 @@ async def crawl_specific_pages(
         return DataResponse(
             success=True,
             message=result["message"],
-            data={
-                "batch_id": result["batch_id"],
-                "task_ids": result["task_ids"],
-                "total_pages": result["total_pages"],
-                "successful_tasks": result["successful_tasks"]
-            }
+            data=BatchJobResponse(
+                batch_id=result["batch_id"],
+                task_ids=result["task_ids"],
+                total_pages=result["total_pages"],
+                successful_tasks=result["successful_tasks"]
+            )
         )
 
     except HTTPException:
@@ -121,7 +121,7 @@ async def crawl_specific_pages(
         )
 
 
-@router.post("/page/{page_id}", response_model=DataResponse[str])
+@router.post("/page/{page_id}", response_model=DataResponse[SinglePageResponse])
 async def crawl_single_page(
         page_id: str,
         force: bool = Query(False, description="是否强制爬取（忽略间隔限制）")
@@ -155,11 +155,11 @@ async def crawl_single_page(
         return DataResponse(
             success=True,
             message=f"已添加单页面爬取任务: {page_id}",
-            data={
-                "batch_id": result["batch_id"],
-                "task_ids": result["task_ids"],
-                "page_id": page_id
-            }
+            data=SinglePageResponse(
+                batch_id=result["batch_id"],
+                task_ids=result["task_ids"],
+                page_id=page_id
+            )
         )
 
     except HTTPException:
@@ -171,7 +171,7 @@ async def crawl_single_page(
         )
 
 
-@router.get("/status")
+@router.get("/status", response_model=DataResponse[SchedulerStatusResponse])
 async def get_scheduler_status():
     """
     获取调度器状态和任务信息
@@ -218,7 +218,18 @@ async def get_scheduler_status():
         return DataResponse(
             success=True,
             message="获取调度器状态成功",
-            data=response_data
+            data=SchedulerStatusResponse(
+                scheduler_status=status,
+                jobs=job_details,
+                job_count=len(jobs),
+                summary={
+                    "total_jobs": status.get("job_count", 0),
+                    "running_jobs": status.get("running_jobs", 0),
+                    "paused_jobs": status.get("paused_jobs", 0),
+                    "scheduler_state": status.get("status", "unknown"),
+                    "uptime": status.get("uptime", 0)
+                }
+            )
         )
 
     except Exception as e:
@@ -228,7 +239,7 @@ async def get_scheduler_status():
         )
 
 
-@router.get("/batch/{batch_id}/status")
+@router.get("/batch/{batch_id}/status", response_model=DataResponse[BatchStatusResponse])
 async def get_batch_status(batch_id: str):
     """
     获取批量任务状态
@@ -266,7 +277,12 @@ async def get_batch_status(batch_id: str):
         return DataResponse(
             success=True,
             message=f"获取批量任务 {batch_id} 状态成功",
-            data=response_data
+            data=BatchStatusResponse(
+                batch_id=batch_status.get("batch_id", batch_id),
+                status=batch_status.get("status", "unknown"),
+                total_jobs=batch_status.get("total_jobs", 0),
+                jobs=job_details
+            )
         )
         
     except Exception as e:

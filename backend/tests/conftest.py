@@ -1,114 +1,161 @@
 """
-pytest配置文件 - 测试fixtures和数据库设置
+pytest配置文件 - 统一的测试fixtures和测试数据
 """
 import pytest
-import asyncio
-from typing import Generator, AsyncGenerator
+from datetime import datetime
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-import tempfile
-import os
+from unittest.mock import Mock
 
-# 导入应用和数据库相关模块
-from app.main import app
-from app.database.db.base import Base
-from app.database.connection import get_db
+from app.api.crawl import router as crawl_router
+from app.api.books import router as books_router
+from app.api.rankings import router as rankings_router
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """创建事件循环用于异步测试"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# ==================== 基础Fixtures ====================
 
-
-@pytest.fixture(scope="function")
-def test_db():
-    """创建测试数据库"""
-    # 创建临时数据库文件
-    temp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
-    temp_db.close()
-    
-    # 创建测试数据库引擎
-    engine = create_engine(
-        f"sqlite:///{temp_db.name}",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool
-    )
-    
-    # 创建表
-    Base.metadata.create_all(bind=engine)
-    
-    # 创建会话
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
-    yield TestingSessionLocal
-    
-    # 清理
-    os.unlink(temp_db.name)
+@pytest.fixture
+def app():
+    """创建FastAPI应用实例"""
+    app = FastAPI()
+    app.include_router(crawl_router, prefix="/api/v1/crawl")
+    app.include_router(books_router, prefix="/api/v1/books")
+    app.include_router(rankings_router, prefix="/api/v1/rankings")
+    return app
 
 
 @pytest.fixture
-def client(test_db):
+def client(app):
     """创建测试客户端"""
-    def override_get_db():
-        try:
-            db = test_db()
-            yield db
-        finally:
-            db.close()
-    
-    app.dependency_overrides[get_db] = override_get_db
-    
-    with TestClient(app) as test_client:
-        yield test_client
-    
-    app.dependency_overrides.clear()
+    return TestClient(app)
 
 
 @pytest.fixture
-def sample_book_data():
-    """示例书籍数据"""
+def db_session():
+    """模拟数据库会话"""
+    return Mock()
+
+
+# ==================== Mock数据 ====================
+
+@pytest.fixture
+def mock_scheduler_response():
+    """模拟调度器响应数据"""
     return {
-        "novel_id": 12345,
-        "title": "测试小说",
-        "author": "测试作者",
-        "status": "连载中",
-        "tag": "现代言情",
-        "length": 100000,
-        "favorites": 1000,
-        "total_clicks": 5000,
-        "monthly_clicks": 500,
-        "weekly_clicks": 100,
-        "daily_clicks": 20,
-        "total_comments": 200,
-        "monthly_comments": 50,
-        "weekly_comments": 10,
-        "daily_comments": 2,
-        "total_recs": 100,
-        "monthly_recs": 25,
-        "weekly_recs": 5,
-        "daily_recs": 1,
-        "total_words": 100000,
-        "intro": "这是一本测试小说",
-        "last_update": "2024-01-01 12:00:00"
+        "success": {
+            "success": True,
+            "message": "批量任务创建成功",
+            "batch_id": "batch_20240101_120000",
+            "task_ids": ["crawl_jiazi_batch_20240101_120000"],
+            "total_pages": 1,
+            "successful_tasks": 1
+        },
+        "failure": {
+            "success": False,
+            "message": "没有找到有效的页面ID",
+            "batch_id": "batch_20240101_120000",
+            "task_ids": []
+        }
     }
 
 
 @pytest.fixture
-def sample_ranking_data():
-    """示例榜单数据"""
+def mock_scheduler_status():
+    """模拟调度器状态数据"""
     return {
-        "name": "夹子榜",
-        "type": "jiazi",
-        "url": "https://www.jjwxc.net/topten.php?orderstr=4",
-        "description": "夹子榜单",
-        "is_active": True,
-        "crawl_interval": 3600,
-        "last_crawl": None
+        "status": "running",
+        "job_count": 5,
+        "running_jobs": 2,
+        "paused_jobs": 3,
+        "uptime": 3600.0
+    }
+
+
+@pytest.fixture
+def mock_batch_status():
+    """模拟批量任务状态数据"""
+    return {
+        "found": {
+            "batch_id": "batch_20240101_120000",
+            "status": "running",
+            "total_jobs": 2,
+            "running_jobs": 1,
+            "completed_jobs": 1
+        },
+        "not_found": {
+            "batch_id": "nonexistent_batch",
+            "status": "not_found",
+            "total_jobs": 0,
+            "running_jobs": 0,
+            "completed_jobs": 0
+        }
+    }
+
+
+@pytest.fixture
+def mock_jobs():
+    """模拟任务列表数据"""
+    return [
+        type('MockJob', (), {
+            'id': 'test_job_1',
+            'name': 'test_job_1',
+            'next_run_time': None,
+            'trigger': 'interval',
+            'args': [],
+            'kwargs': {}
+        })()
+    ]
+
+
+@pytest.fixture
+def mock_batch_jobs():
+    """模拟批量任务列表数据"""
+    return [
+        type('MockJob', (), {
+            'id': 'crawl_jiazi_batch_20240101_120000',
+            'next_run_time': None
+        })(),
+        type('MockJob', (), {
+            'id': 'crawl_index_batch_20240101_120000',
+            'next_run_time': datetime(2024, 1, 1, 12, 0, 0)
+        })()
+    ]
+
+
+# ==================== 爬虫测试数据 ====================
+
+@pytest.fixture
+def sample_config_data():
+    """样本配置数据"""
+    return {
+        "global": {
+            "params": {
+                "page": 1,
+                "pageSize": 20
+            },
+            "templates": {
+                "jiazi": "https://api.example.com/jiazi?page={page}",
+                "category": "https://api.example.com/category/{category}?page={page}"
+            }
+        },
+        "crawl_tasks": [
+            {
+                "id": "jiazi",
+                "template": "jiazi",
+                "params": {"page": 1},
+                "category": "jiazi"
+            },
+            {
+                "id": "index",
+                "template": "category",
+                "params": {"category": "index", "page": 1}
+            },
+            {
+                "id": "yq", 
+                "template": "category",
+                "params": {"category": "yq", "page": 1}
+            }
+        ]
     }
 
 
@@ -116,182 +163,239 @@ def sample_ranking_data():
 def mock_http_response():
     """模拟HTTP响应"""
     return {
-        "status_code": 200,
-        "text": """
-        <html>
-        <body>
-        <table>
-        <tr>
-            <td>测试小说</td>
-            <td>测试作者</td>
-            <td>1000</td>
-        </tr>
-        </table>
-        </body>
-        </html>
-        """
-    }
-
-
-@pytest.fixture
-def mock_task_data():
-    """模拟任务数据"""
-    return {
-        "task_id": "test_task_001",
-        "task_type": "crawl_jiazi",
-        "status": "pending",
-        "created_at": "2024-01-01T12:00:00Z",
-        "updated_at": "2024-01-01T12:00:00Z",
-        "result": None,
-        "error": None
-    }
-
-
-# ==================== 调度模块测试数据 ====================
-
-@pytest.fixture
-def scheduler_config():
-    """调度器配置数据"""
-    return {
-        "timezone": "Asia/Shanghai",
-        "job_defaults": {
-            "coalesce": False,
-            "max_instances": 3,
-            "misfire_grace_time": 30
+        "success": {
+            "status": "success",
+            "data": []
         },
-        "executors": {
-            "default": {
-                "type": "threadpool",
-                "max_workers": 10
+        "failure": {
+            "status": "error",
+            "message": "Request failed"
+        }
+    }
+
+
+@pytest.fixture
+def mock_crawl_result():
+    """模拟爬取结果"""
+    return {
+        "success": {
+            "success": True,
+            "books_crawled": 25,
+            "page_id": "test_page"
+        },
+        "failure": {
+            "success": False,
+            "error_message": "网络连接失败"
+        }
+    }
+
+
+# ==================== 调度器测试数据 ====================
+
+@pytest.fixture
+def sample_job_config():
+    """样本任务配置"""
+    return {
+        "job_id": "test_job",
+        "trigger_type": "date",
+        "handler_class": "CrawlJobHandler",
+        "page_ids": ["test_page"],
+        "enabled": True,
+        "force": False
+    }
+
+
+@pytest.fixture
+def sample_job_context():
+    """样本任务上下文"""
+    return {
+        "job_id": "test_job",
+        "job_name": "test_job",
+        "trigger_time": datetime(2024, 1, 1, 12, 0, 0),
+        "scheduled_time": datetime(2024, 1, 1, 12, 0, 0)
+    }
+
+
+@pytest.fixture
+def sample_job_result():
+    """样本任务结果"""
+    return {
+        "success": {
+            "success": True,
+            "message": "任务执行成功",
+            "data": {"count": 5},
+            "execution_time": 1.5
+        },
+        "failure": {
+            "success": False,
+            "message": "任务执行失败",
+            "exception": "测试异常",
+            "execution_time": 0.5
+        }
+    }
+
+
+# ==================== 书籍API测试数据 ====================
+
+@pytest.fixture
+def mock_pagination_data():
+    """模拟分页数据"""
+    return {
+        "books": [
+            {
+                "id": 1,
+                "novel_id": 12345,
+                "title": "测试小说1",
+                "author_name": "作者1",
+                "status": "连载中"
+            },
+            {
+                "id": 2,
+                "novel_id": 12346,
+                "title": "测试小说2",
+                "author_name": "作者2",
+                "status": "完结"
             }
-        }
+        ],
+        "total": 2,
+        "page": 1,
+        "size": 20,
+        "total_pages": 1
     }
 
 
 @pytest.fixture
-def sample_job_data():
-    """示例定时任务数据"""
-    return {
-        "jiazi_crawl_job": {
-            "id": "jiazi_crawl_job",
-            "func": "crawl_jiazi_ranking",
-            "trigger": "interval",
-            "hours": 1,
-            "name": "夹子榜爬取任务",
-            "description": "每小时爬取夹子榜数据",
-            "max_instances": 1,
-            "coalesce": True,
-            "misfire_grace_time": 300
-        },
-        "category_crawl_job": {
-            "id": "category_crawl_job",
-            "func": "crawl_category_rankings",
-            "trigger": "interval",
-            "hours": 6,
-            "name": "分类榜爬取任务",
-            "description": "每6小时爬取分类榜数据",
-            "max_instances": 1,
-            "coalesce": True,
-            "misfire_grace_time": 600
-        },
-        "data_cleanup_job": {
-            "id": "data_cleanup_job",
-            "func": "cleanup_old_data",
-            "trigger": "cron",
-            "hour": 2,
-            "minute": 0,
-            "name": "数据清理任务",
-            "description": "每天凌晨2点清理过期数据",
-            "max_instances": 1,
-            "coalesce": True,
-            "misfire_grace_time": 3600
-        }
-    }
-
-
-@pytest.fixture
-def mock_scheduler_jobs():
-    """模拟调度器任务列表"""
+def mock_search_results():
+    """模拟搜索结果"""
     return [
         {
-            "id": "jiazi_crawl_job",
-            "name": "夹子榜爬取任务",
-            "func": "crawl_jiazi_ranking",
-            "trigger": "interval",
-            "next_run_time": "2024-01-01T13:00:00+08:00",
-            "state": "running"
+            "id": 1,
+            "novel_id": 12345,
+            "title": "搜索结果1",
+            "author_name": "作者1",
+            "status": "连载中"
         },
         {
-            "id": "category_crawl_job", 
-            "name": "分类榜爬取任务",
-            "func": "crawl_category_rankings",
-            "trigger": "interval",
-            "next_run_time": "2024-01-01T18:00:00+08:00",
-            "state": "paused"
-        },
-        {
-            "id": "data_cleanup_job",
-            "name": "数据清理任务",
-            "func": "cleanup_old_data",
-            "trigger": "cron",
-            "next_run_time": "2024-01-02T02:00:00+08:00",
-            "state": "running"
+            "id": 2,
+            "novel_id": 12346,
+            "title": "搜索结果2",
+            "author_name": "作者2",
+            "status": "完结"
         }
     ]
 
 
 @pytest.fixture
-def mock_task_execution_data():
-    """模拟任务执行数据"""
+def mock_book_data():
+    """模拟书籍数据"""
     return {
-        "successful_execution": {
-            "task_id": "jiazi_crawl_job_20240101_120000",
-            "job_id": "jiazi_crawl_job",
-            "start_time": "2024-01-01T12:00:00+08:00",
-            "end_time": "2024-01-01T12:02:30+08:00",
-            "status": "success",
-            "result": {
-                "books_processed": 50,
-                "new_books": 5,
-                "updated_books": 45,
-                "execution_time": 150.5
-            },
-            "error": None
-        },
-        "failed_execution": {
-            "task_id": "category_crawl_job_20240101_120000",
-            "job_id": "category_crawl_job",
-            "start_time": "2024-01-01T12:00:00+08:00",
-            "end_time": "2024-01-01T12:01:15+08:00",
-            "status": "failed",
-            "result": None,
-            "error": "Network timeout: Failed to connect to target server"
-        },
-        "running_execution": {
-            "task_id": "data_cleanup_job_20240101_020000",
-            "job_id": "data_cleanup_job",
-            "start_time": "2024-01-01T02:00:00+08:00",
-            "end_time": None,
-            "status": "running",
-            "result": None,
-            "error": None
+        "book": {
+            "id": 1,
+            "novel_id": 12345,
+            "title": "测试小说",
+            "author_name": "测试作者",
+            "status": "连载中",
+            "tags": "现代言情",
+            "created_at": datetime(2024, 1, 1, 12, 0, 0),
+            "updated_at": datetime(2024, 1, 15, 12, 0, 0)
         }
     }
 
 
 @pytest.fixture
-def mock_scheduler_statistics():
-    """模拟调度器统计数据"""
+def mock_book_snapshot_data():
+    """模拟书籍快照数据"""
     return {
-        "total_jobs": 3,
-        "running_jobs": 2,
-        "paused_jobs": 1,
-        "failed_jobs": 0,
-        "total_executions": 150,
-        "successful_executions": 145,
-        "failed_executions": 5,
-        "average_execution_time": 125.8,
-        "last_execution_time": "2024-01-01T12:30:00+08:00",
-        "scheduler_uptime": 86400,  # 24小时，单位：秒
-        "scheduler_status": "running"
-    } 
+        "latest_snapshot": {
+            "id": 1,
+            "novel_id": 12345,
+            "clicks": 50000,
+            "favorites": 1200,
+            "comments": 800,
+            "recommendations": 300,
+            "word_count": 120000,
+            "status": "连载中",
+            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+        },
+        "trend_snapshots": [
+            {
+                "id": 1,
+                "novel_id": 12345,
+                "clicks": 48000,
+                "favorites": 1150,
+                "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
+            },
+            {
+                "id": 2,
+                "novel_id": 12345,
+                "clicks": 50000,
+                "favorites": 1200,
+                "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+            }
+        ],
+        "aggregated_data": [
+            {
+                "period": "2024-01-15T12:00:00",
+                "clicks": 50000,
+                "favorites": 1200,
+                "avg_clicks": 49000,
+                "avg_favorites": 1175
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def mock_ranking_history_data():
+    """模拟排名历史数据"""
+    return [
+        {
+            "ranking_id": 1,
+            "ranking_name": "测试榜单",
+            "position": 5,
+            "score": 95.5,
+            "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
+        },
+        {
+            "ranking_id": 1,
+            "ranking_name": "测试榜单",
+            "position": 3,
+            "score": 97.2,
+            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+        }
+    ]
+
+
+# ==================== 通用测试常量 ====================
+
+@pytest.fixture
+def test_page_ids():
+    """测试页面ID"""
+    return {
+        "valid": ["jiazi", "index", "yq"],
+        "invalid": ["invalid", "nonexistent"],
+        "special": ["all", "jiazi", "category"],
+        "single": ["jiazi"],
+        "multiple": ["jiazi", "index"]
+    }
+
+
+@pytest.fixture
+def test_batch_ids():
+    """测试批量任务ID"""
+    return {
+        "valid": "batch_20240101_120000",
+        "invalid": "nonexistent_batch"
+    }
+
+
+@pytest.fixture
+def api_endpoints():
+    """API端点"""
+    return {
+        "crawl_all": "/api/v1/crawl/all",
+        "crawl_pages": "/api/v1/crawl/pages",
+        "crawl_single": "/api/v1/crawl/page/{page_id}",
+        "scheduler_status": "/api/v1/crawl/status",
+        "batch_status": "/api/v1/crawl/batch/{batch_id}/status"
+    }

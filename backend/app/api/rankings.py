@@ -2,7 +2,7 @@
 榜单相关API接口
 """
 from typing import List, Optional
-from datetime import date as Date
+from datetime import date as Date, datetime
 from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -282,7 +282,7 @@ async def compare_rankings(
                 page_id=ranking_info["page_id"],
                 category=None,
                 description=None,
-                snapshot_time=None,
+                snapshot_time=datetime.combine(request.date, datetime.min.time()) if request.date else datetime.now(),
                 books=books_in_ranking,
                 total_books=len(books_in_ranking)
             ))

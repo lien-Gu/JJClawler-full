@@ -23,6 +23,7 @@ pydantic-settings = "^2.6.0"
 pytz = "^2025.2"
 sqlalchemy = "^2.0.41"
 aiosqlite = "^0.21.0"
+pytest = "^8.4.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

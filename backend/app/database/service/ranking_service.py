@@ -80,9 +80,11 @@ class RankingService:
         # 构造详情数据
         books_data = []
         for snapshot in snapshots:
+            # 获取书籍信息
+            book = self.book_dao.get_by_novel_id(db, snapshot.novel_id)
             book_data = {
-                "book_id": snapshot.book.id,
-                "title": snapshot.book.title,
+                "novel_id": snapshot.novel_id,
+                "title": book.title if book else "未知书籍",
                 "position": snapshot.position,
                 "score": snapshot.score,
                 "snapshot_time": snapshot.snapshot_time
@@ -130,7 +132,7 @@ class RankingService:
     def get_book_ranking_history(
         self, 
         db: Session, 
-        book_id: int, 
+        novel_id: int, 
         ranking_id: Optional[int] = None,
         days: int = 30
     ) -> List[Dict[str, Any]]:
@@ -138,14 +140,16 @@ class RankingService:
         start_time = datetime.now() - timedelta(days=days)
         
         snapshots = self.ranking_snapshot_dao.get_book_ranking_history(
-            db, book_id, ranking_id, start_time
+            db, novel_id, ranking_id, start_time
         )
         
         history_data = []
         for snapshot in snapshots:
+            # 获取榜单信息
+            ranking = self.ranking_dao.get_by_id(db, snapshot.ranking_id)
             history_data.append({
-                "ranking_id": snapshot.ranking.id,
-                "ranking_name": snapshot.ranking.rank_name,
+                "ranking_id": snapshot.ranking_id,
+                "ranking_name": ranking.rank_name if ranking else "未知榜单",
                 "position": snapshot.position,
                 "score": snapshot.score,
                 "snapshot_time": snapshot.snapshot_time
@@ -196,21 +200,24 @@ class RankingService:
         )
         
         # 分析共同书籍
-        all_books = {}  # book_id -> book_info
-        ranking_books = {}  # ranking_id -> set of book_ids
+        all_books = {}  # novel_id -> book_info
+        ranking_books = {}  # ranking_id -> set of novel_ids
         
         for ranking_id, snapshots in comparison_data.items():
-            book_ids = set()
+            novel_ids = set()
             for snapshot in snapshots:
-                book_ids.add(snapshot.book_id)
-                all_books[snapshot.book_id] = {
-                    "id": snapshot.book.id,
-                    "title": snapshot.book.title
+                novel_ids.add(snapshot.novel_id)
+                # 获取书籍信息
+                book = self.book_dao.get_by_novel_id(db, snapshot.novel_id)
+                all_books[snapshot.novel_id] = {
+                    "id": book.id if book else None,
+                    "novel_id": snapshot.novel_id,
+                    "title": book.title if book else "未知书籍"
                 }
-            ranking_books[ranking_id] = book_ids
+            ranking_books[ranking_id] = novel_ids
         
         # 找出共同书籍
-        common_book_ids = set.intersection(*ranking_books.values()) if ranking_books else set()
+        common_novel_ids = set.intersection(*ranking_books.values()) if ranking_books else set()
         
         return {
             "rankings": [
@@ -224,19 +231,19 @@ class RankingService:
             "ranking_data": {
                 ranking_id: [
                     {
-                        "book_id": s.book_id,
-                        "title": s.book.title,
+                        "novel_id": s.novel_id,
+                        "title": all_books.get(s.novel_id, {}).get("title", "未知书籍"),
                         "position": s.position,
                         "score": s.score
                     } for s in snapshots
                 ] for ranking_id, snapshots in comparison_data.items()
             },
             "common_books": [
-                all_books[book_id] for book_id in common_book_ids
+                all_books[novel_id] for novel_id in common_novel_ids
             ],
             "stats": {
                 "total_unique_books": len(all_books),
-                "common_books_count": len(common_book_ids)
+                "common_books_count": len(common_novel_ids)
             }
         }
     
