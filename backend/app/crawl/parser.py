@@ -52,13 +52,21 @@ class Parser:
         if not isinstance(data, dict):
             return DataType.PAGE
         
-        # 检查是否为夹子榜数据（单一榜单）
-        if "list" in data:
-            return DataType.RANKING
-
+        # 检查是否为夹子榜数据（直接在data字段中有list）
+        if "data" in data and isinstance(data["data"], dict):
+            if "list" in data["data"]:
+                return DataType.RANKING
+        
+        # 检查是否为页面数据（content.data结构）
+        content = data.get("content", {})
+        if isinstance(content, dict) and "data" in content:
+            if isinstance(content["data"], list):
+                return DataType.PAGE
+        
         # 检查是否为书籍详情数据
         if "novelId" in data or "book_id" in data:
             return DataType.BOOK
+            
         # 默认返回页面类型
         return DataType.PAGE
     
@@ -92,9 +100,11 @@ class Parser:
             return []
     
     def _parse_ranking_data(self, raw_data: Dict) -> List[ParsedItem]:
-        """解析榜单数据"""
+        """解析榜单数据（夹子榜）"""
         try:
-            books_data = raw_data.get("list", [])
+            # 新数据结构：data.list
+            data_section = raw_data.get("data", {})
+            books_data = data_section.get("list", [])
             books = []
             
             for position, book_item in enumerate(books_data, 1):

@@ -23,7 +23,7 @@ class TestCrawlConfig:
 
         config = CrawlConfig()
 
-        assert config.params == sample_config_data["global"]["params"]
+        assert config.params == sample_config_data["global"]["base_params"]
         assert config.templates == sample_config_data["global"]["templates"]
         assert config._config == sample_config_data
 
@@ -54,12 +54,12 @@ class TestCrawlConfig:
         # jiazi任务
         jiazi_task = sample_config_data["crawl_tasks"][0]
         url = config.build_url(jiazi_task)
-        assert url == "https://api.example.com/jiazi?page=1"
+        assert url == "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day=today&use_cdn=1&version=20"
 
-        # category任务
+        # index任务
         index_task = sample_config_data["crawl_tasks"][1]
         url = config.build_url(index_task)
-        assert url == "https://api.example.com/category/index?page=1"
+        assert url == "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel=index&version=20&use_cdn=1"
 
     def test_determine_page_ids(self, mocker: MockerFixture, sample_config_data):
         """测试页面ID确定"""
@@ -147,8 +147,8 @@ class TestIntegration:
         """测试配置和URL构建集成"""
         config_data = {
             "global": {
-                "params": {"page": 1},
-                "templates": {"test": "https://api.com/{category}?page={page}"}
+                "base_params": {"version": 20},
+                "templates": {"test": "https://api.com/{category}?version={version}"}
             },
             "crawl_tasks": [
                 {"id": "test", "template": "test", "params": {"category": "books"}}
@@ -161,4 +161,4 @@ class TestIntegration:
         task = config.get_task_config("test")
         url = config.build_url(task)
 
-        assert url == "https://api.com/books?page=1"
+        assert url == "https://api.com/books?version=20"

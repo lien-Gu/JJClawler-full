@@ -23,7 +23,7 @@ class CrawlConfig:
         try:
             with open(self.urls_file, 'r', encoding='utf-8') as f:
                 self._config = json.load(f)
-            self.params = self._config.get("global", {}).get("params", {})
+            self.params = self._config.get("global", {}).get("base_params", {})
             self.templates = self._config.get("global", {}).get("templates", {})
         except Exception as e:
             raise Exception(f"配置文件加载失败: {e}")

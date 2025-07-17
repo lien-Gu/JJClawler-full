@@ -57,7 +57,7 @@ class TestCrawlFlow:
         result = crawl_flow._parse_rankings_from_page(mock_page_content)
 
         assert len(result) == 1
-        assert result[0]["rank_id"] == 1
+        assert result[0]["rank_id"] == "1"
         assert len(result[0]["books"]) == 2
 
     def test_extract_book_ids_from_rankings(self, crawl_flow, mock_rankings_data):
@@ -82,7 +82,7 @@ class TestCrawlFlow:
     @pytest.mark.asyncio
     async def test_crawl_book_detail(self, crawl_flow, mocker: MockerFixture, mock_book_detail, mock_parsed_items):
         """测试爬取单个书籍详情"""
-        crawl_flow.config.templates = {'novel_detail': 'https://test.com/book/{book_id}'}
+        crawl_flow.config.templates = {'novel_detail': 'https://test.com/book/{novel_id}'}
         crawl_flow.config.params = {}
 
         mocker.patch.object(crawl_flow.client, 'get', return_value=mock_book_detail)

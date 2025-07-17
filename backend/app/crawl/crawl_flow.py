@@ -246,6 +246,8 @@ class CrawlFlow:
                     # 回滚事务
                     db.rollback()
                     self.logger.error(f"保存数据失败: {e}")
+                    import traceback
+                    self.logger.error(f"详细错误信息: {traceback.format_exc()}")
                     raise
                 
                 # 只循环一次，使用 break 退出
@@ -264,7 +266,7 @@ class CrawlFlow:
                 # 创建或更新榜单
                 ranking_info = {
                     "rank_id": ranking_data.get("rank_id"),
-                    "rank_name": ranking_data.get("rank_name", ""),
+                    "name": ranking_data.get("rank_name", ""),
                     "page_id": ranking_data.get("page_id", ""),
                     "rank_group_type": ranking_data.get("rank_group_type", "")
                 }
@@ -278,7 +280,7 @@ class CrawlFlow:
                 for book in books:
                     # 先确保书籍存在
                     book_info = {
-                        "book_id": book.get("book_id"),
+                        "novel_id": int(book.get("book_id")),  # 转换为整数
                         "title": book.get("title", "")
                     }
                     book_obj = self.book_service.create_or_update_book(db, book_info)
@@ -313,7 +315,7 @@ class CrawlFlow:
             try:
                 # 创建或更新书籍基本信息
                 book_info = {
-                    "book_id": book_data.get("book_id"),
+                    "novel_id": int(book_data.get("book_id")),  # 转换为整数
                     "title": book_data.get("title", "")
                 }
                 
@@ -322,10 +324,11 @@ class CrawlFlow:
                 # 创建书籍快照数据
                 snapshot_data = {
                     "book_id": book.id,
-                    "clicks": book_data.get("clicks", 0),
-                    "favorites": book_data.get("favorites", 0),
-                    "comments": book_data.get("comments", 0),
-                    "word_count": book_data.get("word_count"),
+                    "clicks": self._parse_number(book_data.get("clicks", 0)),
+                    "favorites": self._parse_number(book_data.get("favorites", 0)),
+                    "comments": self._parse_number(book_data.get("comments", 0)),
+                    "recommendations": self._parse_number(book_data.get("nutrition", 0)),  # 营养度作为推荐数
+                    "word_count": self._parse_number(book_data.get("word_count")),
                     "status": book_data.get("status"),
                     "snapshot_time": snapshot_time
                 }
@@ -345,7 +348,7 @@ class CrawlFlow:
         try:
             # 构建书籍详情URL
             book_url = self.config.templates['novel_detail'].format(
-                book_id=book_id,
+                novel_id=book_id,
                 **self.config.params
             )
 
@@ -404,6 +407,28 @@ class CrawlFlow:
             stats['execution_time'] = stats['end_time'] - stats['start_time']
         stats['total_data_items'] = len(self.pages_data) + len(self.rankings_data) + len(self.books_data)
         return stats
+
+    def _parse_number(self, value):
+        """解析数值字段，处理格式化的字符串"""
+        if value is None:
+            return None
+        
+        if isinstance(value, (int, float)):
+            return int(value)
+        
+        if isinstance(value, str):
+            # 移除非数字字符，如 "85,221(章均)" -> "85221"
+            import re
+            numbers = re.findall(r'[\d,]+', value)
+            if numbers:
+                # 移除逗号并转换为整数
+                number_str = numbers[0].replace(',', '')
+                try:
+                    return int(number_str)
+                except ValueError:
+                    return 0
+        
+        return 0
 
     async def close(self):
         """关闭资源"""

@@ -25,14 +25,14 @@ class Ranking(Base):
 
     # 榜单基本信息
     rank_id: Mapped[int] = mapped_column(Integer, unique=True, index=True,comment="榜单唯一标识ID，来源于晋江文学城的榜单ID")
-    rank_name: Mapped[str] = mapped_column(String(100), index=True, comment="榜单中文名称，如：夹子相关、总收藏榜、总推荐榜等")
+    name: Mapped[str] = mapped_column(String(100), index=True, comment="榜单中文名称，如：夹子相关、总收藏榜、总推荐榜等")
     rank_group_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="榜单分组类型，如：热门、分类、专题等，用于榜单分类管理")
     page_id: Mapped[str] = mapped_column(String(50), index=True, comment="页面标识ID，用于关联爬取配置和URL生成")
 
     # 索引优化
     __table_args__ = (
         Index("idx_ranking_rank_id", "rank_id"),
-        Index("idx_ranking_name", "rank_name"),
+        Index("idx_ranking_name", "name"),
         Index("idx_ranking_page_id", "page_id"),
         Index("idx_ranking_group_type", "rank_group_type"),
     )
@@ -59,6 +59,10 @@ class RankingSnapshot(Base):
 
     # 快照时间
     snapshot_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True, comment="快照记录时间，用于趋势分析和排名历史查询")
+    
+    # 覆盖Base类的时间戳字段（实际数据库表中没有这些字段）
+    created_at = None
+    updated_at = None
 
     # 复合索引和约束 - 优化查询性能和数据完整性
     __table_args__ = (

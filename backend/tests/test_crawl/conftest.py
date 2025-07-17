@@ -16,32 +16,32 @@ def sample_config_data():
     """样本配置数据"""
     return {
         "global": {
-            "params": {
-                "page": 1,
-                "pageSize": 20
+            "base_params": {
+                "version": 20,
+                "use_cdn": "1"
             },
             "templates": {
-                "jiazi": "https://api.example.com/jiazi?page={page}",
-                "category": "https://api.example.com/category/{category}?page={page}",
-                "novel_detail": "https://api.example.com/book/{book_id}"
+                "jiazi_ranking": "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day={day}&use_cdn={use_cdn}&version={version}",
+                "page_ranking": "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={channel}&version={version}",
+                "novel_detail": "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId={novel_id}"
             }
         },
         "crawl_tasks": [
             {
                 "id": "jiazi",
-                "template": "jiazi",
-                "params": {"page": 1},
+                "template": "jiazi_ranking",
+                "params": {"day": "today"},
                 "category": "jiazi"
             },
             {
                 "id": "index",
-                "template": "category",
-                "params": {"category": "index", "page": 1}
+                "template": "page_ranking",
+                "params": {"channel": "index"}
             },
             {
                 "id": "yq", 
-                "template": "category",
-                "params": {"category": "yq", "page": 1}
+                "template": "page_ranking",
+                "params": {"channel": "yq"}
             }
         ]
     }
@@ -81,20 +81,21 @@ def mock_page_content():
     """模拟页面内容"""
     return {
         "content": {
+            "code": "200",
             "data": [
                 {
-                    "rankid": 1,
+                    "rankid": "1",
                     "channelName": "测试榜单",
                     "rank_group_type": "热门",
                     "data": [
                         {
-                            "novelId": 12345,
+                            "novelId": "12345",
                             "novelName": "测试小说1",
                             "novelClickCount": 1000,
                             "novelFavoriteCount": 500
                         },
                         {
-                            "novelId": 12346,
+                            "novelId": "12346",
                             "novelName": "测试小说2", 
                             "novelClickCount": 2000,
                             "novelFavoriteCount": 800
@@ -110,20 +111,23 @@ def mock_page_content():
 def mock_jiazi_content():
     """模拟夹子榜内容"""
     return {
-        "list": [
-            {
-                "novelId": 55555,
-                "novelName": "夹子测试小说1",
-                "novelClickCount": 8000,
-                "novelFavoriteCount": 2000
-            },
-            {
-                "novelId": 55556,
-                "novelName": "夹子测试小说2",
-                "novelClickCount": 9000,
-                "novelFavoriteCount": 2500
-            }
-        ]
+        "code": "200",
+        "data": {
+            "list": [
+                {
+                    "novelId": "55555",
+                    "novelName": "夹子测试小说1",
+                    "novelClickCount": 8000,
+                    "novelFavoriteCount": 2000
+                },
+                {
+                    "novelId": "55556",
+                    "novelName": "夹子测试小说2",
+                    "novelClickCount": 9000,
+                    "novelFavoriteCount": 2500
+                }
+            ]
+        }
     }
 
 
@@ -131,7 +135,7 @@ def mock_jiazi_content():
 def mock_book_detail():
     """模拟书籍详情"""
     return {
-        "novelId": 12345,
+        "novelId": "12345",
         "novelName": "测试小说详情",
         "novelClickCount": 5000,
         "novelFavoriteCount": 1200,
@@ -147,15 +151,15 @@ def mock_parsed_items():
     """模拟解析结果"""
     return {
         "ranking": ParsedItem(DataType.RANKING, {
-            "rank_id": 1,
+            "rank_id": "1",
             "rank_name": "测试榜单",
             "books": [
-                {"book_id": 12345, "title": "测试小说1", "position": 1},
-                {"book_id": 12346, "title": "测试小说2", "position": 2}
+                {"book_id": "12345", "title": "测试小说1", "position": 1},
+                {"book_id": "12346", "title": "测试小说2", "position": 2}
             ]
         }),
         "book": ParsedItem(DataType.BOOK, {
-            "book_id": 12345,
+            "book_id": "12345",
             "title": "测试小说",
             "clicks": 1000,
             "favorites": 500
@@ -192,12 +196,12 @@ def mock_rankings_data():
     """模拟榜单数据"""
     return [
         {
-            "rank_id": 1,
+            "rank_id": "1",
             "rank_name": "测试榜单",
             "page_id": "test_page",
             "rank_group_type": "热门",
             "books": [
-                {"book_id": 12345, "title": "测试小说1", "position": 1, "score": 95.0}
+                {"book_id": "12345", "title": "测试小说1", "position": 1, "score": 95.0}
             ]
         }
     ]
@@ -208,7 +212,7 @@ def mock_books_data():
     """模拟书籍数据"""
     return [
         {
-            "book_id": 12345,
+            "book_id": "12345",
             "title": "测试小说1",
             "clicks": 1000,
             "favorites": 500,
