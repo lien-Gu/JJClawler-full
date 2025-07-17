@@ -46,10 +46,9 @@ class TestBookService:
             id=1,
             novel_id=12345,
             title="测试小说",
-            author_name="测试作者",
-            status="连载中",
+            author_id=101,
+            novel_class="现代言情",
             tags="现代,都市",
-            word_count=100000,
             created_at=datetime(2024, 1, 1, 12, 0, 0),
             updated_at=datetime(2024, 1, 1, 12, 0, 0)
         )
@@ -335,7 +334,7 @@ class TestBookService:
     def test_create_or_update_book_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
         """测试成功创建或更新书籍"""
         # Arrange
-        book_data = {"novel_id": 12345, "title": "新书籍", "author_name": "新作者"}
+        book_data = {"novel_id": 12345, "title": "新书籍", "author_id": 201}
         mock_book_dao.create_or_update_by_novel_id.return_value = sample_book
         
         # Act
@@ -412,7 +411,7 @@ class TestBookService:
     def test_get_books_by_ids_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
         """测试成功根据ID列表获取书籍"""
         # Arrange
-        book2 = Book(id=2, novel_id=54321, title="第二本书", author_name="作者2")
+        book2 = Book(id=2, novel_id=54321, title="第二本书", author_id=202)
         mock_book_dao.get_by_id.side_effect = [sample_book, book2, None]  # 第三个ID不存在
         
         # Act
@@ -453,9 +452,9 @@ class TestBookServiceIntegration:
         book_data = {
             "novel_id": 77777,
             "title": "集成测试小说",
-            "author_name": "集成测试作者",
-            "status": "连载中",
-            "word_count": 50000
+            "author_id": 301,
+            "novel_class": "现代言情",
+            "tags": "都市,甜文"
         }
         
         book = book_service.create_or_update_book(db_session, book_data)
@@ -502,7 +501,7 @@ class TestBookServiceIntegration:
         """测试分页功能集成测试"""
         # 创建多本书籍
         books_data = [
-            {"novel_id": 88881 + i, "title": f"分页测试书籍{i}", "author_name": f"作者{i}"}
+            {"novel_id": 88881 + i, "title": f"分页测试书籍{i}", "author_id": 401 + i}
             for i in range(5)
         ]
         
@@ -533,8 +532,8 @@ class TestBookServiceIntegration:
         book_data = {
             "novel_id": 99999,
             "title": "搜索测试专用小说",
-            "author_name": "搜索测试作者",
-            "status": "连载中"
+            "author_id": 501,
+            "novel_class": "现代言情"
         }
         
         book = book_service.create_or_update_book(db_session, book_data)

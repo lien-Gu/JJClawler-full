@@ -341,7 +341,7 @@ async def get_book_trend_monthly(
 async def get_book_trend_aggregated(
     book_id: int,
     period_count: int = Query(7, ge=1, le=365, description="统计周期数"),
-    interval: str = Query("day", regex="^(hour|day|week|month)$", description="时间间隔：hour/day/week/month"),
+    interval: str = Query("day", pattern="^(hour|day|week|month)$", description="时间间隔：hour/day/week/month"),
     db: Session = Depends(get_db)
 ):
     """

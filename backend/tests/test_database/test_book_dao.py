@@ -34,7 +34,7 @@ class TestBookDAO:
         assert result is not None
         assert result.novel_id == book_entity.novel_id
         assert result.title == book_entity.title
-        assert result.author_name == book_entity.author_name
+        assert result.author_id == book_entity.author_id
     
     def test_get_by_novel_id_not_found(self, db_session, book_dao):
         """测试novel_id不存在时返回None"""
@@ -112,10 +112,9 @@ class TestBookDAO:
         book_data = {
             "novel_id": 54321,
             "title": "新创建的小说",
-            "author_name": "新作者",
-            "status": "连载中",
-            "tags": "现代,都市",
-            "word_count": 50000
+            "author_id": 201,
+            "novel_class": "现代言情",
+            "tags": "现代,都市"
         }
         
         # Act
@@ -125,10 +124,9 @@ class TestBookDAO:
         assert result is not None
         assert result.novel_id == 54321
         assert result.title == "新创建的小说"
-        assert result.author_name == "新作者"
-        assert result.status == "连载中"
+        assert result.author_id == 201
+        assert result.novel_class == "现代言情"
         assert result.tags == "现代,都市"
-        assert result.word_count == 50000
         assert result.created_at is not None
         assert result.updated_at is not None
     
@@ -139,8 +137,8 @@ class TestBookDAO:
         update_data = {
             "novel_id": book_entity.novel_id,
             "title": "更新后的标题",
-            "word_count": 200000,
-            "status": "完本"
+            "novel_class": "古代言情",
+            "tags": "宫廷,重生,甜文"
         }
         
         # Act
@@ -150,8 +148,8 @@ class TestBookDAO:
         assert result is not None
         assert result.novel_id == book_entity.novel_id
         assert result.title == "更新后的标题"
-        assert result.word_count == 200000
-        assert result.status == "完本"
+        assert result.novel_class == "古代言情"
+        assert result.tags == "宫廷,重生,甜文"
         assert result.updated_at > original_updated_at
         assert result.created_at == book_entity.created_at  # 创建时间不变
     
@@ -160,7 +158,7 @@ class TestBookDAO:
         # Arrange
         book_data = {
             "title": "缺少ID的小说",
-            "author_name": "作者"
+            "author_id": 301
         }
         
         # Act & Assert
@@ -173,7 +171,7 @@ class TestBookDAO:
         duplicate_data = {
             "novel_id": book_entity.novel_id,
             "title": "重复ID测试",
-            "author_name": "重复作者"
+            "author_id": 999
         }
         
         # Act
@@ -182,7 +180,7 @@ class TestBookDAO:
         # Assert - 应该是更新操作，不是创建新记录
         assert result.novel_id == book_entity.novel_id
         assert result.title == "重复ID测试"
-        assert result.author_name == "重复作者"
+        assert result.author_id == 999
         
         # 验证数据库中只有一条记录
         all_books = book_dao.get_all(db_session, skip=0, limit=100)
@@ -492,8 +490,8 @@ class TestBookDAOIntegration:
         book_data = {
             "novel_id": 88888,
             "title": "生命周期测试小说",
-            "author_name": "测试作者",
-            "status": "连载中"
+            "author_id": 401,
+            "novel_class": "现代言情"
         }
         book = book_dao.create_or_update_by_novel_id(db_session, book_data)
         assert book.novel_id == 88888
@@ -519,12 +517,12 @@ class TestBookDAOIntegration:
         # 4. 更新书籍信息
         update_data = {
             "novel_id": book.novel_id,
-            "status": "完本",
-            "word_count": 300000
+            "novel_class": "现代言情",
+            "tags": "都市,完结"
         }
         updated_book = book_dao.create_or_update_by_novel_id(db_session, update_data)
-        assert updated_book.status == "完本"
-        assert updated_book.word_count == 300000
+        assert updated_book.novel_class == "现代言情"
+        assert updated_book.tags == "都市,完结"
         
         # 5. 获取统计信息
         stats = snapshot_dao.get_statistics_by_book_id(db_session, book.novel_id)

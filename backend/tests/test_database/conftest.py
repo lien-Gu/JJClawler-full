@@ -53,11 +53,9 @@ def sample_book_data():
     return {
         "novel_id": 12345,
         "title": "测试小说",
-        "author_name": "测试作者",
-        "status": "连载中",
+        "author_id": 101,
+        "novel_class": "现代言情",
         "tags": "现代都市,言情",
-        "description": "这是一个测试小说",
-        "word_count": 100000,
         "created_at": datetime(2024, 1, 1, 12, 0, 0),
         "updated_at": datetime(2024, 1, 1, 12, 0, 0)
     }
@@ -158,22 +156,25 @@ def create_multiple_books(db_session):
         {
             "novel_id": 12348,
             "title": "测试小说1",
-            "author_name": "作者1",
-            "status": "连载中",
+            "author_id": 201,
+            "novel_class": "现代言情",
+            "tags": "都市,甜文",
             "created_at": datetime(2024, 1, 1, 12, 0, 0)
         },
         {
             "novel_id": 12349,
             "title": "测试小说2", 
-            "author_name": "作者2",
-            "status": "完本",
+            "author_id": 202,
+            "novel_class": "古代言情",
+            "tags": "宫廷,重生",
             "created_at": datetime(2024, 1, 2, 12, 0, 0)
         },
         {
             "novel_id": 12350,
             "title": "搜索测试小说",
-            "author_name": "作者3",
-            "status": "连载中",
+            "author_id": 203,
+            "novel_class": "纯爱小说",
+            "tags": "仙侠,幻想",
             "created_at": datetime(2024, 1, 3, 12, 0, 0)
         }
     ]
@@ -332,8 +333,8 @@ def assert_book_equal(book1: Book, book2: Book):
     """验证两个书籍对象相等"""
     assert book1.novel_id == book2.novel_id
     assert book1.title == book2.title
-    assert book1.author_name == book2.author_name
-    assert book1.status == book2.status
+    assert book1.author_id == book2.author_id
+    assert book1.novel_class == book2.novel_class
 
 
 def assert_snapshot_equal(snapshot1: BookSnapshot, snapshot2: BookSnapshot):

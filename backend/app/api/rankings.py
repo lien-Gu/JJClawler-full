@@ -58,7 +58,6 @@ async def get_rankings(
                 page_id=ranking.page_id,
                 url="",  # URL字段不在数据库模型中，需要从配置获取
                 category=ranking.rank_group_type,
-                description=None,
                 is_active=True,  # 模型中没有is_active字段，默认True
                 crawl_frequency=60,  # 默认值
                 last_crawl_time=None,
@@ -113,8 +112,7 @@ async def get_ranking_detail(
                 favorites=None,
                 comments=None,
                 recommendations=None,
-                word_count=None,
-                status=None
+                word_count=None
             ))
         
         response_data = RankingDetailResponse(
@@ -122,7 +120,6 @@ async def get_ranking_detail(
             name=ranking.name,
             page_id=ranking.page_id,
             category=ranking.rank_group_type,
-            description=None,
             snapshot_time=ranking_detail["snapshot_time"],
             books=books_in_ranking,
             total_books=ranking_detail["total_books"]
@@ -272,8 +269,7 @@ async def compare_rankings(
                     favorites=None,
                     comments=None,
                     recommendations=None,
-                    word_count=None,
-                    status=None
+                    word_count=None
                 ))
             
             ranking_details.append(RankingDetailResponse(
@@ -281,7 +277,6 @@ async def compare_rankings(
                 name=ranking_info["name"],
                 page_id=ranking_info["page_id"],
                 category=None,
-                description=None,
                 snapshot_time=datetime.combine(request.date, datetime.min.time()) if request.date else datetime.now(),
                 books=books_in_ranking,
                 total_books=len(books_in_ranking)
@@ -299,8 +294,7 @@ async def compare_rankings(
                 favorites=None,
                 comments=None,
                 recommendations=None,
-                word_count=None,
-                status=None
+                word_count=None
             ))
         
         response_data = RankingCompareResponse(

@@ -20,8 +20,9 @@ def mock_book_data():
             "id": 1,
             "novel_id": 12345,
             "title": "测试小说",
-            "author_name": "测试作者",
-            "status": "连载中",
+            "author_id": 101,
+            "novel_class": "现代言情",
+            "tags": "都市,甜文",
             "created_at": datetime(2024, 1, 1, 12, 0, 0),
             "updated_at": datetime(2024, 1, 15, 12, 0, 0)
         },
@@ -30,13 +31,17 @@ def mock_book_data():
                 "id": 1,
                 "novel_id": 12345,
                 "title": "测试小说1",
-                "author_name": "测试作者1"
+                "author_id": 101,
+                "novel_class": "现代言情",
+                "tags": "都市,甜文"
             },
             {
                 "id": 2,
                 "novel_id": 12346,
                 "title": "测试小说2",
-                "author_name": "测试作者2"
+                "author_id": 102,
+                "novel_class": "古代言情",
+                "tags": "宫廷,重生"
             }
         ]
     }
@@ -153,8 +158,8 @@ def mock_pagination_data():
     """模拟分页数据"""
     return {
         "books": [
-            Book(id=1, novel_id=12345, title="测试小说1"),
-            Book(id=2, novel_id=12346, title="测试小说2")
+            Book(id=1, novel_id=12345, title="测试小说1", author_id=101, novel_class="现代言情"),
+            Book(id=2, novel_id=12346, title="测试小说2", author_id=102, novel_class="古代言情")
         ],
         "total": 50,
         "page": 1,
@@ -167,8 +172,8 @@ def mock_pagination_data():
 def mock_search_results():
     """模拟搜索结果"""
     return [
-        Book(id=1, novel_id=12345, title="搜索结果1"),
-        Book(id=2, novel_id=12346, title="搜索结果2")
+        Book(id=1, novel_id=12345, title="搜索结果1", author_id=101, novel_class="现代言情"),
+        Book(id=2, novel_id=12346, title="搜索结果2", author_id=102, novel_class="古代言情")
     ]
 
 
@@ -234,8 +239,9 @@ def mock_book_models(mock_book_data):
         id=book_data["id"],
         novel_id=book_data["novel_id"],
         title=book_data["title"],
-        author_name=book_data["author_name"],
-        status=book_data["status"],
+        author_id=book_data["author_id"],
+        novel_class=book_data["novel_class"],
+        tags=book_data["tags"],
         created_at=book_data["created_at"],
         updated_at=book_data["updated_at"]
     )

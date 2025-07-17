@@ -63,8 +63,8 @@ class TestRankingService:
             id=1,
             novel_id=12345,
             title="测试小说",
-            author_name="测试作者",
-            status="连载中"
+            author_id=101,
+            novel_class="现代言情"
         )
     
     @pytest.fixture
@@ -603,7 +603,8 @@ class TestRankingServiceIntegration:
         book_data = {
             "novel_id": 77777,
             "title": "快照测试小说",
-            "author_name": "快照测试作者"
+            "author_id": 301,
+            "novel_class": "现代言情"
         }
         book = book_service.create_or_update_book(db_session, book_data)
         
@@ -668,10 +669,10 @@ class TestRankingServiceIntegration:
         from app.database.service.book_service import BookService
         book_service = BookService()
         
-        book1_data = {"novel_id": 11111, "title": "对比书籍1", "author_name": "作者1"}
+        book1_data = {"novel_id": 11111, "title": "对比书籍1", "author_id": 401}
         book1 = book_service.create_or_update_book(db_session, book1_data)
         
-        book2_data = {"novel_id": 22222, "title": "对比书籍2", "author_name": "作者2"}
+        book2_data = {"novel_id": 22222, "title": "对比书籍2", "author_id": 402}
         book2 = book_service.create_or_update_book(db_session, book2_data)
         
         # 为榜单创建快照

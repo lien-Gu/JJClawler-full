@@ -246,15 +246,17 @@ def mock_pagination_data():
                 "id": 1,
                 "novel_id": 12345,
                 "title": "测试小说1",
-                "author_name": "作者1",
-                "status": "连载中"
+                "author_id": 101,
+                "novel_class": "现代言情",
+                "tags": "都市,甜文"
             },
             {
                 "id": 2,
                 "novel_id": 12346,
                 "title": "测试小说2",
-                "author_name": "作者2",
-                "status": "完结"
+                "author_id": 102,
+                "novel_class": "古代言情",
+                "tags": "宫廷,重生"
             }
         ],
         "total": 2,
@@ -272,15 +274,17 @@ def mock_search_results():
             "id": 1,
             "novel_id": 12345,
             "title": "搜索结果1",
-            "author_name": "作者1",
-            "status": "连载中"
+            "author_id": 101,
+            "novel_class": "现代言情",
+            "tags": "都市,甜文"
         },
         {
             "id": 2,
             "novel_id": 12346,
             "title": "搜索结果2",
-            "author_name": "作者2",
-            "status": "完结"
+            "author_id": 102,
+            "novel_class": "古代言情",
+            "tags": "宫廷,重生"
         }
     ]
 
@@ -293,9 +297,9 @@ def mock_book_data():
             "id": 1,
             "novel_id": 12345,
             "title": "测试小说",
-            "author_name": "测试作者",
-            "status": "连载中",
-            "tags": "现代言情",
+            "author_id": 101,
+            "novel_class": "现代言情",
+            "tags": "都市,甜文,职场",
             "created_at": datetime(2024, 1, 1, 12, 0, 0),
             "updated_at": datetime(2024, 1, 15, 12, 0, 0)
         }
@@ -314,7 +318,6 @@ def mock_book_snapshot_data():
             "comments": 800,
             "recommendations": 300,
             "word_count": 120000,
-            "status": "连载中",
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
         },
         "trend_snapshots": [
@@ -323,6 +326,9 @@ def mock_book_snapshot_data():
                 "novel_id": 12345,
                 "clicks": 48000,
                 "favorites": 1150,
+                "comments": 750,
+                "recommendations": 280,
+                "word_count": 118000,
                 "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
             },
             {
@@ -330,6 +336,9 @@ def mock_book_snapshot_data():
                 "novel_id": 12345,
                 "clicks": 50000,
                 "favorites": 1200,
+                "comments": 800,
+                "recommendations": 300,
+                "word_count": 120000,
                 "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
             }
         ],

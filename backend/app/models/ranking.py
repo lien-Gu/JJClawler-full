@@ -14,7 +14,6 @@ class RankingResponse(BaseModel):
     page_id: str = Field(..., description="页面ID")
     url: str = Field(..., description="榜单URL")
     category: Optional[str] = Field(None, description="榜单分类")
-    description: Optional[str] = Field(None, description="榜单描述")
     is_active: bool = Field(True, description="是否启用")
     crawl_frequency: int = Field(60, description="爬取频率（分钟）")
     last_crawl_time: Optional[datetime] = Field(None, description="最后爬取时间")
@@ -32,7 +31,6 @@ class BookInRanking(BaseModel):
     comments: Optional[int] = Field(None, description="评论数")
     recommendations: Optional[int] = Field(None, description="推荐数")
     word_count: Optional[int] = Field(None, description="字数")
-    status: Optional[str] = Field(None, description="连载状态")
 
 
 class RankingDetailResponse(BaseModel):
@@ -41,7 +39,6 @@ class RankingDetailResponse(BaseModel):
     name: str = Field(..., description="榜单名称")
     page_id: str = Field(..., description="页面ID")
     category: Optional[str] = Field(None, description="榜单分类")
-    description: Optional[str] = Field(None, description="榜单描述")
     snapshot_time: datetime = Field(..., description="快照时间")
     books: List[BookInRanking] = Field([], description="榜单书籍列表")
     total_books: int = Field(0, description="书籍总数")
