@@ -245,7 +245,7 @@ class RankingService:
 
     # ==================== 内部依赖方法 ====================
     
-    def get_ranking_by_rank_id(self, db: Session, rank_id: int) -> Optional[Ranking]:
+    def get_ranking_by_rank_id(self, db: Session, rank_id: str) -> Optional[Ranking]:
         """根据rank_id获取榜单"""
         return db.scalar(select(Ranking).where(Ranking.rank_id == rank_id))
     

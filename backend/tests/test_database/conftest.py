@@ -72,7 +72,7 @@ def sample_book_snapshot_data():
 def sample_ranking_data():
     """样本榜单数据"""
     return {
-        "rank_id": 1,
+        "rank_id": "1",
         "name": "测试榜单",
         "page_id": "test_ranking",
         "rank_group_type": "热门",

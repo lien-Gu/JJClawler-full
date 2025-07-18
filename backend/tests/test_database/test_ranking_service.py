@@ -40,7 +40,7 @@ class TestRankingService:
     def test_create_ranking(self, ranking_service, db_session):
         """测试创建榜单"""
         ranking_data = {
-            "rank_id": 999,
+            "rank_id": "999",
             "name": "新建榜单",
             "page_id": "new_ranking",
             "rank_group_type": "新分类"
@@ -48,7 +48,7 @@ class TestRankingService:
         
         result = ranking_service.create_ranking(db_session, ranking_data)
         
-        assert result.rank_id == 999
+        assert result.rank_id == "999"
         assert result.name == "新建榜单"
         assert result.page_id == "new_ranking"
         assert result.rank_group_type == "新分类"
@@ -69,7 +69,7 @@ class TestRankingService:
     def test_create_or_update_ranking_create(self, ranking_service, db_session):
         """测试创建或更新榜单 - 创建新榜单"""
         ranking_data = {
-            "rank_id": 888,
+            "rank_id": "888",
             "name": "创建或更新测试榜单",
             "page_id": "create_or_update",
             "rank_group_type": "测试分类"
@@ -77,7 +77,7 @@ class TestRankingService:
         
         result = ranking_service.create_or_update_ranking(db_session, ranking_data)
         
-        assert result.rank_id == 888
+        assert result.rank_id == "888"
         assert result.name == "创建或更新测试榜单"
     
     def test_create_or_update_ranking_update(self, ranking_service, db_session, create_test_ranking):
@@ -304,7 +304,7 @@ class TestRankingService:
         """测试对比多个榜单"""
         # 创建第二个榜单
         ranking_data2 = {
-            "rank_id": 2,
+            "rank_id": "2",
             "name": "第二个榜单",
             "page_id": "second_ranking",
             "rank_group_type": "热门"

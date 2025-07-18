@@ -24,7 +24,7 @@ class Ranking(Base):
     __tablename__ = "rankings"
 
     # 榜单基本信息
-    rank_id: Mapped[int] = mapped_column(Integer, unique=True, index=True,comment="榜单唯一标识ID，来源于晋江文学城的榜单ID")
+    rank_id: Mapped[str] = mapped_column(String(100), unique=True, index=True,comment="榜单唯一标识ID，来源于晋江文学城的榜单ID")
     name: Mapped[str] = mapped_column(String(100), index=True, comment="榜单中文名称，如：夹子相关、总收藏榜、总推荐榜等")
     rank_group_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="榜单分组类型，如：热门、分类、专题等，用于榜单分类管理")
     page_id: Mapped[str] = mapped_column(String(50), index=True, comment="页面标识ID，用于关联爬取配置和URL生成")

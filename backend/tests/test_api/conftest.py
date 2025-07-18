@@ -100,7 +100,7 @@ def mock_ranking_data():
     """模拟榜单数据"""
     return {
         "ranking": {
-            "rank_id": 1,
+            "rank_id": "1",
             "name": "测试榜单",
             "page_id": "test_ranking",
             "rank_group_type": "热门",
@@ -108,14 +108,14 @@ def mock_ranking_data():
         },
         "ranking_list": [
             {
-                "rank_id": 1,
+                "rank_id": "1",
                 "name": "热门榜单",
                 "page_id": "hot_ranking",
                 "rank_group_type": "热门",
                 "created_at": datetime(2024, 1, 1, 12, 0, 0)
             },
             {
-                "rank_id": 2,
+                "rank_id": "2",
                 "name": "新书榜单",
                 "page_id": "new_ranking",
                 "rank_group_type": "新书",
@@ -124,7 +124,7 @@ def mock_ranking_data():
         ],
         "ranking_detail": {
             "ranking": {
-                "rank_id": 1,
+                "rank_id": "1",
                 "name": "测试榜单",
                 "page_id": "test_ranking",
                 "rank_group_type": "热门"

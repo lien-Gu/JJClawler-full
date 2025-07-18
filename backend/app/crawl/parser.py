@@ -123,10 +123,14 @@ class Parser:
                         if not sub_rank_id:
                             if isinstance(rank_id, list):
                                 # 如果父榜单ID是列表，使用列表中的第一个
-                                base_id = rank_id[0] if rank_id else 0
+                                base_id = rank_id[0] if rank_id else "0"
                             else:
-                                base_id = rank_id if rank_id else 0
+                                base_id = rank_id if rank_id else "0"
+                            # 生成唯一的字符串ID：父榜单ID + "_" + 索引
                             sub_rank_id = f"{base_id}_{idx}"
+                        else:
+                            # 确保sub_rank_id是字符串类型
+                            sub_rank_id = str(sub_rank_id)
                         
                         sub_ranking_info = {
                             "rank_id": sub_rank_id,
@@ -149,6 +153,9 @@ class Parser:
                             parsed_items.append(ParsedItem(DataType.RANKING, sub_ranking_info))
                 else:
                     # 常规榜单结构
+                    # 确保rank_id是字符串类型
+                    rank_id = str(rank_id) if rank_id else "0"
+                    
                     ranking_info = {
                         "rank_id": rank_id,
                         "rank_name": rank_name,
@@ -195,7 +202,7 @@ class Parser:
                 page_id = context["page_id"]
             
             ranking_info = {
-                "rank_id": "jiazi",
+                "rank_id": "jiazi",  # 使用"jiazi"作为夹子榜的固定ID
                 "rank_name": "夹子榜",
                 "page_id": page_id,
                 "books": books

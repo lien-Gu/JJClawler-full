@@ -142,7 +142,7 @@ class TestCrawlFlow:
     def test_get_all_data(self, crawl_flow):
         """测试获取所有数据"""
         crawl_flow.books_data = [{"book_id": 1}]
-        crawl_flow.rankings_data = [{"rank_id": 1}]
+        crawl_flow.rankings_data = [{"rank_id": "1"}]
         crawl_flow.pages_data = [{"page_id": 1}]
 
         result = crawl_flow.get_all_data()
