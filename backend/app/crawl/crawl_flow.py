@@ -40,7 +40,7 @@ class CrawlFlow:
         self.config = CrawlConfig()
         self.client = HttpClient(request_delay=request_delay or crawl_settings.request_delay)
         self.parser = Parser()
-        
+
         # 初始化数据服务
         self.book_service = BookService()
         self.ranking_service = RankingService()
@@ -90,7 +90,7 @@ class CrawlFlow:
                 return self._format_error_result(page_id, "页面内容爬取失败", start_time)
 
             # 第三步：解析页面中的榜单
-            rankings = self._parse_rankings_from_page(page_content)
+            rankings = self._parse_rankings_from_page(page_content, page_id)
             self.logger.debug(f"发现 {len(rankings)} 个榜单")
 
             # 第四步：从榜单中提取书籍ID
@@ -124,7 +124,8 @@ class CrawlFlow:
             self.logger.error(f"页面 {page_id} 爬取异常: {e}")
             return self._format_error_result(page_id, f"页面爬取异常: {str(e)}", start_time)
 
-    def _format_success_result(self, page_id: str, books_crawled: int, execution_time: float, data: Dict[str, Any] = None) -> Dict[str, Any]:
+    def _format_success_result(self, page_id: str, books_crawled: int, execution_time: float,
+                               data: Dict[str, Any] = None) -> Dict[str, Any]:
         """格式化成功结果"""
         result = {
             "success": True,
@@ -166,10 +167,12 @@ class CrawlFlow:
         except Exception:
             return None
 
-    def _parse_rankings_from_page(self, page_content: Dict) -> List[Dict]:
+    def _parse_rankings_from_page(self, page_content: Dict, page_id: str) -> List[Dict]:
         """从页面中解析榜单"""
         try:
-            parsed_items = self.parser.parse(page_content)
+            # 传递上下文信息给解析器
+            context = {"page_id": page_id}
+            parsed_items = self.parser.parse(page_content, context)
 
             rankings = []
             for item in parsed_items:
@@ -201,8 +204,6 @@ class CrawlFlow:
             if book_id not in self.crawled_book_ids:
                 unique_ids.append(book_id)
                 self.crawled_book_ids.add(book_id)
-
-        print(f"去除重复书籍ID: {len(book_ids) - len(unique_ids)} 个")
 
         return unique_ids
 
@@ -236,12 +237,12 @@ class CrawlFlow:
                     snapshot_time = datetime.now()
                     await self._save_rankings(db, rankings, snapshot_time)
                     await self._save_books(db, books, snapshot_time)
-                    
+
                     # 提交事务
                     db.commit()
                     self.logger.info(f"成功保存 {len(rankings)} 个榜单和 {len(books)} 本书籍的数据")
                     return True
-                    
+
                 except Exception as e:
                     # 回滚事务
                     db.rollback()
@@ -249,10 +250,10 @@ class CrawlFlow:
                     import traceback
                     self.logger.error(f"详细错误信息: {traceback.format_exc()}")
                     raise
-                
+
                 # 只循环一次，使用 break 退出
                 break
-                
+
         except Exception as e:
             self.logger.error(f"处理爬取结果时出错: {e}")
             return False
@@ -270,13 +271,13 @@ class CrawlFlow:
                     "page_id": ranking_data.get("page_id", ""),
                     "rank_group_type": ranking_data.get("rank_group_type", "")
                 }
-                
+
                 ranking = self.ranking_service.create_or_update_ranking(db, ranking_info)
-                
+
                 # 保存榜单快照
                 books = ranking_data.get("books", [])
                 ranking_snapshots = []
-                
+
                 for book in books:
                     # 先确保书籍存在
                     book_info = {
@@ -284,7 +285,7 @@ class CrawlFlow:
                         "title": book.get("title", "")
                     }
                     book_obj = self.book_service.create_or_update_book(db, book_info)
-                    
+
                     # 创建榜单快照
                     snapshot_data = {
                         "ranking_id": ranking.id,
@@ -294,13 +295,13 @@ class CrawlFlow:
                         "snapshot_time": snapshot_time
                     }
                     ranking_snapshots.append(snapshot_data)
-                
+
                 # 批量创建榜单快照
                 if ranking_snapshots:
                     self.ranking_service.batch_create_ranking_snapshots(db, ranking_snapshots)
-                    
+
                 self.logger.debug(f"保存榜单 {ranking_data.get('rank_name')} 数据，包含 {len(books)} 本书")
-                
+
             except Exception as e:
                 self.logger.error(f"保存榜单 {ranking_data.get('rank_name')} 数据失败: {e}")
                 raise
@@ -310,7 +311,7 @@ class CrawlFlow:
         if not books_data:
             return
         book_snapshots = []
-        
+
         for book_data in books_data:
             try:
                 # 创建或更新书籍基本信息
@@ -318,9 +319,9 @@ class CrawlFlow:
                     "novel_id": int(book_data.get("book_id")),  # 转换为整数
                     "title": book_data.get("title", "")
                 }
-                
+
                 book = self.book_service.create_or_update_book(db, book_info)
-                
+
                 # 创建书籍快照数据
                 snapshot_data = {
                     "book_id": book.id,
@@ -333,11 +334,11 @@ class CrawlFlow:
                     "snapshot_time": snapshot_time
                 }
                 book_snapshots.append(snapshot_data)
-                
+
             except Exception as e:
                 self.logger.error(f"处理书籍 {book_data.get('title')} 数据失败: {e}")
                 continue
-        
+
         # 批量创建书籍快照
         if book_snapshots:
             self.book_service.batch_create_book_snapshots(db, book_snapshots)
@@ -412,10 +413,10 @@ class CrawlFlow:
         """解析数值字段，处理格式化的字符串"""
         if value is None:
             return None
-        
+
         if isinstance(value, (int, float)):
             return int(value)
-        
+
         if isinstance(value, str):
             # 移除非数字字符，如 "85,221(章均)" -> "85221"
             import re
@@ -427,7 +428,7 @@ class CrawlFlow:
                     return int(number_str)
                 except ValueError:
                     return 0
-        
+
         return 0
 
     async def close(self):

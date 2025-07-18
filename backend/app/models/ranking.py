@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class RankingResponse(BaseModel):
     """榜单基础信息响应"""
-    ranking_id: int = Field(..., description="榜单ID")
+    ranking_id: str = Field(..., description="榜单ID")  # 修改为string类型
     name: str = Field(..., description="榜单名称")
     page_id: str = Field(..., description="页面ID")
     url: str = Field(..., description="榜单URL")
@@ -34,7 +34,7 @@ class BookInRanking(BaseModel):
 
 class RankingDetailResponse(BaseModel):
     """榜单详情响应"""
-    ranking_id: int = Field(..., description="榜单ID")
+    ranking_id: str = Field(..., description="榜单ID")  # 修改为string类型
     name: str = Field(..., description="榜单名称")
     page_id: str = Field(..., description="页面ID")
     category: Optional[str] = Field(None, description="榜单分类")

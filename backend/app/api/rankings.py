@@ -53,7 +53,7 @@ async def get_rankings(
         ranking_responses = []
         for ranking in result["rankings"]:
             ranking_responses.append(RankingResponse(
-                ranking_id=ranking.rank_id,
+                ranking_id=str(ranking.rank_id),  # 转换为字符串
                 name=ranking.name,
                 page_id=ranking.page_id,
                 url="",  # URL字段不在数据库模型中，需要从配置获取
@@ -115,7 +115,7 @@ async def get_ranking_detail(
             ))
         
         response_data = RankingDetailResponse(
-            ranking_id=ranking.rank_id,
+            ranking_id=str(ranking.rank_id),  # 转换为字符串
             name=ranking.name,
             page_id=ranking.page_id,
             category=ranking.rank_group_type,
@@ -209,7 +209,7 @@ async def get_ranking_stats(
         stats = ranking_service.get_ranking_statistics(db, ranking_id)
         
         response_data = RankingStatsResponse(
-            ranking_id=ranking.rank_id,
+            ranking_id=str(ranking.rank_id),  # 转换为字符串
             ranking_name=ranking.name,
             total_snapshots=stats.get("total_snapshots", 0),
             unique_books=stats.get("unique_books", 0),
