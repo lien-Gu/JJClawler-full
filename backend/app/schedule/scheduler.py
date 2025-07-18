@@ -41,17 +41,17 @@ class TaskScheduler:
 
     def _create_scheduler(self) -> AsyncIOScheduler:
         """创建APScheduler实例"""
-        # 使用现有数据库配置
-        job_store_url = self.settings.scheduler.job_store_url or self.settings.database.url
-
+        # 暂时使用内存存储避免序列化问题
+        from apscheduler.jobstores.memory import MemoryJobStore
+        
         # 配置job store
         jobstores = {
-            'default': SQLAlchemyJobStore(url=job_store_url)
+            'default': MemoryJobStore()
         }
 
         # 配置executor
         executors = {
-            'default': AsyncIOExecutor(max_workers=self.settings.scheduler.max_workers)
+            'default': AsyncIOExecutor()
         }
 
         # 创建调度器

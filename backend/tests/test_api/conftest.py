@@ -2,12 +2,12 @@
 API模块测试配置文件
 提供API测试专用的fixtures和mock数据
 """
-import pytest
 from datetime import datetime, date
-from typing import Dict, Any, List
+
+import pytest
 
 from app.database.db.book import Book, BookSnapshot
-from app.database.db.ranking import Ranking, RankingSnapshot
+from app.database.db.ranking import Ranking
 
 
 # ==================== API专用Mock数据 ====================
@@ -74,7 +74,7 @@ def mock_book_snapshot_data():
                 "clicks": 50000,
                 "favorites": 1500,
                 "comments": 800,
-                    "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+                "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
             }
         ],
         "aggregated_data": [
@@ -154,8 +154,8 @@ def mock_pagination_data():
     """模拟分页数据"""
     return {
         "books": [
-            Book(id=1, novel_id=12345, title="测试小说1", author_id=101, novel_class="现代言情"),
-            Book(id=2, novel_id=12346, title="测试小说2", author_id=102, novel_class="古代言情")
+            Book(id=1, novel_id=12345, title="测试小说1"),
+            Book(id=2, novel_id=12346, title="测试小说2")
         ],
         "total": 50,
         "page": 1,
@@ -320,7 +320,7 @@ def mock_db_session(mocker):
 def mock_book_service(mocker):
     """模拟BookService"""
     service = mocker.Mock()
-    
+
     # 设置常用方法的返回值
     service.get_book_by_id.return_value = None
     service.get_books_with_pagination.return_value = {
@@ -334,7 +334,7 @@ def mock_book_service(mocker):
     service.get_book_trend_weekly.return_value = []
     service.get_book_trend_monthly.return_value = []
     service.get_book_trend_with_interval.return_value = []
-    
+
     return service
 
 
@@ -342,7 +342,7 @@ def mock_book_service(mocker):
 def mock_ranking_service(mocker):
     """模拟RankingService"""
     service = mocker.Mock()
-    
+
     # 设置常用方法的返回值
     service.get_all_rankings.return_value = {"rankings": [], "total": 0}
     service.get_ranking_detail.return_value = None
@@ -350,9 +350,9 @@ def mock_ranking_service(mocker):
     service.get_ranking_by_id.return_value = None
     service.get_ranking_statistics.return_value = {}
     service.compare_rankings.return_value = {
-        "rankings": [], "ranking_data": {}, "common_books": [], 
+        "rankings": [], "ranking_data": {}, "common_books": [],
         "comparison_date": date.today(), "stats": {"total_unique_books": 0}
     }
     service.get_book_ranking_history.return_value = []
-    
+
     return service
