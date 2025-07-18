@@ -164,15 +164,11 @@ class TestCrawlFlow:
 class TestRealCrawlFlow:
     """真实爬取流程测试（集成测试）"""
 
-    @pytest.fixture
-    def real_crawl_flow(self):
-        """创建真实CrawlFlow实例"""
-        return CrawlFlow(request_delay=0.5)
-
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_real_page_crawl(self, real_crawl_flow):
+    async def test_real_page_crawl(self, app):
         """测试真实的夹子榜爬取（集成测试）"""
+        real_crawl_flow = CrawlFlow(request_delay=0.5)
         try:
             page_id = "index"
             result = await real_crawl_flow.execute_crawl_task(page_id)
