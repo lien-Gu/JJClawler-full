@@ -269,7 +269,8 @@ class CrawlFlow:
                     "rank_id": ranking_data.get("rank_id"),
                     "name": ranking_data.get("rank_name", ""),
                     "page_id": ranking_data.get("page_id", ""),
-                    "rank_group_type": ranking_data.get("rank_group_type", "")
+                    "rank_group_type": ranking_data.get("rank_group_type", ""),
+                    "sub_ranking_name": ranking_data.get("sub_ranking_name")
                 }
 
                 ranking = self.ranking_service.create_or_update_ranking(db, ranking_info)

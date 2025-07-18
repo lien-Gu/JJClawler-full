@@ -107,24 +107,66 @@ class Parser:
                 if context and "page_id" in context:
                     page_id = context["page_id"]
                 
-                ranking_info = {
-                    "rank_id": rank_id,
-                    "rank_name": rank_name,
-                    "rank_group_type": rank_group_type,
-                    "page_id": page_id,
-                    "books": []
-                }
-                
-                # 解析榜单中的书籍
-                books_data = ranking_data.get("data", [])
-                for position, book_item in enumerate(books_data, 1):
-                    book_info = self._parse_book_basic(book_item, position)
-                    if book_info:
-                        ranking_info["books"].append(book_info)
-                
-                # 只有当榜单信息完整时才添加
-                if rank_id and rank_name:
-                    parsed_items.append(ParsedItem(DataType.RANKING, ranking_info))
+                # 检查是否为嵌套榜单
+                nested_rankings = ranking_data.get("data", [])
+                if nested_rankings and "channelName" in nested_rankings[0]:
+                    # 这是嵌套榜单结构，处理子榜单
+                    for idx, sub_ranking in enumerate(nested_rankings):
+                        sub_rank_id = sub_ranking.get("rankid")
+                        sub_rank_name = sub_ranking.get("channelName")
+                        
+                        # 如果子榜单没有channelName，跳过
+                        if not sub_rank_name:
+                            continue
+                        
+                        # 生成唯一的rank_id：如果没有sub_rank_id，则使用父榜单ID + 索引
+                        if not sub_rank_id:
+                            if isinstance(rank_id, list):
+                                # 如果父榜单ID是列表，使用列表中的第一个
+                                base_id = rank_id[0] if rank_id else 0
+                            else:
+                                base_id = rank_id if rank_id else 0
+                            sub_rank_id = f"{base_id}_{idx}"
+                        
+                        sub_ranking_info = {
+                            "rank_id": sub_rank_id,
+                            "rank_name": rank_name,  # 使用父榜单名称作为主榜单名称
+                            "rank_group_type": rank_group_type,
+                            "page_id": page_id,
+                            "sub_ranking_name": sub_rank_name,  # 设置子榜单名称
+                            "books": []
+                        }
+                        
+                        # 解析子榜单中的书籍
+                        sub_books_data = sub_ranking.get("data", [])
+                        for position, book_item in enumerate(sub_books_data, 1):
+                            book_info = self._parse_book_basic(book_item, position)
+                            if book_info:
+                                sub_ranking_info["books"].append(book_info)
+                        
+                        # 只有当子榜单信息完整时才添加
+                        if sub_rank_id and sub_rank_name:
+                            parsed_items.append(ParsedItem(DataType.RANKING, sub_ranking_info))
+                else:
+                    # 常规榜单结构
+                    ranking_info = {
+                        "rank_id": rank_id,
+                        "rank_name": rank_name,
+                        "rank_group_type": rank_group_type,
+                        "page_id": page_id,
+                        "books": []
+                    }
+                    
+                    # 解析榜单中的书籍
+                    books_data = ranking_data.get("data", [])
+                    for position, book_item in enumerate(books_data, 1):
+                        book_info = self._parse_book_basic(book_item, position)
+                        if book_info:
+                            ranking_info["books"].append(book_info)
+                    
+                    # 只有当榜单信息完整时才添加
+                    if rank_id and rank_name:
+                        parsed_items.append(ParsedItem(DataType.RANKING, ranking_info))
             
             return parsed_items
             

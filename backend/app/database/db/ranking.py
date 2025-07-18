@@ -28,6 +28,7 @@ class Ranking(Base):
     name: Mapped[str] = mapped_column(String(100), index=True, comment="榜单中文名称，如：夹子相关、总收藏榜、总推荐榜等")
     rank_group_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="榜单分组类型，如：热门、分类、专题等，用于榜单分类管理")
     page_id: Mapped[str] = mapped_column(String(50), index=True, comment="页面标识ID，用于关联爬取配置和URL生成")
+    sub_ranking_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="子榜单名称，用于处理嵌套榜单结构")
 
     # 索引优化
     __table_args__ = (
@@ -35,6 +36,7 @@ class Ranking(Base):
         Index("idx_ranking_name", "name"),
         Index("idx_ranking_page_id", "page_id"),
         Index("idx_ranking_group_type", "rank_group_type"),
+        Index("idx_ranking_sub_name", "sub_ranking_name"),
     )
 
 

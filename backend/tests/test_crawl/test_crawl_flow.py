@@ -171,10 +171,11 @@ class TestRealCrawlFlow:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_real_jiazi_crawl(self, real_crawl_flow):
+    async def test_real_page_crawl(self, real_crawl_flow):
         """测试真实的夹子榜爬取（集成测试）"""
         try:
-            result = await real_crawl_flow.execute_crawl_task("jiazi")
+            page_id = "index"
+            result = await real_crawl_flow.execute_crawl_task(page_id)
 
             # 验证结果结构
             assert "success" in result
