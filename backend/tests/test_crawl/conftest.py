@@ -3,10 +3,66 @@
 集中管理爬虫相关的测试数据和fixtures
 """
 import pytest
+import os
 from datetime import datetime
 from pytest_mock import MockerFixture
 
 from app.crawl.parser import DataType, ParsedItem
+from app.database.connection import create_tables, drop_tables
+
+
+# ==================== 数据库初始化 ====================
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_database():
+    """测试数据库初始化
+    
+    这个fixture会在所有测试开始前创建数据库表，
+    并在测试结束后清理数据库
+    """
+    # 设置测试环境使用独立的数据库
+    original_db_url = os.environ.get("DATABASE_URL")
+    test_db_url = "sqlite:///./test.db"
+    os.environ["DATABASE_URL"] = test_db_url
+    
+    # 导入需要在设置环境变量后重新导入
+    from app.database.connection import create_tables as create_test_tables
+    
+    try:
+        # 创建数据库表
+        create_test_tables()
+        
+        yield
+        
+    finally:
+        # 恢复原始数据库配置
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        else:
+            os.environ.pop("DATABASE_URL", None)
+        
+        # 清理测试数据库文件
+        if os.path.exists("test.db"):
+            os.remove("test.db")
+
+
+@pytest.fixture
+def clean_database():
+    """清理数据库数据的fixture
+    
+    在需要干净数据库环境的测试中使用
+    """
+    # 导入当前的数据库连接
+    from app.database.connection import create_tables, drop_tables
+    
+    # 清理现有数据
+    drop_tables()
+    create_tables()
+    
+    yield
+    
+    # 测试后可以选择保留数据用于调试
+    # drop_tables()
 
 
 # ==================== 爬虫配置数据 ====================
