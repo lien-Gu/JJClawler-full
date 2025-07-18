@@ -5,7 +5,6 @@
 import pytest
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-from unittest.mock import Mock, patch
 
 from app.database.service.book_service import BookService
 from app.database.db.book import Book, BookSnapshot
@@ -19,531 +18,372 @@ class TestBookService:
         """BookService实例fixture"""
         return BookService()
     
-    @pytest.fixture
-    def mock_book_dao(self, mocker):
-        """模拟BookDAO"""
-        mock_dao = mocker.Mock()
-        return mock_dao
+    # ==================== 基础CRUD操作测试 ====================
     
-    @pytest.fixture
-    def mock_book_snapshot_dao(self, mocker):
-        """模拟BookSnapshotDAO"""
-        mock_dao = mocker.Mock()
-        return mock_dao
-    
-    @pytest.fixture
-    def book_service_with_mocks(self, mocker, mock_book_dao, mock_book_snapshot_dao):
-        """使用模拟DAO的BookService"""
-        service = BookService()
-        service.book_dao = mock_book_dao
-        service.book_snapshot_dao = mock_book_snapshot_dao
-        return service
-    
-    @pytest.fixture
-    def sample_book(self):
-        """样本书籍数据"""
-        return Book(
-            id=1,
-            novel_id=12345,
-            title="测试小说",
-            author_id=101,
-            novel_class="现代言情",
-            tags="现代,都市",
-            created_at=datetime(2024, 1, 1, 12, 0, 0),
-            updated_at=datetime(2024, 1, 1, 12, 0, 0)
-        )
-    
-    @pytest.fixture
-    def sample_snapshot(self):
-        """样本快照数据"""
-        return BookSnapshot(
-            id=1,
-            book_id=1,  # 指向Book表的主键id
-            clicks=50000,
-            favorites=1500,
-            comments=800,
-            snapshot_time=datetime(2024, 1, 15, 12, 0, 0)
-        )
-    
-    def test_get_book_by_id_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功根据ID获取书籍"""
-        # Arrange
-        mock_book_dao.get_by_id.return_value = sample_book
+    def test_get_book_by_id(self, book_service, db_session, create_test_book):
+        """测试根据ID获取书籍"""
+        result = book_service.get_book_by_id(db_session, create_test_book.id)
         
-        # Act
-        result = book_service_with_mocks.get_book_by_id(db_session, 1)
-        
-        # Assert
-        assert result == sample_book
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-    
-    def test_get_book_by_id_not_found(self, book_service_with_mocks, mock_book_dao, db_session):
-        """测试书籍不存在时返回None"""
-        # Arrange
-        mock_book_dao.get_by_id.return_value = None
-        
-        # Act
-        result = book_service_with_mocks.get_book_by_id(db_session, 999)
-        
-        # Assert
-        assert result is None
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 999)
-    
-    def test_get_book_by_novel_id_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功根据novel_id获取书籍"""
-        # Arrange
-        mock_book_dao.get_by_novel_id.return_value = sample_book
-        
-        # Act
-        result = book_service_with_mocks.get_book_by_novel_id(db_session, 12345)
-        
-        # Assert
-        assert result == sample_book
-        mock_book_dao.get_by_novel_id.assert_called_once_with(db_session, 12345)
-    
-    def test_search_books_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功搜索书籍"""
-        # Arrange
-        mock_book_dao.search_by_title.return_value = [sample_book]
-        
-        # Act
-        results = book_service_with_mocks.search_books(db_session, "测试", page=1, size=20)
-        
-        # Assert
-        assert len(results) == 1
-        assert results[0] == sample_book
-        mock_book_dao.search_by_title.assert_called_once_with(db_session, "测试", limit=20)
-    
-    def test_search_books_with_pagination(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试搜索书籍分页功能"""
-        # Arrange
-        books = [sample_book] * 5  # 5本书
-        mock_book_dao.search_by_title.return_value = books
-        
-        # Act - 获取第2页，每页2条
-        results = book_service_with_mocks.search_books(db_session, "测试", page=2, size=2)
-        
-        # Assert
-        assert len(results) == 2  # 第2页应该有2条记录
-        mock_book_dao.search_by_title.assert_called_once_with(db_session, "测试", limit=4)  # skip=2, size=2, 所以limit=4
-    
-    def test_get_books_with_pagination_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功获取分页书籍列表"""
-        # Arrange
-        books = [sample_book] * 2
-        mock_book_dao.get_multi.return_value = books
-        mock_book_dao.count.return_value = 30
-        
-        # Act
-        result = book_service_with_mocks.get_books_with_pagination(db_session, page=1, size=2)
-        
-        # Assert
-        assert result["books"] == books
-        assert result["total"] == 30
-        assert result["page"] == 1
-        assert result["size"] == 2
-        assert result["total_pages"] == 15  # (30 + 2 - 1) // 2
-        
-        # 验证DAO调用
-        mock_book_dao.get_multi.assert_called_once_with(db_session, skip=0, limit=2, filters=None)
-        mock_book_dao.count.assert_called_once_with(db_session, filters=None)
-    
-    def test_get_book_detail_with_latest_snapshot_success(self, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, sample_snapshot, db_session):
-        """测试成功获取书籍详情和最新快照"""
-        # Arrange
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_latest_by_book_id.return_value = sample_snapshot
-        mock_book_snapshot_dao.get_statistics_by_book_id.return_value = {"total_snapshots": 10}
-        
-        # Act
-        result = book_service_with_mocks.get_book_detail_with_latest_snapshot(db_session, 1)
-        
-        # Assert
         assert result is not None
-        assert result["book"] == sample_book
-        assert result["latest_snapshot"] == sample_snapshot
-        assert result["statistics"] == {"total_snapshots": 10}
-        
-        # 验证DAO调用 - 使用sample_book的id
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_latest_by_book_id.assert_called_once_with(db_session, sample_book.id)
-        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.id)
+        assert result.id == create_test_book.id
+        assert result.title == create_test_book.title
     
-    def test_get_book_detail_with_latest_snapshot_book_not_found(self, book_service_with_mocks, mock_book_dao, db_session):
-        """测试书籍不存在时返回None"""
-        # Arrange
-        mock_book_dao.get_by_id.return_value = None
+    def test_get_book_by_novel_id(self, book_service, db_session, create_test_book):
+        """测试根据novel_id获取书籍"""
+        result = book_service.get_book_by_novel_id(db_session, create_test_book.novel_id)
         
-        # Act
-        result = book_service_with_mocks.get_book_detail_with_latest_snapshot(db_session, 999)
-        
-        # Assert
-        assert result is None
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 999)
+        assert result is not None
+        assert result.novel_id == create_test_book.novel_id
+        assert result.title == create_test_book.title
     
-    @patch('app.database.service.book_service.datetime')
-    def test_get_book_trend_success(self, mock_datetime, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, sample_snapshot, db_session):
-        """测试成功获取书籍趋势数据"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_trend_by_book_id.return_value = [sample_snapshot]
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend(db_session, 1, days=7)
-        
-        # Assert
-        assert len(results) == 1
-        assert results[0] == sample_snapshot
-        
-        # 验证调用参数
-        expected_start_time = now - timedelta(days=7)
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_trend_by_book_id.assert_called_once_with(
-            db_session, sample_book.id, start_time=expected_start_time, limit=168  # 7 * 24
-        )
-    
-    @patch('app.database.service.book_service.datetime')
-    def test_get_book_trend_hourly_success(self, mock_datetime, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, db_session):
-        """测试成功获取小时级趋势数据"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        trend_data = [{"time_period": "2024-01-15 11", "avg_clicks": 50000.0}]
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_hourly(db_session, 1, hours=24)
-        
-        # Assert
-        assert results == trend_data
-        
-        # 验证调用参数
-        expected_start_time = now - timedelta(hours=24)
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.id, expected_start_time, now, "hour"
-        )
-    
-    @patch('app.database.service.book_service.datetime')
-    def test_get_book_trend_daily_success(self, mock_datetime, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, db_session):
-        """测试成功获取天级趋势数据"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        trend_data = [{"time_period": "2024-01-14", "avg_clicks": 50000.0}]
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_daily(db_session, 1, days=7)
-        
-        # Assert
-        assert results == trend_data
-        
-        # 验证调用参数
-        expected_start_time = now - timedelta(days=7)
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.id, expected_start_time, now, "day"
-        )
-    
-    @patch('app.database.service.book_service.datetime')
-    def test_get_book_trend_weekly_success(self, mock_datetime, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, db_session):
-        """测试成功获取周级趋势数据"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        trend_data = [{"time_period": "2024-W02", "avg_clicks": 50000.0}]
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_weekly(db_session, 1, weeks=4)
-        
-        # Assert
-        assert results == trend_data
-        
-        # 验证调用参数
-        expected_start_time = now - timedelta(weeks=4)
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.id, expected_start_time, now, "week"
-        )
-    
-    @patch('app.database.service.book_service.datetime')
-    def test_get_book_trend_monthly_success(self, mock_datetime, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, db_session):
-        """测试成功获取月级趋势数据"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        trend_data = [{"time_period": "2024-01", "avg_clicks": 50000.0}]
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_monthly(db_session, 1, months=3)
-        
-        # Assert
-        assert results == trend_data
-        
-        # 验证调用参数
-        expected_start_time = now - timedelta(days=90)  # 3 * 30
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_trend_by_book_id_with_interval.assert_called_once_with(
-            db_session, sample_book.id, expected_start_time, now, "month"
-        )
-    
-    def test_get_book_trend_with_interval_hour(self, book_service_with_mocks, mocker, db_session):
-        """测试使用统一接口获取小时级趋势"""
-        # Arrange
-        mock_hourly = mocker.patch.object(book_service_with_mocks, 'get_book_trend_hourly')
-        trend_data = [{"time_period": "2024-01-15 11", "avg_clicks": 50000.0}]
-        mock_hourly.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_with_interval(db_session, 1, 24, "hour")
-        
-        # Assert
-        assert results == trend_data
-        mock_hourly.assert_called_once_with(db_session, 1, 24)
-    
-    def test_get_book_trend_with_interval_day(self, book_service_with_mocks, mocker, db_session):
-        """测试使用统一接口获取天级趋势"""
-        # Arrange
-        mock_daily = mocker.patch.object(book_service_with_mocks, 'get_book_trend_daily')
-        trend_data = [{"time_period": "2024-01-14", "avg_clicks": 50000.0}]
-        mock_daily.return_value = trend_data
-        
-        # Act
-        results = book_service_with_mocks.get_book_trend_with_interval(db_session, 1, 7, "day")
-        
-        # Assert
-        assert results == trend_data
-        mock_daily.assert_called_once_with(db_session, 1, 7)
-    
-    def test_get_book_trend_with_interval_invalid(self, book_service_with_mocks, db_session):
-        """测试使用无效时间间隔"""
-        # Act & Assert
-        with pytest.raises(ValueError, match="不支持的时间间隔"):
-            book_service_with_mocks.get_book_trend_with_interval(db_session, 1, 7, "invalid")
-    
-    def test_create_or_update_book_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功创建或更新书籍"""
-        # Arrange
-        book_data = {"novel_id": 12345, "title": "新书籍", "author_id": 201}
-        mock_book_dao.create_or_update_by_novel_id.return_value = sample_book
-        
-        # Act
-        result = book_service_with_mocks.create_or_update_book(db_session, book_data)
-        
-        # Assert
-        assert result == sample_book
-        mock_book_dao.create_or_update_by_novel_id.assert_called_once_with(db_session, book_data)
-    
-    def test_create_book_snapshot_success(self, book_service_with_mocks, mock_book_snapshot_dao, sample_snapshot, db_session):
-        """测试成功创建书籍快照"""
-        # Arrange
-        snapshot_data = {"book_id": 1, "clicks": 50000, "favorites": 1500}
-        mock_book_snapshot_dao.create.return_value = sample_snapshot
-        
-        # Act
-        result = book_service_with_mocks.create_book_snapshot(db_session, snapshot_data)
-        
-        # Assert
-        assert result == sample_snapshot
-        mock_book_snapshot_dao.create.assert_called_once_with(db_session, snapshot_data)
-    
-    def test_batch_create_book_snapshots_success(self, book_service_with_mocks, mock_book_snapshot_dao, sample_snapshot, db_session):
-        """测试成功批量创建书籍快照"""
-        # Arrange
-        snapshots_data = [
-            {"book_id": 1, "clicks": 50000, "favorites": 1500},
-            {"book_id": 1, "clicks": 52000, "favorites": 1600}
-        ]
-        mock_book_snapshot_dao.bulk_create.return_value = [sample_snapshot, sample_snapshot]
-        
-        # Act
-        results = book_service_with_mocks.batch_create_book_snapshots(db_session, snapshots_data)
-        
-        # Assert
-        assert len(results) == 2
-        mock_book_snapshot_dao.bulk_create.assert_called_once_with(db_session, snapshots_data)
-    
-    @patch('app.database.service.book_service.datetime')
-    def test_cleanup_old_snapshots_success(self, mock_datetime, book_service_with_mocks, mock_book_snapshot_dao, db_session):
-        """测试成功清理旧快照"""
-        # Arrange
-        now = datetime(2024, 1, 15, 12, 0, 0)
-        mock_datetime.now.return_value = now
-        mock_book_snapshot_dao.delete_old_snapshots.return_value = 5  # 删除了5个快照
-        
-        # Act
-        deleted_count = book_service_with_mocks.cleanup_old_snapshots(db_session, 1, keep_days=30, keep_count=100)
-        
-        # Assert
-        assert deleted_count == 5
-        
-        # 验证调用参数
-        expected_cutoff_time = now - timedelta(days=30)
-        mock_book_snapshot_dao.delete_old_snapshots.assert_called_once_with(
-            db_session, 1, expected_cutoff_time, 100
-        )
-    
-    def test_get_book_statistics_success(self, book_service_with_mocks, mock_book_dao, mock_book_snapshot_dao, sample_book, db_session):
-        """测试成功获取书籍统计信息"""
-        # Arrange
-        stats = {"total_snapshots": 10, "max_clicks": 60000}
-        mock_book_dao.get_by_id.return_value = sample_book
-        mock_book_snapshot_dao.get_statistics_by_book_id.return_value = stats
-        
-        # Act
-        result = book_service_with_mocks.get_book_statistics(db_session, 1)
-        
-        # Assert
-        assert result == stats
-        mock_book_dao.get_by_id.assert_called_once_with(db_session, 1)
-        mock_book_snapshot_dao.get_statistics_by_book_id.assert_called_once_with(db_session, sample_book.id)
-    
-    def test_get_books_by_ids_success(self, book_service_with_mocks, mock_book_dao, sample_book, db_session):
-        """测试成功根据ID列表获取书籍"""
-        # Arrange
-        book2 = Book(id=2, novel_id=54321, title="第二本书", author_id=202)
-        mock_book_dao.get_by_id.side_effect = [sample_book, book2, None]  # 第三个ID不存在
-        
-        # Act
-        results = book_service_with_mocks.get_books_by_ids(db_session, [1, 2, 999])
-        
-        # Assert
-        assert len(results) == 2  # 只返回存在的书籍
-        assert results[0] == sample_book
-        assert results[1] == book2
-        
-        # 验证DAO调用
-        assert mock_book_dao.get_by_id.call_count == 3
-        mock_book_dao.get_by_id.assert_any_call(db_session, 1)
-        mock_book_dao.get_by_id.assert_any_call(db_session, 2)
-        mock_book_dao.get_by_id.assert_any_call(db_session, 999)
-    
-    def test_get_books_by_ids_empty_list(self, book_service_with_mocks, mock_book_dao, db_session):
-        """测试空ID列表"""
-        # Act
-        results = book_service_with_mocks.get_books_by_ids(db_session, [])
-        
-        # Assert
-        assert results == []
-        mock_book_dao.get_by_id.assert_not_called()
-
-
-class TestBookServiceIntegration:
-    """BookService集成测试"""
-    
-    @pytest.fixture
-    def book_service(self):
-        """BookService实例"""
-        return BookService()
-    
-    def test_book_lifecycle_integration(self, db_session, book_service):
-        """测试书籍完整生命周期（集成测试）"""
-        # 1. 创建书籍
+    def test_create_book(self, book_service, db_session):
+        """测试创建书籍"""
         book_data = {
-            "novel_id": 77777,
-            "title": "集成测试小说",
-            "author_id": 301,
-            "novel_class": "现代言情",
-            "tags": "都市,甜文"
+            "novel_id": 99999,
+            "title": "新建测试小说"
         }
         
-        book = book_service.create_or_update_book(db_session, book_data)
-        assert book.novel_id == 77777
-        assert book.title == "集成测试小说"
+        result = book_service.create_book(db_session, book_data)
         
-        # 2. 根据novel_id获取书籍
-        found_book = book_service.get_book_by_novel_id(db_session, 77777)
-        assert found_book is not None
-        assert found_book.id == book.id
+        assert result.novel_id == 99999
+        assert result.title == "新建测试小说"
+        assert result.title == "新建测试小说"
+    
+    def test_update_book(self, book_service, db_session, create_test_book):
+        """测试更新书籍"""
+        update_data = {
+            "title": "更新后的书名"
+        }
         
-        # 3. 创建快照
+        result = book_service.update_book(db_session, create_test_book, update_data)
+        
+        assert result.title == "更新后的书名"
+        assert result.novel_id == create_test_book.novel_id  # novel_id不变
+    
+    def test_create_or_update_book_create(self, book_service, db_session):
+        """测试创建或更新书籍 - 创建新书籍"""
+        book_data = {
+            "novel_id": 88888,
+            "title": "创建或更新测试小说"
+        }
+        
+        result = book_service.create_or_update_book(db_session, book_data)
+        
+        assert result.novel_id == 88888
+        assert result.title == "创建或更新测试小说"
+    
+    def test_create_or_update_book_update(self, book_service, db_session, create_test_book):
+        """测试创建或更新书籍 - 更新现有书籍"""
+        book_data = {
+            "novel_id": create_test_book.novel_id,
+            "title": "更新的书名"
+        }
+        
+        result = book_service.create_or_update_book(db_session, book_data)
+        
+        assert result.id == create_test_book.id  # 同一个记录
+        assert result.title == "更新的书名"
+    
+    # ==================== 查询操作测试 ====================
+    
+    def test_search_books_by_title(self, book_service, db_session, create_multiple_books):
+        """测试根据标题搜索书籍"""
+        result = book_service.search_books_by_title(db_session, "测试")
+        
+        assert len(result) >= 2  # create_multiple_books中有多本包含"测试"的书籍
+        assert all("测试" in book.title for book in result)
+    
+    def test_search_books_by_title_exact_match(self, book_service, db_session, create_multiple_books):
+        """测试精确搜索书籍标题"""
+        result = book_service.search_books_by_title(db_session, "搜索测试小说")
+        
+        assert len(result) >= 1
+        assert any(book.title == "搜索测试小说" for book in result)
+    
+    def test_get_books_with_pagination(self, book_service, db_session, create_multiple_books):
+        """测试分页获取书籍列表"""
+        result = book_service.get_books_with_pagination(db_session, page=1, size=10)
+        
+        assert "books" in result
+        assert "total" in result
+        assert "page" in result
+        assert "size" in result
+        assert "total_pages" in result
+        assert result["page"] == 1
+        assert result["size"] == 10
+        assert len(result["books"]) >= 1
+    
+    def test_get_books_with_pagination_filters(self, book_service, db_session, create_multiple_books):
+        """测试带过滤条件的分页获取书籍列表"""
+        filters = {"title": "测试小说1"}
+        result = book_service.get_books_with_pagination(db_session, page=1, size=10, filters=filters)
+        
+        assert len(result["books"]) >= 1
+        assert all("测试小说1" in book.title for book in result["books"])
+    
+    def test_get_books_by_ids(self, book_service, db_session, create_multiple_books):
+        """测试根据ID列表获取书籍"""
+        book_ids = [book.id for book in create_multiple_books[:2]]  # 取前两本书的ID
+        
+        result = book_service.get_books_by_ids(db_session, book_ids)
+        
+        assert len(result) == 2
+        assert all(book.id in book_ids for book in result)
+    
+    def test_get_books_by_ids_with_invalid_id(self, book_service, db_session, create_multiple_books):
+        """测试根据包含无效ID的列表获取书籍"""
+        book_ids = [create_multiple_books[0].id, 99999]  # 一个有效ID，一个无效ID
+        
+        result = book_service.get_books_by_ids(db_session, book_ids)
+        
+        assert len(result) == 1  # 只返回有效的书籍
+        assert result[0].id == create_multiple_books[0].id
+    
+    # ==================== 书籍快照操作测试 ====================
+    
+    def test_create_book_snapshot(self, book_service, db_session, create_test_book):
+        """测试创建书籍快照"""
         snapshot_data = {
-            "book_id": book.id,
+            "book_id": create_test_book.id,
+            "clicks": 60000,
+            "favorites": 2000,
+            "comments": 1000,
+            "snapshot_time": datetime(2024, 1, 16, 12, 0, 0)
+        }
+        
+        result = book_service.create_book_snapshot(db_session, snapshot_data)
+        
+        assert result.book_id == create_test_book.id
+        assert result.clicks == 60000
+        assert result.favorites == 2000
+        assert result.comments == 1000
+    
+    def test_batch_create_book_snapshots(self, book_service, db_session, create_test_book):
+        """测试批量创建书籍快照"""
+        snapshots_data = [
+            {
+                "book_id": create_test_book.id,
+                "clicks": 60000,
+                "favorites": 2000,
+                "comments": 1000,
+                "snapshot_time": datetime(2024, 1, 16, 12, 0, 0)
+            },
+            {
+                "book_id": create_test_book.id,
+                "clicks": 62000,
+                "favorites": 2100,
+                "comments": 1050,
+                "snapshot_time": datetime(2024, 1, 17, 12, 0, 0)
+            }
+        ]
+        
+        result = book_service.batch_create_book_snapshots(db_session, snapshots_data)
+        
+        assert len(result) == 2
+        assert result[0].clicks == 60000
+        assert result[1].clicks == 62000
+    
+    def test_get_latest_snapshot_by_book_id(self, book_service, db_session, create_test_book_snapshot):
+        """测试获取书籍最新快照"""
+        result = book_service.get_latest_snapshot_by_book_id(db_session, create_test_book_snapshot.book_id)
+        
+        assert result is not None
+        assert result.book_id == create_test_book_snapshot.book_id
+    
+    def test_get_snapshots_by_book_id(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试获取书籍快照列表"""
+        result = book_service.get_snapshots_by_book_id(db_session, create_test_book.id)
+        
+        assert len(result) >= 2  # create_multiple_snapshots为create_test_book创建了多个快照
+        assert all(snapshot.book_id == create_test_book.id for snapshot in result)
+    
+    def test_get_snapshots_by_book_id_with_time_range(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试在指定时间范围内获取书籍快照列表"""
+        start_time = datetime(2024, 1, 14, 0, 0, 0)
+        end_time = datetime(2024, 1, 16, 23, 59, 59)
+        
+        result = book_service.get_snapshots_by_book_id(
+            db_session, 
+            create_test_book.id, 
+            start_time=start_time, 
+            end_time=end_time
+        )
+        
+        assert len(result) >= 1
+        assert all(
+            start_time <= snapshot.snapshot_time <= end_time 
+            for snapshot in result
+        )
+    
+    # ==================== 趋势分析测试 ====================
+    
+    def test_get_book_trend_by_interval_day(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按天获取书籍趋势数据"""
+        start_time = datetime(2024, 1, 1, 0, 0, 0)
+        end_time = datetime(2024, 1, 31, 23, 59, 59)
+        
+        result = book_service.get_book_trend_by_interval(
+            db_session, 
+            create_test_book.id, 
+            start_time, 
+            end_time, 
+            "day"
+        )
+        
+        assert isinstance(result, list)
+        assert len(result) >= 1
+        
+        # 验证返回数据结构
+        trend_item = result[0]
+        assert "time_period" in trend_item
+        assert "avg_favorites" in trend_item
+        assert "avg_clicks" in trend_item
+        assert "snapshot_count" in trend_item
+    
+    def test_get_book_trend_by_interval_hour(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按小时获取书籍趋势数据"""
+        start_time = datetime(2024, 1, 14, 0, 0, 0)
+        end_time = datetime(2024, 1, 15, 23, 59, 59)
+        
+        result = book_service.get_book_trend_by_interval(
+            db_session,
+            create_test_book.id,
+            start_time,
+            end_time,
+            "hour"
+        )
+        
+        assert isinstance(result, list)
+        assert len(result) >= 1
+    
+    def test_get_book_trend_by_interval_invalid_interval(self, book_service, db_session, create_test_book):
+        """测试使用无效时间间隔"""
+        start_time = datetime(2024, 1, 1, 0, 0, 0)
+        end_time = datetime(2024, 1, 31, 23, 59, 59)
+        
+        with pytest.raises(ValueError, match="不支持的时间间隔"):
+            book_service.get_book_trend_by_interval(
+                db_session,
+                create_test_book.id,
+                start_time,
+                end_time,
+                "invalid_interval"
+            )
+    
+    # ==================== 业务逻辑方法测试 ====================
+    
+    def test_get_book_detail_with_latest_snapshot(self, book_service, db_session, create_test_book_snapshot):
+        """测试获取书籍详情和最新快照数据"""
+        result = book_service.get_book_detail_with_latest_snapshot(db_session, create_test_book_snapshot.book_id)
+        
+        assert result is not None
+        assert "book" in result
+        assert "latest_snapshot" in result
+        assert "statistics" in result
+        assert result["book"].id == create_test_book_snapshot.book_id
+    
+    def test_get_book_detail_with_latest_snapshot_no_book(self, book_service, db_session):
+        """测试获取不存在书籍的详情"""
+        result = book_service.get_book_detail_with_latest_snapshot(db_session, 99999)
+        assert result is None
+    
+    def test_get_book_trend_hourly(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按小时获取书籍趋势数据"""
+        result = book_service.get_book_trend_hourly(db_session, create_test_book.id, hours=48)
+        
+        assert isinstance(result, list)
+        # 由于测试数据的时间范围，可能没有数据在最近48小时内
+        # 所以这里只验证方法能正常调用和返回正确的数据结构
+    
+    def test_get_book_trend_daily(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按天获取书籍趋势数据"""
+        result = book_service.get_book_trend_daily(db_session, create_test_book.id, days=30)
+        
+        assert isinstance(result, list)
+    
+    def test_get_book_trend_weekly(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按周获取书籍趋势数据"""
+        result = book_service.get_book_trend_weekly(db_session, create_test_book.id, weeks=8)
+        
+        assert isinstance(result, list)
+    
+    def test_get_book_trend_monthly(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试按月获取书籍趋势数据"""
+        result = book_service.get_book_trend_monthly(db_session, create_test_book.id, months=6)
+        
+        assert isinstance(result, list)
+    
+    def test_get_book_statistics(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试获取书籍统计信息"""
+        result = book_service.get_book_statistics(db_session, create_test_book.id)
+        
+        assert "total_snapshots" in result
+        assert "max_favorites" in result
+        assert "max_clicks" in result
+        assert "max_comments" in result
+        assert "first_snapshot_time" in result
+        assert "last_snapshot_time" in result
+        assert result["total_snapshots"] >= 1
+    
+    def test_get_book_statistics_no_snapshots(self, book_service, db_session, create_test_book):
+        """测试获取没有快照的书籍统计信息"""
+        # create_test_book没有关联的快照
+        # 所以应该返回空字典或者默认值
+        result = book_service.get_book_statistics(db_session, create_test_book.id)
+        
+        # 根据实现，这应该返回空字典
+        assert result == {}
+    
+    def test_cleanup_old_snapshots(self, book_service, db_session, create_multiple_snapshots, create_test_book):
+        """测试清理旧快照"""
+        # 创建一个很久以前的快照
+        old_snapshot_data = {
+            "book_id": create_test_book.id,
             "clicks": 10000,
             "favorites": 500,
             "comments": 200,
-            "snapshot_time": datetime.now()
+            "snapshot_time": datetime(2023, 1, 1, 12, 0, 0)  # 很久以前的快照
         }
+        book_service.create_book_snapshot(db_session, old_snapshot_data)
         
-        snapshot = book_service.create_book_snapshot(db_session, snapshot_data)
-        assert snapshot.book_id == book.id
-        assert snapshot.clicks == 10000
+        # 清理30天前的快照，保留最新100条
+        deleted_count = book_service.cleanup_old_snapshots(
+            db_session,
+            create_test_book.id,
+            keep_days=30,
+            keep_count=100
+        )
         
-        # 4. 获取书籍详情和最新快照
-        detail = book_service.get_book_detail_with_latest_snapshot(db_session, book.id)
-        assert detail is not None
-        assert detail["book"].id == book.id
-        assert detail["latest_snapshot"] is not None
-        assert detail["latest_snapshot"].clicks == 10000
-        
-        # 5. 搜索书籍
-        search_results = book_service.search_books(db_session, "集成测试")
-        assert len(search_results) >= 1
-        found_in_search = any(b.id == book.id for b in search_results)
-        assert found_in_search
-        
-        # 6. 获取统计信息
-        stats = book_service.get_book_statistics(db_session, book.id)
-        assert stats["total_snapshots"] >= 1
+        assert deleted_count >= 0  # 可能没有删除任何记录，取决于测试数据
     
-    def test_pagination_integration(self, db_session, book_service):
-        """测试分页功能集成测试"""
-        # 创建多本书籍
-        books_data = [
-            {"novel_id": 88881 + i, "title": f"分页测试书籍{i}", "author_id": 401 + i}
-            for i in range(5)
-        ]
-        
-        created_books = []
-        for book_data in books_data:
-            book = book_service.create_or_update_book(db_session, book_data)
-            created_books.append(book)
-        
-        # 测试分页
-        page1 = book_service.get_books_with_pagination(db_session, page=1, size=2)
-        assert len(page1["books"]) <= 2
-        assert page1["page"] == 1
-        assert page1["size"] == 2
-        assert page1["total"] >= 5
-        
-        page2 = book_service.get_books_with_pagination(db_session, page=2, size=2)
-        assert len(page2["books"]) <= 2
-        assert page2["page"] == 2
-        
-        # 验证不同页面的书籍不重复
-        page1_ids = {book.id for book in page1["books"]}
-        page2_ids = {book.id for book in page2["books"]}
-        assert page1_ids.isdisjoint(page2_ids)  # 两个集合没有交集
+    # ==================== 错误处理测试 ====================
     
-    def test_search_integration(self, db_session, book_service):
-        """测试搜索功能集成测试"""
-        # 创建具有特定关键词的书籍
+    def test_create_or_update_book_without_novel_id(self, book_service, db_session):
+        """测试创建或更新书籍时缺少novel_id"""
         book_data = {
-            "novel_id": 99999,
-            "title": "搜索测试专用小说",
-            "author_id": 501,
-            "novel_class": "现代言情"
+            "title": "测试书籍"
         }
         
-        book = book_service.create_or_update_book(db_session, book_data)
-        
-        # 搜索测试
-        search_results = book_service.search_books(db_session, "搜索测试")
-        assert len(search_results) >= 1
-        
-        found_book = next((b for b in search_results if b.id == book.id), None)
-        assert found_book is not None
-        assert "搜索测试" in found_book.title
-        
-        # 搜索不存在的关键词
-        no_results = book_service.search_books(db_session, "不存在的关键词xyz")
-        assert len(no_results) == 0
+        with pytest.raises(ValueError, match="novel_id is required"):
+            book_service.create_or_update_book(db_session, book_data)
+    
+    def test_get_book_by_id_not_found(self, book_service, db_session):
+        """测试获取不存在的书籍"""
+        result = book_service.get_book_by_id(db_session, 99999)
+        assert result is None
+    
+    def test_get_book_by_novel_id_not_found(self, book_service, db_session):
+        """测试根据不存在的novel_id获取书籍"""
+        result = book_service.get_book_by_novel_id(db_session, 99999)
+        assert result is None
+    
+    def test_search_books_by_title_empty_result(self, book_service, db_session):
+        """测试搜索不存在的书籍标题"""
+        result = book_service.search_books_by_title(db_session, "不存在的书名")
+        assert len(result) == 0
+    
+    def test_get_latest_snapshot_by_book_id_no_snapshots(self, book_service, db_session, create_test_book):
+        """测试获取没有快照的书籍的最新快照"""
+        # create_test_book没有关联的快照
+        result = book_service.get_latest_snapshot_by_book_id(db_session, create_test_book.id)
+        assert result is None

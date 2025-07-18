@@ -52,12 +52,7 @@ def sample_book_data():
     """样本书籍数据"""
     return {
         "novel_id": 12345,
-        "title": "测试小说",
-        "author_id": 101,
-        "novel_class": "现代言情",
-        "tags": "现代都市,言情",
-        "created_at": datetime(2024, 1, 1, 12, 0, 0),
-        "updated_at": datetime(2024, 1, 1, 12, 0, 0)
+        "title": "测试小说"
     }
 
 
@@ -78,7 +73,7 @@ def sample_ranking_data():
     """样本榜单数据"""
     return {
         "rank_id": 1,
-        "rank_name": "测试榜单",
+        "name": "测试榜单",
         "page_id": "test_ranking",
         "rank_group_type": "热门",
         "created_at": datetime(2024, 1, 1, 12, 0, 0)
@@ -154,27 +149,15 @@ def create_multiple_books(db_session):
     books_data = [
         {
             "novel_id": 12348,
-            "title": "测试小说1",
-            "author_id": 201,
-            "novel_class": "现代言情",
-            "tags": "都市,甜文",
-            "created_at": datetime(2024, 1, 1, 12, 0, 0)
+            "title": "测试小说1"
         },
         {
             "novel_id": 12349,
-            "title": "测试小说2", 
-            "author_id": 202,
-            "novel_class": "古代言情",
-            "tags": "宫廷,重生",
-            "created_at": datetime(2024, 1, 2, 12, 0, 0)
+            "title": "测试小说2"
         },
         {
             "novel_id": 12350,
-            "title": "搜索测试小说",
-            "author_id": 203,
-            "novel_class": "纯爱小说",
-            "tags": "仙侠,幻想",
-            "created_at": datetime(2024, 1, 3, 12, 0, 0)
+            "title": "搜索测试小说"
         }
     ]
     
