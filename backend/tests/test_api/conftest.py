@@ -152,24 +152,26 @@ def mock_ranking_data():
 @pytest.fixture
 def mock_pagination_data():
     """模拟分页数据"""
-    return {
-        "books": [
-            Book(id=1, novel_id=12345, title="测试小说1"),
-            Book(id=2, novel_id=12346, title="测试小说2")
-        ],
+    books = [
+        Book(id=1, novel_id=12345, title="测试小说1"),
+        Book(id=2, novel_id=12346, title="测试小说2")
+    ]
+    pagination_info = {
         "total": 50,
         "page": 1,
         "size": 20,
         "total_pages": 3
     }
+    # 返回tuple以匹配API期望的返回值格式 (books, pagination_info)
+    return (books, pagination_info)
 
 
 @pytest.fixture
 def mock_search_results():
     """模拟搜索结果"""
     return [
-        Book(id=1, novel_id=12345, title="搜索结果1", author_id=101, novel_class="现代言情"),
-        Book(id=2, novel_id=12346, title="搜索结果2", author_id=102, novel_class="古代言情")
+        Book(id=1, novel_id=12345, title="搜索结果1"),
+        Book(id=2, novel_id=12346, title="搜索结果2")
     ]
 
 

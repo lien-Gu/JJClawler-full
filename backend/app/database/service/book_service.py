@@ -2,12 +2,13 @@
 书籍业务逻辑服务 - 集成DAO功能的简化版本
 """
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 
 from ..db.book import Book, BookSnapshot
+from ...models import BookResponse
 
 
 class BookService:
@@ -79,7 +80,7 @@ class BookService:
         page: int = 1, 
         size: int = 20,
         filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    ) -> Tuple[List[Book], int]:
         """分页获取书籍列表"""
         skip = (page - 1) * size
         
@@ -102,14 +103,9 @@ class BookService:
         ).scalars())
         
         total = db.scalar(count_query)
+        total_pages = (total + size - 1) // size if total > 0 else 0
         
-        return {
-            "books": books,
-            "total": total,
-            "page": page,
-            "size": size,
-            "total_pages": (total + size - 1) // size if total > 0 else 0
-        }
+        return books, total_pages
 
     def search_books(
         self,

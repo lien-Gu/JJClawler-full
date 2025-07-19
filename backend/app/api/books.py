@@ -36,16 +36,12 @@ async def get_books_list(
     获取书籍列表（分页）
     """
     try:
-        result = book_service.get_books_with_pagination(db, page, size)
+        book_result, _ = book_service.get_books_with_pagination(db, page, size)
         
         # 转换为响应模型
-        book_responses = []
-        for book in result["books"]:
-            book_responses.append(BookResponse(
-                id=book.id,
-                novel_id=book.novel_id,
-                title=book.title
-            ))
+        book_responses = [
+            BookResponse.from_book_table(book) for book in book_result
+        ]
         
         return ListResponse(
             data=book_responses,
@@ -70,15 +66,10 @@ async def search_books(
     """
     try:
         books = book_service.search_books(db, keyword, page, size)
-        
-        # 转换为响应模型
-        book_responses = []
-        for book in books:
-            book_responses.append(BookResponse(
-                id=book.id,
-                novel_id=book.novel_id,
-                title=book.title
-            ))
+
+        book_responses = [
+            BookResponse.from_book_table(book) for book in books
+        ]
         
         return ListResponse(
             data=book_responses,
@@ -113,15 +104,7 @@ async def get_book_detail(
         latest_snapshot = book_detail["latest_snapshot"]
         
         # 构造响应数据
-        response_data = BookDetailResponse(
-            id=book.id,
-            novel_id=book.novel_id,
-            title=book.title,
-            snapshot_time=latest_snapshot.snapshot_time if latest_snapshot else datetime.now(),
-            clicks=latest_snapshot.clicks if latest_snapshot else None,
-            favorites=latest_snapshot.favorites if latest_snapshot else None,
-            comments=latest_snapshot.comments if latest_snapshot else None
-        )
+        response_data = BookDetailResponse.from_book_and_snapshot(book, latest_snapshot)
         
         return DataResponse(
             data=response_data,
@@ -159,14 +142,9 @@ async def get_book_trend(
         trend_data = book_service.get_book_trend(db, book_id, days)
         
         # 转换为响应模型
-        trend_points = []
-        for snapshot in trend_data:
-            trend_points.append(BookTrendPoint(
-                snapshot_time=snapshot.snapshot_time,
-                clicks=snapshot.clicks,
-                favorites=snapshot.favorites,
-                comments=snapshot.comments
-            ))
+        trend_points = [
+            BookTrendPoint.from_snapshot(snapshot) for snapshot in trend_data
+        ]
         
         return ListResponse(
             data=trend_points,
@@ -449,15 +427,10 @@ async def get_book_ranking_history(
         # 转换为响应模型
         from ..models.book import BookRankingInfo
         
-        ranking_infos = []
-        for history in ranking_history:
-            ranking_infos.append(BookRankingInfo(
-                book_id=book_id,
-                ranking_id=history["ranking_id"],
-                ranking_name=history["ranking_name"],
-                position=history["position"],
-                snapshot_time=history["snapshot_time"]
-            ))
+        ranking_infos = [
+            BookRankingInfo.from_history_dict(book_id, history) 
+            for history in ranking_history
+        ]
         
         response_data = BookRankingHistoryResponse(
             book_id=book_id,
