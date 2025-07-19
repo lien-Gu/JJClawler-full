@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
+from app.config import settings
 from app.database.connection import get_db
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
@@ -16,21 +17,6 @@ from .base import CrawlConfig, HttpClient
 from .parser import DataType, Parser
 
 logger = logging.getLogger(__name__)
-
-
-class CrawlSettings:
-    """爬取配置类"""
-    
-    # 并发设置
-    BATCH_SIZE = 10
-    CONCURRENT_LIMIT = 5
-    BATCH_DELAY = 1.0
-    
-    # 请求设置
-    CONCURRENT_REQUEST_DELAY = 0.1
-    SEQUENTIAL_REQUEST_DELAY = 0.5
-    CONCURRENT_TIMEOUT = 10.0
-    SEQUENTIAL_TIMEOUT = 15.0
 
 
 class CrawlFlow:
@@ -45,27 +31,35 @@ class CrawlFlow:
     """
 
     def __init__(self, request_delay: Optional[float] = None, 
-                 concurrent_mode: bool = True) -> None:
+                 concurrent_mode: Optional[bool] = None) -> None:
         """
         初始化爬取流程管理器
         
         Args:
             request_delay: 请求间隔时间（秒）
-            concurrent_mode: 是否启用并发模式
+            concurrent_mode: 是否启用并发模式（None时使用配置文件设置）
         """
         self.config = CrawlConfig()
         self.parser = Parser()
         self.book_service = BookService()
         self.ranking_service = RankingService()
         
+        # 从配置文件获取设置
+        crawler_config = settings.crawler
+        
         # 配置HTTP客户端
-        self.concurrent_mode = concurrent_mode
-        if concurrent_mode:
-            delay = request_delay or CrawlSettings.CONCURRENT_REQUEST_DELAY
-            timeout = CrawlSettings.CONCURRENT_TIMEOUT
+        if concurrent_mode is None:
+            # 根据配置的并发请求数判断是否启用并发模式
+            self.concurrent_mode = crawler_config.concurrent_requests > 1
         else:
-            delay = request_delay or CrawlSettings.SEQUENTIAL_REQUEST_DELAY
-            timeout = CrawlSettings.SEQUENTIAL_TIMEOUT
+            self.concurrent_mode = concurrent_mode
+            
+        if self.concurrent_mode:
+            delay = request_delay or (crawler_config.request_delay / 10)  # 并发时减少延迟
+            timeout = crawler_config.timeout / 2  # 并发时减少超时
+        else:
+            delay = request_delay or crawler_config.request_delay
+            timeout = crawler_config.timeout
             
         self.client = HttpClient(request_delay=delay, timeout=timeout)
         
@@ -230,7 +224,8 @@ class CrawlFlow:
     async def _crawl_books_concurrent(self, book_ids: List[str]) -> List[Dict]:
         """并发模式爬取书籍"""
         books = []
-        batch_size = CrawlSettings.BATCH_SIZE
+        # 使用配置的并发请求数作为批处理大小
+        batch_size = min(settings.crawler.concurrent_requests * 2, 10)  # 最多10个一批
         
         for i in range(0, len(book_ids), batch_size):
             batch_ids = book_ids[i:i + batch_size]
@@ -242,9 +237,9 @@ class CrawlFlow:
             batch_results = await self._crawl_books_batch(batch_ids)
             books.extend(batch_results)
             
-            # 批次间延迟
+            # 批次间延迟，使用配置的请求延迟
             if i + batch_size < len(book_ids):
-                await asyncio.sleep(CrawlSettings.BATCH_DELAY)
+                await asyncio.sleep(settings.crawler.request_delay)
         
         return books
 
@@ -260,7 +255,7 @@ class CrawlFlow:
 
     async def _crawl_books_batch(self, book_ids: List[str]) -> List[Dict]:
         """并发爬取一批书籍"""
-        semaphore = asyncio.Semaphore(CrawlSettings.CONCURRENT_LIMIT)
+        semaphore = asyncio.Semaphore(settings.crawler.concurrent_requests)
         
         async def crawl_with_semaphore(book_id: str) -> Optional[Dict]:
             async with semaphore:
