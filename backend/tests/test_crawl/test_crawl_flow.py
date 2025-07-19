@@ -2,6 +2,7 @@
 爬取流程管理器测试文件
 测试CrawlFlow类的关键功能，包括真实的爬取过程
 """
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -23,36 +24,46 @@ class TestCrawlFlow:
         assert crawl_flow.book_service is not None
         assert crawl_flow.ranking_service is not None
         assert isinstance(crawl_flow.crawled_book_ids, set)
-        assert crawl_flow.stats['books_crawled'] == 0
+        assert crawl_flow.stats["books_crawled"] == 0
 
     def test_generate_page_url(self, crawl_flow, mocker: MockerFixture):
         """测试生成页面地址"""
         mock_config = {
             "id": "test_page",
             "template": "test_template",
-            "params": {"page": 1}
+            "params": {"page": 1},
         }
 
-        mocker.patch.object(crawl_flow.config, 'get_task_config', return_value=mock_config)
-        mocker.patch.object(crawl_flow.config, 'build_url', return_value="https://test.com/page1")
+        mocker.patch.object(
+            crawl_flow.config, "get_task_config", return_value=mock_config
+        )
+        mocker.patch.object(
+            crawl_flow.config, "build_url", return_value="https://test.com/page1"
+        )
 
         result = crawl_flow._generate_page_url("test_page")
 
         assert result == "https://test.com/page1"
 
     @pytest.mark.asyncio
-    async def test_crawl_page_content(self, crawl_flow, mocker: MockerFixture, mock_page_content):
+    async def test_crawl_page_content(
+        self, crawl_flow, mocker: MockerFixture, mock_page_content
+    ):
         """测试爬取页面内容"""
-        mocker.patch.object(crawl_flow.client, 'get', return_value=mock_page_content)
+        mocker.patch.object(crawl_flow.client, "get", return_value=mock_page_content)
 
         result = await crawl_flow._crawl_page_content("https://test.com/page1")
 
         assert result == mock_page_content
-        assert crawl_flow.stats['total_requests'] == 1
+        assert crawl_flow.stats["total_requests"] == 1
 
-    def test_parse_rankings_from_page(self, crawl_flow, mocker: MockerFixture, mock_page_content, mock_parsed_items):
+    def test_parse_rankings_from_page(
+        self, crawl_flow, mocker: MockerFixture, mock_page_content, mock_parsed_items
+    ):
         """测试从页面解析榜单"""
-        mocker.patch.object(crawl_flow.parser, 'parse', return_value=[mock_parsed_items["ranking"]])
+        mocker.patch.object(
+            crawl_flow.parser, "parse", return_value=[mock_parsed_items["ranking"]]
+        )
 
         result = crawl_flow._parse_rankings_from_page(mock_page_content, "test_page")
 
@@ -69,64 +80,99 @@ class TestCrawlFlow:
         assert len(crawl_flow.crawled_book_ids) == 1
 
     @pytest.mark.asyncio
-    async def test_crawl_books_details(self, crawl_flow, mocker: MockerFixture, mock_book_detail):
+    async def test_crawl_books_details(
+        self, crawl_flow, mocker: MockerFixture, mock_book_detail
+    ):
         """测试爬取书籍详情"""
+
         # Mock方法并模拟统计更新
         async def mock_crawl_single_book(book_id):
-            crawl_flow.stats['books_crawled'] += 1
+            crawl_flow.stats["books_crawled"] += 1
             crawl_flow.books_data.append(mock_book_detail)
             return mock_book_detail
-            
-        mocker.patch.object(crawl_flow, '_crawl_single_book', side_effect=mock_crawl_single_book)
+
+        mocker.patch.object(
+            crawl_flow, "_crawl_single_book", side_effect=mock_crawl_single_book
+        )
 
         result = await crawl_flow._crawl_books_details(["12345"])
 
         assert len(result) == 1
         assert result[0] == mock_book_detail
-        assert crawl_flow.stats['books_crawled'] == 1
+        assert crawl_flow.stats["books_crawled"] == 1
 
     @pytest.mark.asyncio
-    async def test_crawl_book_detail(self, crawl_flow, mocker: MockerFixture, mock_book_detail, mock_parsed_items):
+    async def test_crawl_book_detail(
+        self, crawl_flow, mocker: MockerFixture, mock_book_detail, mock_parsed_items
+    ):
         """测试爬取单个书籍详情"""
-        crawl_flow.config.templates = {'novel_detail': 'https://test.com/book/{novel_id}'}
+        crawl_flow.config.templates = {
+            "novel_detail": "https://test.com/book/{novel_id}"
+        }
         crawl_flow.config.params = {}
 
-        mocker.patch.object(crawl_flow.client, 'get', return_value=mock_book_detail)
-        mocker.patch.object(crawl_flow.parser, 'parse', return_value=[mock_parsed_items["book"]])
+        mocker.patch.object(crawl_flow.client, "get", return_value=mock_book_detail)
+        mocker.patch.object(
+            crawl_flow.parser, "parse", return_value=[mock_parsed_items["book"]]
+        )
 
         result = await crawl_flow._crawl_single_book("12345")
 
         assert result == mock_parsed_items["book"].data
-        assert crawl_flow.stats['total_requests'] == 1
+        assert crawl_flow.stats["total_requests"] == 1
 
     @pytest.mark.asyncio
-    async def test_save_crawl_result(self, crawl_flow, mocker: MockerFixture, mock_rankings_data, mock_books_data,
-                                     mock_services):
+    async def test_save_crawl_result(
+        self,
+        crawl_flow,
+        mocker: MockerFixture,
+        mock_rankings_data,
+        mock_books_data,
+        mock_services,
+    ):
         """测试保存爬取结果"""
         # Mock数据库会话
         mock_db = mocker.Mock()
-        mocker.patch('app.crawl.crawl_flow.get_db', return_value=[mock_db])
+        mocker.patch("app.crawl.crawl_flow.get_db", return_value=[mock_db])
 
         # Mock服务
         crawl_flow.ranking_service = mock_services["ranking_service"]
         crawl_flow.book_service = mock_services["book_service"]
 
-        result = await crawl_flow._save_crawl_result(mock_rankings_data, mock_books_data)
+        result = await crawl_flow._save_crawl_result(
+            mock_rankings_data, mock_books_data
+        )
 
         assert result is True
         mock_db.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute_crawl_task_success(self, crawl_flow, mocker: MockerFixture, mock_page_content,
-                                              mock_rankings_data, mock_books_data):
+    async def test_execute_crawl_task_success(
+        self,
+        crawl_flow,
+        mocker: MockerFixture,
+        mock_page_content,
+        mock_rankings_data,
+        mock_books_data,
+    ):
         """测试执行完整爬取任务成功"""
         # Mock所有步骤
-        mocker.patch.object(crawl_flow, '_generate_page_url', return_value="https://test.com/page1")
-        mocker.patch.object(crawl_flow, '_crawl_page_content', return_value=mock_page_content)
-        mocker.patch.object(crawl_flow, '_parse_rankings_from_page', return_value=mock_rankings_data)
-        mocker.patch.object(crawl_flow, '_extract_unique_book_ids', return_value=["12345"])
-        mocker.patch.object(crawl_flow, '_crawl_books_details', return_value=mock_books_data)
-        mocker.patch.object(crawl_flow, '_save_crawl_result', return_value=True)
+        mocker.patch.object(
+            crawl_flow, "_generate_page_url", return_value="https://test.com/page1"
+        )
+        mocker.patch.object(
+            crawl_flow, "_crawl_page_content", return_value=mock_page_content
+        )
+        mocker.patch.object(
+            crawl_flow, "_parse_rankings_from_page", return_value=mock_rankings_data
+        )
+        mocker.patch.object(
+            crawl_flow, "_extract_unique_book_ids", return_value=["12345"]
+        )
+        mocker.patch.object(
+            crawl_flow, "_crawl_books_details", return_value=mock_books_data
+        )
+        mocker.patch.object(crawl_flow, "_save_crawl_result", return_value=True)
 
         result = await crawl_flow.execute_crawl_task("test_page")
 
@@ -138,7 +184,7 @@ class TestCrawlFlow:
     @pytest.mark.asyncio
     async def test_execute_crawl_task_failure(self, crawl_flow, mocker: MockerFixture):
         """测试执行爬取任务失败"""
-        mocker.patch.object(crawl_flow, '_generate_page_url', return_value=None)
+        mocker.patch.object(crawl_flow, "_generate_page_url", return_value=None)
 
         result = await crawl_flow.execute_crawl_task("invalid_page")
 
@@ -160,7 +206,7 @@ class TestCrawlFlow:
     @pytest.mark.asyncio
     async def test_close(self, crawl_flow, mocker: MockerFixture):
         """测试关闭资源"""
-        mocker.patch.object(crawl_flow.client, 'close')
+        mocker.patch.object(crawl_flow.client, "close")
 
         await crawl_flow.close()
 
@@ -191,7 +237,7 @@ class TestRealCrawlFlow:
                 assert result["books_crawled"] >= 0
                 assert result["execution_time"] > 0
             else:
-                error_msg = result.get('error_message', '未知错误')
+                error_msg = result.get("error_message", "未知错误")
                 print(f"❌ 真实爬取失败: {error_msg}")
                 # 数据保存失败应该导致测试失败
                 pytest.fail(f"爬取任务失败: {error_msg}")

@@ -2,20 +2,20 @@
 Database模块测试配置文件
 提供数据库测试专用的fixtures和mock数据
 """
-import pytest
-from datetime import datetime
-from typing import List, Dict, Any
 
+from datetime import datetime
+
+import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database.db.base import Base
 from app.database.db.book import Book, BookSnapshot
 from app.database.db.ranking import Ranking, RankingSnapshot
 
-
 # ==================== 测试数据库配置 ====================
+
 
 @pytest.fixture(scope="function")
 def test_db():
@@ -26,16 +26,16 @@ def test_db():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
+
     # 创建所有表
     Base.metadata.create_all(bind=engine)
-    
+
     # 创建session
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = TestingSessionLocal()
-    
+
     yield session
-    
+
     session.close()
 
 
@@ -47,13 +47,11 @@ def db_session(test_db):
 
 # ==================== 测试数据 ====================
 
+
 @pytest.fixture
 def sample_book_data():
     """样本书籍数据"""
-    return {
-        "novel_id": 12345,
-        "title": "测试小说"
-    }
+    return {"novel_id": 12345, "title": "测试小说"}
 
 
 @pytest.fixture
@@ -64,7 +62,7 @@ def sample_book_snapshot_data():
         "clicks": 50000,
         "favorites": 1500,
         "comments": 800,
-        "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+        "snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
     }
 
 
@@ -76,7 +74,7 @@ def sample_ranking_data():
         "name": "测试榜单",
         "page_id": "test_ranking",
         "rank_group_type": "热门",
-        "created_at": datetime(2024, 1, 1, 12, 0, 0)
+        "created_at": datetime(2024, 1, 1, 12, 0, 0),
     }
 
 
@@ -88,11 +86,12 @@ def sample_ranking_snapshot_data():
         "book_id": 1,  # 指向Book表的主键id
         "position": 1,
         "score": 95.5,
-        "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+        "snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
     }
 
 
 # ==================== 预置数据库记录 ====================
+
 
 @pytest.fixture
 def create_test_book(db_session, sample_book_data):
@@ -109,7 +108,7 @@ def create_test_book_snapshot(db_session, create_test_book, sample_book_snapshot
     """创建测试书籍快照记录"""
     snapshot_data = sample_book_snapshot_data.copy()
     snapshot_data["book_id"] = create_test_book.id
-    
+
     snapshot = BookSnapshot(**snapshot_data)
     db_session.add(snapshot)
     db_session.commit()
@@ -128,12 +127,14 @@ def create_test_ranking(db_session, sample_ranking_data):
 
 
 @pytest.fixture
-def create_test_ranking_snapshot(db_session, create_test_ranking, create_test_book, sample_ranking_snapshot_data):
+def create_test_ranking_snapshot(
+    db_session, create_test_ranking, create_test_book, sample_ranking_snapshot_data
+):
     """创建测试榜单快照记录"""
     snapshot_data = sample_ranking_snapshot_data.copy()
     snapshot_data["ranking_id"] = create_test_ranking.id
     snapshot_data["book_id"] = create_test_book.id
-    
+
     snapshot = RankingSnapshot(**snapshot_data)
     db_session.add(snapshot)
     db_session.commit()
@@ -143,35 +144,27 @@ def create_test_ranking_snapshot(db_session, create_test_ranking, create_test_bo
 
 # ==================== 批量测试数据 ====================
 
+
 @pytest.fixture
 def create_multiple_books(db_session):
     """创建多个测试书籍"""
     books_data = [
-        {
-            "novel_id": 12348,
-            "title": "测试小说1"
-        },
-        {
-            "novel_id": 12349,
-            "title": "测试小说2"
-        },
-        {
-            "novel_id": 12350,
-            "title": "搜索测试小说"
-        }
+        {"novel_id": 12348, "title": "测试小说1"},
+        {"novel_id": 12349, "title": "测试小说2"},
+        {"novel_id": 12350, "title": "搜索测试小说"},
     ]
-    
+
     books = []
     for book_data in books_data:
         book = Book(**book_data)
         db_session.add(book)
         books.append(book)
-    
+
     db_session.commit()
-    
+
     for book in books:
         db_session.refresh(book)
-    
+
     return books
 
 
@@ -185,14 +178,14 @@ def create_multiple_snapshots(db_session, create_multiple_books, create_test_boo
             "clicks": 50000,
             "favorites": 1500,
             "comments": 800,
-                "snapshot_time": datetime(2024, 1, 14, 12, 0, 0)
+            "snapshot_time": datetime(2024, 1, 14, 12, 0, 0),
         },
         {
             "book_id": create_test_book.id,
             "clicks": 52000,
             "favorites": 1600,
             "comments": 850,
-            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
+            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
         },
         # 为create_multiple_books创建快照
         {
@@ -200,25 +193,26 @@ def create_multiple_snapshots(db_session, create_multiple_books, create_test_boo
             "clicks": 30000,
             "favorites": 800,
             "comments": 400,
-            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
-        }
+            "snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
+        },
     ]
-    
+
     snapshots = []
     for snapshot_data in snapshots_data:
         snapshot = BookSnapshot(**snapshot_data)
         db_session.add(snapshot)
         snapshots.append(snapshot)
-    
+
     db_session.commit()
-    
+
     for snapshot in snapshots:
         db_session.refresh(snapshot)
-    
+
     return snapshots
 
 
 # ==================== Mock对象 ====================
+
 
 @pytest.fixture
 def mock_db_session(mocker):
@@ -247,13 +241,14 @@ def mock_query_result(mocker):
 
 # ==================== 业务逻辑测试数据 ====================
 
+
 @pytest.fixture
 def pagination_params():
     """分页参数"""
     return {
         "valid": {"page": 1, "size": 20, "skip": 0},
         "second_page": {"page": 2, "size": 10, "skip": 10},
-        "large_page": {"page": 5, "size": 50, "skip": 200}
+        "large_page": {"page": 5, "size": 50, "skip": 200},
     }
 
 
@@ -264,7 +259,7 @@ def search_params():
         "valid_keyword": "测试",
         "empty_keyword": "",
         "nonexistent_keyword": "不存在的内容",
-        "partial_match": "小说"
+        "partial_match": "小说",
     }
 
 
@@ -277,11 +272,12 @@ def trend_params():
         "weeks": 4,
         "months": 3,
         "start_time": datetime(2024, 1, 1, 0, 0, 0),
-        "end_time": datetime(2024, 1, 15, 23, 59, 59)
+        "end_time": datetime(2024, 1, 15, 23, 59, 59),
     }
 
 
 # ==================== 统计数据Mock ====================
+
 
 @pytest.fixture
 def mock_statistics_data():
@@ -293,7 +289,7 @@ def mock_statistics_data():
             "max_clicks": 60000,
             "min_clicks": 30000,
             "latest_snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
-            "first_snapshot_time": datetime(2024, 1, 1, 12, 0, 0)
+            "first_snapshot_time": datetime(2024, 1, 1, 12, 0, 0),
         },
         "ranking_stats": {
             "total_snapshots": 50,
@@ -301,12 +297,13 @@ def mock_statistics_data():
             "avg_books_per_snapshot": 20.5,
             "most_stable_book": {"book_id": 12345, "title": "稳定书籍"},
             "first_snapshot_time": datetime(2024, 1, 1, 12, 0, 0),
-            "last_snapshot_time": datetime(2024, 1, 15, 12, 0, 0)
-        }
+            "last_snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
+        },
     }
 
 
 # ==================== 验证助手函数 ====================
+
 
 def assert_book_equal(book1: Book, book2: Book):
     """验证两个书籍对象相等"""

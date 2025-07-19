@@ -1,10 +1,11 @@
 """
 配置管理模块 - 使用Pydantic BaseSettings自动读取环境变量
 """
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 
-from pydantic import Field, field_validator, ValidationError
+from pathlib import Path
+from typing import Any
+
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -41,9 +42,6 @@ class APISettings(BaseSettings):
 
     # 跨域配置
     cors_enabled: bool = Field(default=True, description="是否启用CORS")
-    cors_origins: List[str] = Field(default=["*"], description="允许的跨域源")
-    cors_methods: List[str] = Field(default=["GET", "POST", "PUT", "DELETE"], description="允许的HTTP方法")
-    cors_headers: List[str] = Field(default=["*"], description="允许的请求头")
 
     # 分页配置
     default_page_size: int = Field(default=20, ge=1, le=100, description="默认分页大小")
@@ -59,12 +57,15 @@ class CrawlerSettings(BaseSettings):
 
     # HTTP客户端配置
     user_agent: dict = Field(
-        default={'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 jjwxc/4.9.0',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'zh-CN,zh;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive'},
-        description="User-Agent字符串")
+        default={
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 jjwxc/4.9.0",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+        },
+        description="User-Agent字符串",
+    )
     timeout: int = Field(default=30, ge=5, le=300, description="请求超时时间（秒）")
     retry_times: int = Field(default=3, ge=1, le=10, description="重试次数")
     retry_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="重试延迟时间（秒）")
@@ -86,12 +87,14 @@ class SchedulerSettings(BaseSettings):
     max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数")
 
     # 任务默认配置
-    job_defaults: Dict[str, Any] = Field(default={"coalesce": False, "max_instances": 1, "misfire_grace_time": 60},
-                                         description="任务默认配置")
+    job_defaults: dict[str, Any] = Field(
+        default={"coalesce": False, "max_instances": 1, "misfire_grace_time": 60},
+        description="任务默认配置",
+    )
 
     # 任务存储配置
     job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
-    job_store_url: Optional[str] = Field(default="sqlite:///./data/jjcrawler.db", description="任务存储连接URL")
+    job_store_url: str | None = Field(default=None, description="任务存储连接URL，默认使用数据库URL")
 
     class Config:
         env_prefix = "SCHEDULER_"
@@ -108,8 +111,6 @@ class LoggingSettings(BaseSettings):
 
     # 日志文件配置
     file_path: str = Field(default="./logs/jjcrawler.log", description="日志文件路径")
-    max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024 * 1024, le=100 * 1024 * 1024,
-                           description="单个日志文件最大大小（字节）")
     backup_count: int = Field(default=5, ge=1, le=20, description="备份日志文件数量")
 
     # 错误日志配置
@@ -120,13 +121,13 @@ class LoggingSettings(BaseSettings):
         env_prefix = "LOG_"
         env_file_encoding = "utf-8"
 
-    @field_validator('level')
+    @field_validator("level")
     @classmethod
     def validate_log_level(cls, v: str):
         """验证日志级别"""
-        valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in valid_levels:
-            raise ValueError(f'日志级别必须是 {valid_levels} 中的一个')
+            raise ValueError(f"日志级别必须是 {valid_levels} 中的一个")
         return v.upper()
 
 
@@ -161,37 +162,30 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         self._ensure_directories()
 
+    def model_post_init(self, __context):
+        """模型初始化后处理，设置scheduler使用database的URL"""
+        if self.scheduler.job_store_url is None:
+            self.scheduler.job_store_url = self.database.url
+
     def _ensure_directories(self):
         """确保必要的目录存在"""
         directories = [
             self.data_dir,
             self.logs_dir,
-            Path(self.logging.file_path).parent
+            Path(self.logging.file_path).parent,
         ]
 
         for directory in directories:
             if directory:
                 Path(directory).mkdir(parents=True, exist_ok=True)
 
-    @field_validator('env')
+    @field_validator("env")
     def validate_environment(cls, v):
         """验证环境配置"""
-        valid_environments = ['dev', 'test', 'prod']
+        valid_environments = ["dev", "test", "prod"]
         if v.lower() not in valid_environments:
-            raise ValueError(f'环境必须是 {valid_environments} 中的一个')
+            raise ValueError(f"环境必须是 {valid_environments} 中的一个")
         return v.lower()
-
-    def is_development(self) -> bool:
-        """是否为开发环境"""
-        return self.env == 'dev'
-
-    def is_testing(self) -> bool:
-        """是否为测试环境"""
-        return self.env == 'test'
-
-    def is_production(self) -> bool:
-        """是否为生产环境"""
-        return self.env == 'prod'
 
     def get_database_url(self) -> str:
         """获取数据库连接URL"""
@@ -216,14 +210,15 @@ def get_database_url() -> str:
 
 def is_debug() -> bool:
     """是否为调试模式"""
-    return _settings.debug or _settings.is_development()
+    return _settings.debug or _settings.env == "dev"
 
 
 def is_production() -> bool:
     """是否为生产环境"""
     return _settings.is_production()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         # Pydantic-settings 会自动从环境变量或 .env 文件加载
         # 这里我们直接传入数据进行测试

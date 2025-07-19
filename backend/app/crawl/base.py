@@ -1,11 +1,12 @@
 """
 爬虫基础组件 - 简化版本
 """
-import json
+
 import asyncio
-from typing import Dict, List, Optional
-import httpx
+import json
 from pathlib import Path
+
+import httpx
 
 
 class CrawlConfig:
@@ -21,31 +22,31 @@ class CrawlConfig:
     def _load_config(self):
         """加载URL配置文件"""
         try:
-            with open(self.urls_file, 'r', encoding='utf-8') as f:
+            with open(self.urls_file, encoding="utf-8") as f:
                 self._config = json.load(f)
             self.params = self._config.get("global", {}).get("base_params", {})
             self.templates = self._config.get("global", {}).get("templates", {})
         except Exception as e:
             raise Exception(f"配置文件加载失败: {e}")
 
-    def get_task_config(self, task_id: str) -> Optional[Dict]:
+    def get_task_config(self, task_id: str) -> dict | None:
         """获取特定任务的配置"""
         for task in self._config.get("crawl_tasks", []):
             if task["id"] == task_id:
                 return task
         return None
 
-    def get_all_tasks(self) -> List[Dict]:
+    def get_all_tasks(self) -> list[dict]:
         """获取所有任务配置"""
         return self._config.get("crawl_tasks", [])
-    
-    def determine_page_ids(self, page_ids: List[str]) -> List[str]:
+
+    def determine_page_ids(self, page_ids: list[str]) -> list[str]:
         """
         根据任务数据确定需要爬取的页面ID列表
-        
+
         Args:
             page_ids: 任务数据
-            
+
         Returns:
             List[str]: 页面ID列表
         """
@@ -61,71 +62,71 @@ class CrawlConfig:
             else:
                 return self.get_all_page_ids()
         return [pid for pid in page_ids if self.validate_page_id(pid)]
-    
-    def get_category_page_ids(self) -> List[str]:
+
+    def get_category_page_ids(self) -> list[str]:
         """获取所有分类页面ID列表（排除夹子榜）"""
         all_tasks = self.get_all_tasks()
         category_ids = []
-        
+
         for task in all_tasks:
-            task_id = task.get('id', '')
-            if not ('jiazi' in task_id.lower() or task.get('category') == 'jiazi'):
+            task_id = task.get("id", "")
+            if not ("jiazi" in task_id.lower() or task.get("category") == "jiazi"):
                 category_ids.append(task_id)
-        
+
         return category_ids
-    
-    def get_all_page_ids(self) -> List[str]:
+
+    def get_all_page_ids(self) -> list[str]:
         """获取所有页面ID"""
         all_tasks = self.get_all_tasks()
         return [task.get("id") for task in all_tasks if task.get("id")]
-    
+
     def validate_page_id(self, page_id: str) -> bool:
         """验证页面ID是否在配置中"""
         all_tasks = self.get_all_tasks()
-        available_ids = {task.get('id', '') for task in all_tasks}
+        available_ids = {task.get("id", "") for task in all_tasks}
         return page_id in available_ids
 
-    def build_url(self, task_config: Dict) -> str:
+    def build_url(self, task_config: dict) -> str:
         """根据任务配置构建URL"""
         template_name = task_config["template"]
         template = self.templates.get(template_name)
-        
+
         if not template:
             raise ValueError(f"模板不存在: {template_name}")
-        
+
         # 合并参数
         params = {**self.params, **task_config.get("params", {})}
-        
+
         # 格式化URL
         return template.format(**params)
 
 
 class HttpClient:
     """HTTP客户端"""
-    
+
     def __init__(self, request_delay: float = 1.0, timeout: float = 15.0):
         self.request_delay = request_delay
         self.session = httpx.AsyncClient(
             timeout=timeout,
             headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
         )
-    
-    async def get(self, url: str) -> Dict:
+
+    async def get(self, url: str) -> dict:
         """发送GET请求"""
         try:
             # 请求限速
             await asyncio.sleep(self.request_delay)
-            
+
             response = await self.session.get(url)
             response.raise_for_status()
-            
+
             return response.json()
-            
+
         except Exception as e:
             raise Exception(f"请求失败 {url}: {e}")
-    
+
     async def close(self):
         """关闭连接"""
         await self.session.aclose()

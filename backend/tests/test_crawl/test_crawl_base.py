@@ -2,6 +2,7 @@
 爬虫基础模块测试文件
 测试crawl.base模块的核心功能
 """
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -10,8 +11,8 @@ from app.crawl.base import CrawlConfig, HttpClient
 
 def create_mock_config(mocker: MockerFixture, config_data: dict):
     """创建模拟配置对象"""
-    mocker.patch('builtins.open', mocker.mock_open())
-    mocker.patch('json.load', return_value=config_data)
+    mocker.patch("builtins.open", mocker.mock_open())
+    mocker.patch("json.load", return_value=config_data)
 
 
 class TestCrawlConfig:
@@ -29,7 +30,7 @@ class TestCrawlConfig:
 
     def test_initialization_file_not_found(self, mocker: MockerFixture):
         """测试配置文件不存在"""
-        mocker.patch('builtins.open', side_effect=FileNotFoundError)
+        mocker.patch("builtins.open", side_effect=FileNotFoundError)
 
         with pytest.raises(Exception, match="配置文件加载失败"):
             CrawlConfig()
@@ -54,12 +55,18 @@ class TestCrawlConfig:
         # jiazi任务
         jiazi_task = sample_config_data["crawl_tasks"][0]
         url = config.build_url(jiazi_task)
-        assert url == "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day=today&use_cdn=1&version=20"
+        assert (
+            url
+            == "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day=today&use_cdn=1&version=20"
+        )
 
         # index任务
         index_task = sample_config_data["crawl_tasks"][1]
         url = config.build_url(index_task)
-        assert url == "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel=index&version=20&use_cdn=1"
+        assert (
+            url
+            == "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel=index&version=20&use_cdn=1"
+        )
 
     def test_determine_page_ids(self, mocker: MockerFixture, sample_config_data):
         """测试页面ID确定"""
@@ -95,7 +102,7 @@ class TestHttpClient:
     async def test_get_success(self, mocker: MockerFixture, mock_http_response):
         """测试GET请求成功"""
         # Mock asyncio.sleep
-        mocker.patch('asyncio.sleep')
+        mocker.patch("asyncio.sleep")
 
         # Mock httpx.AsyncClient
         mock_response = mocker.Mock()
@@ -116,7 +123,7 @@ class TestHttpClient:
     @pytest.mark.asyncio
     async def test_get_failure(self, mocker: MockerFixture):
         """测试GET请求失败"""
-        mocker.patch('asyncio.sleep')
+        mocker.patch("asyncio.sleep")
 
         mock_session = mocker.Mock()
         mock_session.get = mocker.AsyncMock(side_effect=Exception("Network error"))
@@ -148,11 +155,11 @@ class TestIntegration:
         config_data = {
             "global": {
                 "base_params": {"version": 20},
-                "templates": {"test": "https://api.com/{category}?version={version}"}
+                "templates": {"test": "https://api.com/{category}?version={version}"},
             },
             "crawl_tasks": [
                 {"id": "test", "template": "test", "params": {"category": "books"}}
-            ]
+            ],
         }
 
         create_mock_config(mocker, config_data)

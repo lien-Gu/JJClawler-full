@@ -2,7 +2,7 @@
 爬虫API模块测试文件
 测试api.crawl模块的关键功能
 """
-import pytest
+
 
 
 class TestCrawlAllPages:
@@ -11,7 +11,7 @@ class TestCrawlAllPages:
     def test_crawl_all_pages_success(self, client, mocker, mock_scheduler_response):
         """测试成功爬取所有页面"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.add_batch_jobs = mocker.AsyncMock(
             return_value=mock_scheduler_response["success"]
         )
@@ -32,7 +32,7 @@ class TestCrawlAllPages:
     def test_crawl_all_pages_failure(self, client, mocker, mock_scheduler_response):
         """测试爬取所有页面失败"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.add_batch_jobs = mocker.AsyncMock(
             return_value=mock_scheduler_response["failure"]
         )
@@ -50,15 +50,18 @@ class TestCrawlSpecificPages:
     def test_crawl_specific_pages_success(self, client, mocker):
         """测试成功爬取指定页面"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.add_batch_jobs = mocker.AsyncMock(
             return_value={
                 "success": True,
                 "message": "批量任务创建成功",
                 "batch_id": "batch_20240101_120000",
-                "task_ids": ["crawl_jiazi_batch_20240101_120000", "crawl_index_batch_20240101_120000"],
+                "task_ids": [
+                    "crawl_jiazi_batch_20240101_120000",
+                    "crawl_index_batch_20240101_120000",
+                ],
                 "total_pages": 2,
-                "successful_tasks": 2
+                "successful_tasks": 2,
             }
         )
 
@@ -90,7 +93,7 @@ class TestCrawlSinglePage:
     def test_crawl_single_page_success(self, client, mocker, mock_scheduler_response):
         """测试成功爬取单个页面"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.add_batch_jobs = mocker.AsyncMock(
             return_value=mock_scheduler_response["success"]
         )
@@ -111,10 +114,12 @@ class TestCrawlSinglePage:
 class TestSchedulerStatus:
     """测试调度器状态接口"""
 
-    def test_get_scheduler_status_success(self, client, mocker, mock_scheduler_status, mock_jobs):
+    def test_get_scheduler_status_success(
+        self, client, mocker, mock_scheduler_status, mock_jobs
+    ):
         """测试成功获取调度器状态"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.get_status.return_value = mock_scheduler_status
         mock_scheduler.return_value.get_jobs.return_value = mock_jobs
 
@@ -137,11 +142,15 @@ class TestSchedulerStatus:
 class TestBatchStatus:
     """测试批量任务状态接口"""
 
-    def test_get_batch_status_success(self, client, mocker, mock_batch_status, mock_batch_jobs):
+    def test_get_batch_status_success(
+        self, client, mocker, mock_batch_status, mock_batch_jobs
+    ):
         """测试成功获取批量任务状态"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
-        mock_scheduler.return_value.get_batch_status.return_value = mock_batch_status["found"]
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
+        mock_scheduler.return_value.get_batch_status.return_value = mock_batch_status[
+            "found"
+        ]
         mock_scheduler.return_value.get_batch_jobs.return_value = mock_batch_jobs
 
         # 发送请求
@@ -157,14 +166,20 @@ class TestBatchStatus:
         assert len(data["data"]["jobs"]) == 2
 
         # 验证调度器调用
-        mock_scheduler.return_value.get_batch_status.assert_called_once_with("batch_20240101_120000")
-        mock_scheduler.return_value.get_batch_jobs.assert_called_once_with("batch_20240101_120000")
+        mock_scheduler.return_value.get_batch_status.assert_called_once_with(
+            "batch_20240101_120000"
+        )
+        mock_scheduler.return_value.get_batch_jobs.assert_called_once_with(
+            "batch_20240101_120000"
+        )
 
     def test_get_batch_status_not_found(self, client, mocker, mock_batch_status):
         """测试批量任务不存在"""
         # 设置模拟
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
-        mock_scheduler.return_value.get_batch_status.return_value = mock_batch_status["not_found"]
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
+        mock_scheduler.return_value.get_batch_status.return_value = mock_batch_status[
+            "not_found"
+        ]
         mock_scheduler.return_value.get_batch_jobs.return_value = []
 
         # 发送请求
@@ -185,7 +200,7 @@ class TestErrorHandling:
     def test_scheduler_exception_handling(self, client, mocker):
         """测试调度器异常处理"""
         # 设置模拟异常
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.add_batch_jobs.side_effect = Exception("调度器异常")
 
         # 发送请求
@@ -199,7 +214,7 @@ class TestErrorHandling:
     def test_status_exception_handling(self, client, mocker):
         """测试状态查询异常处理"""
         # 设置模拟异常
-        mock_scheduler = mocker.patch('app.api.crawl.get_scheduler')
+        mock_scheduler = mocker.patch("app.api.crawl.get_scheduler")
         mock_scheduler.return_value.get_status.side_effect = Exception("状态查询异常")
 
         # 发送请求

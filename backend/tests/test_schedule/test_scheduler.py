@@ -2,12 +2,18 @@
 调度器模块测试文件
 测试schedule.scheduler模块的关键功能
 """
-import pytest
+
 from datetime import datetime
 
-from app.schedule.scheduler import TaskScheduler, get_scheduler
-from app.models.schedule import JobConfigModel, TriggerType, JobHandlerType, PREDEFINED_JOB_CONFIGS
+import pytest
+
+from app.models.schedule import (
+    JobConfigModel,
+    JobHandlerType,
+    TriggerType,
+)
 from app.schedule.handlers import CrawlJobHandler, ReportJobHandler
+from app.schedule.scheduler import TaskScheduler, get_scheduler
 
 
 class TestTaskScheduler:
@@ -36,9 +42,11 @@ class TestTaskScheduler:
     def test_create_scheduler(self, scheduler, mocker):
         """测试创建APScheduler实例"""
         # Mock SQLAlchemyJobStore - 实际使用的是这个用于SQLite存储
-        mock_sqlalchemy_jobstore = mocker.patch('app.schedule.scheduler.SQLAlchemyJobStore')
-        mock_asyncio_scheduler = mocker.patch('app.schedule.scheduler.AsyncIOScheduler')
-        mock_executor = mocker.patch('app.schedule.scheduler.AsyncIOExecutor')
+        mock_sqlalchemy_jobstore = mocker.patch(
+            "app.schedule.scheduler.SQLAlchemyJobStore"
+        )
+        mock_asyncio_scheduler = mocker.patch("app.schedule.scheduler.AsyncIOScheduler")
+        mock_executor = mocker.patch("app.schedule.scheduler.AsyncIOExecutor")
 
         mock_scheduler_instance = mocker.Mock()
         mock_asyncio_scheduler.return_value = mock_scheduler_instance
@@ -59,8 +67,12 @@ class TestTaskScheduler:
         mock_apscheduler = mocker.Mock()
         mock_apscheduler.start = mocker.Mock()
 
-        mock_create_scheduler = mocker.patch.object(scheduler, '_create_scheduler', return_value=mock_apscheduler)
-        mock_load_jobs = mocker.patch.object(scheduler, '_load_predefined_jobs', return_value=None)
+        mock_create_scheduler = mocker.patch.object(
+            scheduler, "_create_scheduler", return_value=mock_apscheduler
+        )
+        mock_load_jobs = mocker.patch.object(
+            scheduler, "_load_predefined_jobs", return_value=None
+        )
 
         await scheduler.start()
 
@@ -76,8 +88,8 @@ class TestTaskScheduler:
         mock_apscheduler = mocker.Mock()
         scheduler.scheduler = mock_apscheduler
 
-        mock_create_scheduler = mocker.patch.object(scheduler, '_create_scheduler')
-        mock_load_jobs = mocker.patch.object(scheduler, '_load_predefined_jobs')
+        mock_create_scheduler = mocker.patch.object(scheduler, "_create_scheduler")
+        mock_load_jobs = mocker.patch.object(scheduler, "_load_predefined_jobs")
 
         await scheduler.start()
 
@@ -114,11 +126,14 @@ class TestTaskScheduler:
         mock_job_config = mocker.Mock()
         mock_job_config.is_single_page_task = True
 
-        mock_add_job = mocker.patch.object(scheduler, 'add_job', return_value=True)
-        mock_add_batch_jobs = mocker.patch.object(scheduler, 'add_batch_jobs')
+        mock_add_job = mocker.patch.object(scheduler, "add_job", return_value=True)
+        mock_add_batch_jobs = mocker.patch.object(scheduler, "add_batch_jobs")
 
         # 正确的方式mock PREDEFINED_JOB_CONFIGS
-        mocker.patch('app.schedule.scheduler.PREDEFINED_JOB_CONFIGS', {"test_job": mock_job_config})
+        mocker.patch(
+            "app.schedule.scheduler.PREDEFINED_JOB_CONFIGS",
+            {"test_job": mock_job_config},
+        )
 
         await scheduler._load_predefined_jobs()
 
@@ -134,12 +149,18 @@ class TestTaskScheduler:
         mock_job_config.page_ids = ["page1", "page2"]
         mock_job_config.force = False
 
-        mock_add_job = mocker.patch.object(scheduler, 'add_job')
-        mock_add_batch_jobs = mocker.patch.object(scheduler, 'add_batch_jobs',
-                                                  return_value={"success": True, "successful_tasks": 2})
+        mock_add_job = mocker.patch.object(scheduler, "add_job")
+        mock_add_batch_jobs = mocker.patch.object(
+            scheduler,
+            "add_batch_jobs",
+            return_value={"success": True, "successful_tasks": 2},
+        )
 
         # 正确的方式mock PREDEFINED_JOB_CONFIGS
-        mocker.patch('app.schedule.scheduler.PREDEFINED_JOB_CONFIGS', {"test_batch_job": mock_job_config})
+        mocker.patch(
+            "app.schedule.scheduler.PREDEFINED_JOB_CONFIGS",
+            {"test_batch_job": mock_job_config},
+        )
 
         await scheduler._load_predefined_jobs()
 
@@ -147,7 +168,7 @@ class TestTaskScheduler:
         mock_add_batch_jobs.assert_called_once_with(
             page_ids=["page1", "page2"],
             force=False,
-            batch_id="predefined_test_batch_job"
+            batch_id="predefined_test_batch_job",
         )
 
     @pytest.mark.asyncio
@@ -166,8 +187,8 @@ class TestTaskScheduler:
         mock_apscheduler.add_job.assert_called_once()
         # 验证add_job被调用时包含了正确的参数
         args, kwargs = mock_apscheduler.add_job.call_args
-        assert kwargs['id'] == job_config.job_id
-        assert kwargs['name'] == job_config.job_id
+        assert kwargs["id"] == job_config.job_id
+        assert kwargs["name"] == job_config.job_id
 
     @pytest.mark.asyncio
     async def test_add_job_scheduler_not_started(self, scheduler, sample_job_config):
@@ -183,14 +204,14 @@ class TestTaskScheduler:
     async def test_add_batch_jobs_success(self, scheduler, mocker, test_page_ids):
         """测试添加批量任务成功"""
         # 设置模拟
-        mock_config = mocker.patch('app.crawl.base.CrawlConfig')
-        mock_config.return_value.determine_page_ids.return_value = test_page_ids["multiple"]
-        mock_add_job = mocker.patch.object(scheduler, 'add_job', return_value=True)
+        mock_config = mocker.patch("app.crawl.base.CrawlConfig")
+        mock_config.return_value.determine_page_ids.return_value = test_page_ids[
+            "multiple"
+        ]
+        mock_add_job = mocker.patch.object(scheduler, "add_job", return_value=True)
 
         result = await scheduler.add_batch_jobs(
-            page_ids=["all"],
-            force=True,
-            batch_id="test_batch"
+            page_ids=["all"], force=True, batch_id="test_batch"
         )
 
         assert result["success"] is True
@@ -312,7 +333,7 @@ class TestSchedulerSingleton:
 
     def test_get_scheduler_create_new(self, mocker):
         """测试创建新的调度器实例"""
-        mocker.patch('app.schedule.scheduler._scheduler', None)
+        mocker.patch("app.schedule.scheduler._scheduler", None)
         scheduler = get_scheduler()
 
         assert isinstance(scheduler, TaskScheduler)
@@ -328,7 +349,9 @@ class TestSchedulerModuleFunctions:
 
         mock_scheduler = mocker.Mock()
         mock_scheduler.start = mocker.AsyncMock()
-        mock_get_scheduler = mocker.patch('app.schedule.scheduler.get_scheduler', return_value=mock_scheduler)
+        mock_get_scheduler = mocker.patch(
+            "app.schedule.scheduler.get_scheduler", return_value=mock_scheduler
+        )
 
         await start_scheduler()
 
@@ -342,7 +365,9 @@ class TestSchedulerModuleFunctions:
 
         mock_scheduler = mocker.Mock()
         mock_scheduler.shutdown = mocker.AsyncMock()
-        mock_get_scheduler = mocker.patch('app.schedule.scheduler.get_scheduler', return_value=mock_scheduler)
+        mock_get_scheduler = mocker.patch(
+            "app.schedule.scheduler.get_scheduler", return_value=mock_scheduler
+        )
 
         await stop_scheduler()
 
@@ -372,16 +397,13 @@ class TestRealCrawlScheduler:
                 name="测试真实夹子榜爬取",
                 trigger={
                     "type": TriggerType.INTERVAL,
-                    "seconds": 60  # 每60秒执行一次（测试用）
+                    "seconds": 60,  # 每60秒执行一次（测试用）
                 },
                 handler_type=JobHandlerType.CRAWL,
-                handler_data={
-                    "page_ids": ["jiazi"],
-                    "force": True
-                },
+                handler_data={"page_ids": ["jiazi"], "force": True},
                 is_single_page_task=False,
                 page_ids=["jiazi"],
-                force=True
+                force=True,
             )
 
             # 添加任务到调度器
@@ -412,10 +434,9 @@ class TestRealCrawlScheduler:
             crawl_handler = CrawlJobHandler()
 
             # 执行真实爬取任务
-            execution_result = await crawl_handler.execute({
-                "page_ids": ["jiazi"],
-                "force": True
-            })
+            execution_result = await crawl_handler.execute(
+                {"page_ids": ["jiazi"], "force": True}
+            )
 
             # 验证执行结果
             assert "success" in execution_result
@@ -431,15 +452,17 @@ class TestRealCrawlScheduler:
                 assert "books_crawled" in first_result
                 assert "execution_time" in first_result
 
-                print(f"✅ 真实爬取任务执行成功:")
+                print("✅ 真实爬取任务执行成功:")
                 print(f"  - 任务数量: {len(execution_result['results'])}")
                 print(f"  - 第一个任务页面ID: {first_result['page_id']}")
                 print(f"  - 爬取书籍数量: {first_result['books_crawled']}")
                 print(f"  - 执行时间: {first_result['execution_time']:.2f}秒")
             else:
-                print(f"❌ 真实爬取任务执行失败: {execution_result.get('error', '未知错误')}")
+                print(
+                    f"❌ 真实爬取任务执行失败: {execution_result.get('error', '未知错误')}"
+                )
                 # 不让测试失败，因为网络问题不应该影响单元测试
-                pytest.skip(f"网络问题跳过真实爬取测试")
+                pytest.skip("网络问题跳过真实爬取测试")
 
         except Exception as e:
             print(f"❌ 真实爬取调度任务异常: {e}")
@@ -461,7 +484,7 @@ class TestRealCrawlScheduler:
             batch_result = await real_scheduler.add_batch_jobs(
                 page_ids=["jiazi"],  # 只测试夹子榜，避免过度请求
                 force=True,
-                batch_id="test_real_batch_crawl"
+                batch_id="test_real_batch_crawl",
             )
 
             # 验证批量任务添加结果
@@ -471,7 +494,7 @@ class TestRealCrawlScheduler:
             assert batch_result["successful_tasks"] >= 1
             assert batch_result["failed_tasks"] == 0
 
-            print(f"✅ 批量爬取任务创建成功:")
+            print("✅ 批量爬取任务创建成功:")
             print(f"  - 批次ID: {batch_result['batch_id']}")
             print(f"  - 总页面数: {batch_result['total_pages']}")
             print(f"  - 成功任务数: {batch_result['successful_tasks']}")
@@ -483,7 +506,7 @@ class TestRealCrawlScheduler:
             assert batch_status["total_jobs"] >= 1
             assert batch_status["status"] in ["running", "completed"]
 
-            print(f"✅ 批量任务状态检查成功:")
+            print("✅ 批量任务状态检查成功:")
             print(f"  - 状态: {batch_status['status']}")
             print(f"  - 总任务数: {batch_status['total_jobs']}")
             print(f"  - 运行中任务: {batch_status['running_jobs']}")
@@ -511,7 +534,7 @@ class TestRealCrawlScheduler:
             assert status["status"] == "running"
             assert status["job_count"] >= 0  # 可能有预定义任务
 
-            print(f"✅ 调度器启动成功:")
+            print("✅ 调度器启动成功:")
             print(f"  - 状态: {status['status']}")
             print(f"  - 任务数量: {status['job_count']}")
             print(f"  - 运行中任务: {status['running_jobs']}")
@@ -521,7 +544,7 @@ class TestRealCrawlScheduler:
             # 获取所有任务列表
             jobs = real_scheduler.get_jobs()
 
-            print(f"当前调度器中的任务:")
+            print("当前调度器中的任务:")
             for job in jobs:
                 print(f"  - {job.id}: {job.name} (下次执行: {job.next_run_time})")
 
@@ -535,7 +558,7 @@ class TestRealCrawlScheduler:
                 print(f"✅ 发现爬取任务: {crawl_job.id}")
 
                 # 手动测试任务执行函数（但不实际执行，避免过度请求）
-                if hasattr(crawl_job, 'func') and crawl_job.func:
+                if hasattr(crawl_job, "func") and crawl_job.func:
                     print(f"  任务执行函数: {crawl_job.func}")
 
         except Exception as e:

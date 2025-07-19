@@ -1,11 +1,11 @@
 """
 任务处理器 - 重构后负责多页面管理和调用爬虫模块
 """
+
 import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import List
 
 from app.config import get_settings
 from app.crawl.base import CrawlConfig
@@ -15,14 +15,16 @@ from app.models.schedule import JobContextModel, JobResultModel
 
 class BaseJobHandler(ABC):
     """任务处理器基类"""
-    
+
     def __init__(self, scheduler=None):
         self.scheduler = scheduler
         self.logger = logging.getLogger(self.__class__.__name__)
         self.settings = get_settings()
         self.max_retries = self.settings.crawler.retry_times
-    
-    async def execute_with_retry(self, context: JobContextModel, page_ids: List = None) -> JobResultModel:
+
+    async def execute_with_retry(
+        self, context: JobContextModel, page_ids: list = None
+    ) -> JobResultModel:
         """带重试机制的任务执行"""
         start_time = time.time()
         last_exception = None
@@ -50,7 +52,9 @@ class BaseJobHandler(ABC):
                     # 执行失败，但没有异常
                     last_exception = result.exception
                     if attempt < self.max_retries:
-                        self.logger.warning(f"任务 {job_id} 将进行第 {attempt + 1} 次重试")
+                        self.logger.warning(
+                            f"任务 {job_id} 将进行第 {attempt + 1} 次重试"
+                        )
                         continue
                     else:
                         self.logger.error(f"任务 {job_id} 执行失败: {last_exception}")
@@ -75,22 +79,21 @@ class BaseJobHandler(ABC):
 
         # 所有重试都失败了
         result = JobResultModel.error_result(
-            f"任务执行失败，已重试 {self.max_retries} 次",
-            last_exception
+            f"任务执行失败，已重试 {self.max_retries} 次", last_exception
         )
         result.execution_time = time.time() - start_time
 
         self.logger.error(f"任务 {job_id} 执行失败: {last_exception}")
         return result
-    
+
     @abstractmethod
-    async def execute(self, page_ids: List[str] = None) -> JobResultModel:
+    async def execute(self, page_ids: list[str] = None) -> JobResultModel:
         """
         执行任务的抽象方法，子类必须实现
-        
+
         Args:
             page_ids: 页面列表
-            
+
         Returns:
             JobResultModel: 任务执行结果
         """
@@ -104,24 +107,26 @@ class CrawlJobHandler(BaseJobHandler):
         super().__init__(scheduler)
         self.config = CrawlConfig()
 
-    async def execute(self, page_ids: List[str] = None) -> JobResultModel:
+    async def execute(self, page_ids: list[str] = None) -> JobResultModel:
         """
         执行单页面爬虫任务（重构后只处理单个页面）
-        
+
         Args:
             page_ids: 页面列表，应该只包含一个页面ID
-                
+
         Returns:
             JobResultModel: 任务执行结果
         """
         if not page_ids:
             return JobResultModel.error_result("任务数据为空")
-        
+
         if len(page_ids) != 1:
-            return JobResultModel.error_result(f"单页面任务应该只包含一个页面ID，但收到了 {len(page_ids)} 个")
+            return JobResultModel.error_result(
+                f"单页面任务应该只包含一个页面ID，但收到了 {len(page_ids)} 个"
+            )
 
         page_id = page_ids[0]
-        
+
         try:
             # 验证页面ID是否有效
             if not self.config.validate_page_id(page_id):
@@ -132,23 +137,27 @@ class CrawlJobHandler(BaseJobHandler):
             try:
                 self.logger.info(f"开始爬取页面: {page_id}")
                 crawl_result = await crawler.execute_crawl_task(page_id)
-                
-                if crawl_result.get('success', False):
-                    books_crawled = crawl_result.get('books_crawled', 0)
-                    self.logger.info(f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍")
-                    
+
+                if crawl_result.get("success", False):
+                    books_crawled = crawl_result.get("books_crawled", 0)
+                    self.logger.info(
+                        f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍"
+                    )
+
                     return JobResultModel.success_result(
                         f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍",
                         {
                             "page_id": page_id,
                             "books_crawled": books_crawled,
-                            "crawl_result": crawl_result
-                        }
+                            "crawl_result": crawl_result,
+                        },
                     )
                 else:
-                    error_msg = crawl_result.get('error_message', '未知错误')
-                    return JobResultModel.error_result(f"页面 {page_id} 爬取失败: {error_msg}")
-                    
+                    error_msg = crawl_result.get("error_message", "未知错误")
+                    return JobResultModel.error_result(
+                        f"页面 {page_id} 爬取失败: {error_msg}"
+                    )
+
             finally:
                 await crawler.close()
 
@@ -157,22 +166,20 @@ class CrawlJobHandler(BaseJobHandler):
             return JobResultModel.error_result(f"页面 {page_id} 爬取异常: {str(e)}", e)
 
 
-
-
 class ReportJobHandler(BaseJobHandler):
     """报告任务处理器 - 暂时不实现具体功能"""
 
     def __init__(self, scheduler=None):
         super().__init__(scheduler)
         # 报告相关的配置可以在这里初始化
-        
-    async def execute(self, page_ids: List[str] = None) -> JobResultModel:
+
+    async def execute(self, page_ids: list[str] = None) -> JobResultModel:
         """
         执行报告任务（暂时不实现）
-        
+
         Args:
             page_ids: 页面列表（报告任务可能不需要这个参数）
-            
+
         Returns:
             JobResultModel: 任务执行结果
         """

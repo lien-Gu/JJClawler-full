@@ -1,9 +1,10 @@
 """
 任务调度器
 """
+
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.job import Job
@@ -12,9 +13,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import get_settings
 from app.models.schedule import (
-    JobConfigModel, JobHandlerType, TriggerType, PREDEFINED_JOB_CONFIGS
+    PREDEFINED_JOB_CONFIGS,
+    JobConfigModel,
+    JobContextModel,
+    JobHandlerType,
+    TriggerType,
 )
-from app.models.schedule import JobContextModel
+
 from .handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
 
 
@@ -24,8 +29,8 @@ class TaskScheduler:
     def __init__(self):
         """初始化调度器"""
         self.settings = get_settings()
-        self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_handlers: Dict[str, Type[BaseJobHandler]] = {}
+        self.scheduler: AsyncIOScheduler | None = None
+        self.job_handlers: dict[str, type[BaseJobHandler]] = {}
         self.logger = logging.getLogger(__name__)
         self.start_time = None
 
@@ -43,28 +48,28 @@ class TaskScheduler:
         """创建APScheduler实例"""
         # 使用SQLite数据库存储调度任务，从配置中获取数据库URL
         scheduler_config = self.settings.scheduler
-        
+
         # 配置job store - 使用SQLAlchemyJobStore存储到数据库
         jobstores = {
-            'default': SQLAlchemyJobStore(
+            "default": SQLAlchemyJobStore(
                 url=scheduler_config.job_store_url or self.settings.database.url
             )
         }
 
         # 配置executor
-        executors = {
-            'default': AsyncIOExecutor()
-        }
+        executors = {"default": AsyncIOExecutor()}
 
         # 创建调度器
         scheduler = AsyncIOScheduler(
             jobstores=jobstores,
             executors=executors,
             job_defaults=scheduler_config.job_defaults,
-            timezone=scheduler_config.timezone
+            timezone=scheduler_config.timezone,
         )
 
-        self.logger.info(f"调度器配置完成，任务存储URL: {scheduler_config.job_store_url or self.settings.database.url}")
+        self.logger.info(
+            f"调度器配置完成，任务存储URL: {scheduler_config.job_store_url or self.settings.database.url}"
+        )
 
         return scheduler
 
@@ -111,14 +116,18 @@ class TaskScheduler:
                     result = await self.add_batch_jobs(
                         page_ids=job_config.page_ids,
                         force=job_config.force,
-                        batch_id=f"predefined_{job_id}"
+                        batch_id=f"predefined_{job_id}",
                     )
-                    
+
                     if result["success"]:
-                        self.logger.info(f"已加载预定义批量任务: {job_id}, 包含 {result['successful_tasks']} 个子任务")
+                        self.logger.info(
+                            f"已加载预定义批量任务: {job_id}, 包含 {result['successful_tasks']} 个子任务"
+                        )
                     else:
-                        self.logger.error(f"加载预定义批量任务失败 {job_id}: {result['message']}")
-                        
+                        self.logger.error(
+                            f"加载预定义批量任务失败 {job_id}: {result['message']}"
+                        )
+
             except Exception as e:
                 self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
 
@@ -137,9 +146,7 @@ class TaskScheduler:
                 trigger=trigger,
                 id=job_config.job_id,
                 name=job_config.job_id,
-                kwargs={
-                    'job_config': job_config
-                }
+                kwargs={"job_config": job_config},
             )
 
             # 如果任务被禁用，则暂停
@@ -153,15 +160,17 @@ class TaskScheduler:
             self.logger.error(f"添加任务失败 {job_config.job_id}: {e}")
             return False
 
-    async def add_batch_jobs(self, page_ids: List[str], force: bool = False, batch_id: Optional[str] = None) -> Dict[str, Any]:
+    async def add_batch_jobs(
+        self, page_ids: list[str], force: bool = False, batch_id: str | None = None
+    ) -> dict[str, Any]:
         """
         添加批量任务，为每个页面创建独立的任务
-        
+
         Args:
             page_ids: 页面ID列表
             force: 是否强制执行
             batch_id: 批量任务ID，如果不提供则自动生成
-            
+
         Returns:
             Dict[str, Any]: 包含批量任务信息的字典
         """
@@ -179,7 +188,7 @@ class TaskScheduler:
                 "success": False,
                 "message": "没有找到有效的页面ID",
                 "batch_id": batch_id,
-                "task_ids": []
+                "task_ids": [],
             }
 
         # 为每个页面创建独立的任务
@@ -194,7 +203,7 @@ class TaskScheduler:
                 page_ids=[page_id],
                 batch_id=batch_id,
                 force=force,
-                description=f"批量任务 {batch_id} 中的页面: {page_id}"
+                description=f"批量任务 {batch_id} 中的页面: {page_id}",
             )
 
             success = await self.add_job(job_config)
@@ -212,7 +221,7 @@ class TaskScheduler:
             "task_ids": task_ids,
             "total_pages": len(resolved_page_ids),
             "successful_tasks": successful_tasks,
-            "failed_tasks": len(resolved_page_ids) - successful_tasks
+            "failed_tasks": len(resolved_page_ids) - successful_tasks,
         }
 
     async def _execute_job(self, job_config: JobConfigModel) -> None:
@@ -230,7 +239,7 @@ class TaskScheduler:
             job_id=job_config.job_id,
             job_name=job_config.job_id,
             trigger_time=datetime.now(),
-            scheduled_time=datetime.now()
+            scheduled_time=datetime.now(),
         )
 
         # 获取任务数据
@@ -242,11 +251,11 @@ class TaskScheduler:
         # 记录结果
         self.logger.info(f"任务 {job_config.job_id} 执行完成: {result.message}")
 
-    def get_jobs(self) -> List[Job]:
+    def get_jobs(self) -> list[Job]:
         """获取所有任务"""
         return self.scheduler.get_jobs() if self.scheduler else []
 
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Job | None:
         """获取指定任务"""
         return self.scheduler.get_job(job_id) if self.scheduler else None
 
@@ -254,7 +263,7 @@ class TaskScheduler:
         """检查调度器是否运行中"""
         return self.scheduler is not None and self.scheduler.running
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取调度器状态"""
         if self.scheduler is None:
             return {
@@ -262,28 +271,31 @@ class TaskScheduler:
                 "job_count": 0,
                 "running_jobs": 0,
                 "paused_jobs": 0,
-                "uptime": 0.0
+                "uptime": 0.0,
             }
 
         jobs = self.get_jobs()
         running_jobs = sum(1 for job in jobs if job.next_run_time is not None)
         paused_jobs = len(jobs) - running_jobs
-        uptime = (datetime.now() - self.start_time).total_seconds() if self.start_time else 0.0
+        uptime = (
+            (datetime.now() - self.start_time).total_seconds()
+            if self.start_time
+            else 0.0
+        )
 
         return {
             "status": "running" if self.scheduler.running else "paused",
             "job_count": len(jobs),
             "running_jobs": running_jobs,
             "paused_jobs": paused_jobs,
-            "uptime": uptime
+            "uptime": uptime,
         }
 
-
-    def get_batch_jobs(self, batch_id: str) -> List[Job]:
+    def get_batch_jobs(self, batch_id: str) -> list[Job]:
         """获取批量任务中的所有任务"""
         return [job for job in self.get_jobs() if batch_id in job.id]
 
-    def get_batch_status(self, batch_id: str) -> Dict[str, Any]:
+    def get_batch_status(self, batch_id: str) -> dict[str, Any]:
         """获取批量任务的整体状态"""
         batch_jobs = self.get_batch_jobs(batch_id)
 
@@ -293,7 +305,7 @@ class TaskScheduler:
                 "status": "not_found",
                 "total_jobs": 0,
                 "running_jobs": 0,
-                "completed_jobs": 0
+                "completed_jobs": 0,
             }
 
         running_jobs = sum(1 for job in batch_jobs if job.next_run_time is not None)
@@ -312,12 +324,12 @@ class TaskScheduler:
             "status": batch_status,
             "total_jobs": len(batch_jobs),
             "running_jobs": running_jobs,
-            "completed_jobs": completed_jobs
+            "completed_jobs": completed_jobs,
         }
 
 
 # 全局调度器实例
-_scheduler: Optional[TaskScheduler] = None
+_scheduler: TaskScheduler | None = None
 
 
 def get_scheduler() -> TaskScheduler:
