@@ -103,10 +103,10 @@ class CrawlConfig:
 class HttpClient:
     """HTTP客户端"""
     
-    def __init__(self, request_delay: float = 1.0):
+    def __init__(self, request_delay: float = 1.0, timeout: float = 15.0):
         self.request_delay = request_delay
         self.session = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=timeout,
             headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }

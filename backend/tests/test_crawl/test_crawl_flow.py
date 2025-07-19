@@ -54,7 +54,7 @@ class TestCrawlFlow:
         """测试从页面解析榜单"""
         mocker.patch.object(crawl_flow.parser, 'parse', return_value=[mock_parsed_items["ranking"]])
 
-        result = crawl_flow._parse_rankings_from_page(mock_page_content)
+        result = crawl_flow._parse_rankings_from_page(mock_page_content, "test_page")
 
         assert len(result) == 1
         assert result[0]["rank_id"] == "1"
@@ -62,7 +62,7 @@ class TestCrawlFlow:
 
     def test_extract_book_ids_from_rankings(self, crawl_flow, mock_rankings_data):
         """测试从榜单提取书籍ID"""
-        result = crawl_flow._extract_book_ids_from_rankings(mock_rankings_data)
+        result = crawl_flow._extract_unique_book_ids(mock_rankings_data)
 
         assert len(result) == 1
         assert "12345" in result
@@ -71,7 +71,13 @@ class TestCrawlFlow:
     @pytest.mark.asyncio
     async def test_crawl_books_details(self, crawl_flow, mocker: MockerFixture, mock_book_detail):
         """测试爬取书籍详情"""
-        mocker.patch.object(crawl_flow, 'crawl_book_detail', return_value=mock_book_detail)
+        # Mock方法并模拟统计更新
+        async def mock_crawl_single_book(book_id):
+            crawl_flow.stats['books_crawled'] += 1
+            crawl_flow.books_data.append(mock_book_detail)
+            return mock_book_detail
+            
+        mocker.patch.object(crawl_flow, '_crawl_single_book', side_effect=mock_crawl_single_book)
 
         result = await crawl_flow._crawl_books_details(["12345"])
 
@@ -88,7 +94,7 @@ class TestCrawlFlow:
         mocker.patch.object(crawl_flow.client, 'get', return_value=mock_book_detail)
         mocker.patch.object(crawl_flow.parser, 'parse', return_value=[mock_parsed_items["book"]])
 
-        result = await crawl_flow.crawl_book_detail("12345")
+        result = await crawl_flow._crawl_single_book("12345")
 
         assert result == mock_parsed_items["book"].data
         assert crawl_flow.stats['total_requests'] == 1
@@ -118,7 +124,7 @@ class TestCrawlFlow:
         mocker.patch.object(crawl_flow, '_generate_page_url', return_value="https://test.com/page1")
         mocker.patch.object(crawl_flow, '_crawl_page_content', return_value=mock_page_content)
         mocker.patch.object(crawl_flow, '_parse_rankings_from_page', return_value=mock_rankings_data)
-        mocker.patch.object(crawl_flow, '_extract_book_ids_from_rankings', return_value=["12345"])
+        mocker.patch.object(crawl_flow, '_extract_unique_book_ids', return_value=["12345"])
         mocker.patch.object(crawl_flow, '_crawl_books_details', return_value=mock_books_data)
         mocker.patch.object(crawl_flow, '_save_crawl_result', return_value=True)
 
@@ -168,7 +174,7 @@ class TestRealCrawlFlow:
     @pytest.mark.asyncio
     async def test_real_page_crawl(self, app):
         """测试真实的夹子榜爬取（集成测试）"""
-        real_crawl_flow = CrawlFlow(request_delay=0.5)
+        real_crawl_flow = CrawlFlow(request_delay=0.1, concurrent_mode=True)
         try:
             page_id = "index"
             result = await real_crawl_flow.execute_crawl_task(page_id)

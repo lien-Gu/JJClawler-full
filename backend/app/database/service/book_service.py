@@ -66,6 +66,12 @@ class BookService:
     def get_book_by_id(self, db: Session, book_id: int) -> Optional[Book]:
         """根据ID获取书籍"""
         return db.get(Book, book_id)
+    
+    def get_books_by_novel_ids(self, db: Session, novel_ids: List[int]) -> List[Book]:
+        """根据novel_id列表获取书籍"""
+        if not novel_ids:
+            return []
+        return db.scalars(select(Book).where(Book.novel_id.in_(novel_ids))).all()
 
     def get_books_with_pagination(
         self, 
