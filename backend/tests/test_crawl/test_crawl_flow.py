@@ -187,11 +187,14 @@ class TestRealCrawlFlow:
 
             if result["success"]:
                 print(f"✅ 真实爬取成功: 爬取了 {result['books_crawled']} 本书籍")
-                assert result["page_id"] == "jiazi"
+                assert result["page_id"] == page_id
                 assert result["books_crawled"] >= 0
                 assert result["execution_time"] > 0
             else:
-                print(f"❌ 真实爬取失败: {result.get('error_message', '未知错误')}")
+                error_msg = result.get('error_message', '未知错误')
+                print(f"❌ 真实爬取失败: {error_msg}")
+                # 数据保存失败应该导致测试失败
+                pytest.fail(f"爬取任务失败: {error_msg}")
 
         except Exception as e:
             print(f"❌ 真实爬取异常: {e}")
@@ -202,12 +205,13 @@ class TestRealCrawlFlow:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_real_book_detail_crawl(self, real_crawl_flow):
+    async def test_real_book_detail_crawl(self):
         """测试真实的书籍详情爬取（集成测试）"""
+        real_crawl_flow = CrawlFlow(request_delay=0.1, concurrent_mode=False)
         try:
             test_book_id = "123456"
 
-            result = await real_crawl_flow.crawl_book_detail(test_book_id)
+            result = await real_crawl_flow._crawl_single_book(test_book_id)
 
             if result:
                 assert "book_id" in result

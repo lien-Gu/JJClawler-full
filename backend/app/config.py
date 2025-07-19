@@ -71,7 +71,7 @@ class CrawlerSettings(BaseSettings):
 
     # 爬取频率控制
     request_delay: float = Field(default=1.0, ge=0.1, le=60.0, description="请求间隔延迟（秒）")
-    concurrent_requests: int = Field(default=3, ge=1, le=10, description="并发请求数")
+    concurrent_requests: int = Field(default=5, ge=1, le=10, description="并发请求数")
 
     class Config:
         env_prefix = "CRAWLER_"
