@@ -35,15 +35,12 @@ async def get_books_list(
     """
     获取书籍列表（分页）
     """
-    try:
-        book_result, _ = book_service.get_books_with_pagination(db, page, size)
+    book_result, _ = book_service.get_books_with_pagination(db, page, size)
 
-        return ListResponse(
-            data=[BookResponse.from_book_table(book) for book in book_result],
-            message="获取书籍列表成功"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取书籍列表失败: {str(e)}")
+    return ListResponse(
+        data=[BookResponse.from_book_table(book) for book in book_result],
+        message="获取书籍列表成功"
+    )
 
 
 @router.get("/search", response_model=ListResponse[BookResponse])
@@ -58,15 +55,12 @@ async def search_books(
 
     支持按标题、作者搜索
     """
-    try:
-        books = book_service.search_books(db, keyword, page, size)
+    books = book_service.search_books(db, keyword, page, size)
 
-        return ListResponse(
-            data=[BookResponse.from_book_table(book) for book in books],
-            message="搜索成功"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"搜索失败: {str(e)}")
+    return ListResponse(
+        data=[BookResponse.from_book_table(book) for book in books],
+        message="搜索成功"
+    )
 
 
 @router.get("/{book_id}", response_model=DataResponse[BookDetailResponse])
@@ -80,23 +74,18 @@ async def get_book_detail(book_id: int, db: Session = Depends(get_db)):
     Returns:
         BookDetailResponse: 书籍详细信息
     """
-    try:
-        book_detail = book_service.get_book_detail_with_latest_snapshot(db, book_id)
+    book_detail = book_service.get_book_detail_with_latest_snapshot(db, book_id)
 
-        if not book_detail:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    if not book_detail:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        book = book_detail["book"]
-        latest_snapshot = book_detail["latest_snapshot"]
+    book = book_detail["book"]
+    latest_snapshot = book_detail["latest_snapshot"]
 
-        # 构造响应数据
-        response_data = BookDetailResponse.from_book_and_snapshot(book, latest_snapshot)
+    # 构造响应数据
+    response_data = BookDetailResponse.from_book_and_snapshot(book, latest_snapshot)
 
-        return DataResponse(data=response_data, message="获取书籍详情成功")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取书籍详情失败: {str(e)}")
+    return DataResponse(data=response_data, message="获取书籍详情成功")
 
 
 @router.get("/{book_id}/trend", response_model=ListResponse[BookTrendPoint])
@@ -123,38 +112,31 @@ async def get_book_trend(
     Returns:
         BookTrendResponse: 书籍趋势数据
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取趋势数据
-        trend_data = book_service.get_book_trend(db, book_id, duration)
+    # 获取趋势数据
+    trend_data = book_service.get_book_trend(db, book_id, duration)
 
-        # 转换为响应模型
-        trend_points = [
-            BookTrendPoint.from_snapshot(snapshot) for snapshot in trend_data
-        ]
+    # 转换为响应模型
+    trend_points = [
+        BookTrendPoint.from_snapshot(snapshot) for snapshot in trend_data
+    ]
 
-        duration_desc = {
-            "day": "24小时内每小时",
-            "week": "一周内每小时",
-            "month": "一个月内每天1点",
-            "half-year": "半年内每天1点",
-        }
+    duration_desc = {
+        "day": "24小时内每小时",
+        "week": "一周内每小时",
+        "month": "一个月内每天1点",
+        "half-year": "半年内每天1点",
+    }
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{duration_desc[duration]}趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{duration_desc[duration]}趋势数据成功",
+    )
 
 
 @router.get(
@@ -175,27 +157,22 @@ async def get_book_trend_hourly(
     Returns:
         按小时聚合的趋势数据
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取小时级趋势数据
-        trend_data = book_service.get_book_trend_hourly(db, book_id, hours)
+    # 获取小时级趋势数据
+    trend_data = book_service.get_book_trend_hourly(db, book_id, hours)
 
-        # 转换为响应模型
-        trend_points = _convert_to_aggregated_points(trend_data)
+    # 转换为响应模型
+    trend_points = _convert_to_aggregated_points(trend_data)
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{hours}小时的趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取小时趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{hours}小时的趋势数据成功",
+    )
 
 
 @router.get(
@@ -216,27 +193,22 @@ async def get_book_trend_daily(
     Returns:
         按天聚合的趋势数据
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取日级趋势数据
-        trend_data = book_service.get_book_trend_daily(db, book_id, days)
+    # 获取日级趋势数据
+    trend_data = book_service.get_book_trend_daily(db, book_id, days)
 
-        # 转换为响应模型
-        trend_points = _convert_to_aggregated_points(trend_data)
+    # 转换为响应模型
+    trend_points = _convert_to_aggregated_points(trend_data)
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{days}天的趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取日趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{days}天的趋势数据成功",
+    )
 
 
 @router.get(
@@ -257,27 +229,22 @@ async def get_book_trend_weekly(
     Returns:
         按周聚合的趋势数据
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取周级趋势数据
-        trend_data = book_service.get_book_trend_weekly(db, book_id, weeks)
+    # 获取周级趋势数据
+    trend_data = book_service.get_book_trend_weekly(db, book_id, weeks)
 
-        # 转换为响应模型
-        trend_points = _convert_to_aggregated_points(trend_data)
+    # 转换为响应模型
+    trend_points = _convert_to_aggregated_points(trend_data)
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{weeks}周的趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取周趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{weeks}周的趋势数据成功",
+    )
 
 
 @router.get(
@@ -298,27 +265,22 @@ async def get_book_trend_monthly(
     Returns:
         按月聚合的趋势数据
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取月级趋势数据
-        trend_data = book_service.get_book_trend_monthly(db, book_id, months)
+    # 获取月级趋势数据
+    trend_data = book_service.get_book_trend_monthly(db, book_id, months)
 
-        # 转换为响应模型
-        trend_points = _convert_to_aggregated_points(trend_data)
+    # 转换为响应模型
+    trend_points = _convert_to_aggregated_points(trend_data)
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{months}个月的趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取月趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{months}个月的趋势数据成功",
+    )
 
 
 @router.get(
@@ -349,33 +311,26 @@ async def get_book_trend_aggregated(
     Returns:
         聚合后的趋势数据，包含平均值、最大值、最小值等统计信息
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取聚合趋势数据
-        trend_data = book_service.get_book_trend_with_interval(
-            db, book_id, period_count, interval
-        )
+    # 获取聚合趋势数据
+    trend_data = book_service.get_book_trend_with_interval(
+        db, book_id, period_count, interval
+    )
 
-        # 转换为响应模型
-        trend_points = _convert_to_aggregated_points(trend_data)
+    # 转换为响应模型
+    trend_points = _convert_to_aggregated_points(trend_data)
 
-        interval_desc = {"hour": "小时", "day": "天", "week": "周", "month": "月"}
+    interval_desc = {"hour": "小时", "day": "天", "week": "周", "month": "月"}
 
-        return ListResponse(
-            data=trend_points,
-            count=len(trend_points),
-            message=f"获取{period_count}个{interval_desc[interval]}的聚合趋势数据成功",
-        )
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取聚合趋势数据失败: {str(e)}")
+    return ListResponse(
+        data=trend_points,
+        count=len(trend_points),
+        message=f"获取{period_count}个{interval_desc[interval]}的聚合趋势数据成功",
+    )
 
 
 def _convert_to_aggregated_points(
@@ -430,31 +385,26 @@ async def get_book_ranking_history(
     Returns:
         BookRankingHistoryResponse: 书籍排名历史
     """
-    try:
-        # 检查书籍是否存在
-        book = book_service.get_book_by_id(db, book_id)
-        if not book:
-            raise HTTPException(status_code=404, detail="书籍不存在")
+    # 检查书籍是否存在
+    book = book_service.get_book_by_id(db, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="书籍不存在")
 
-        # 获取排名历史
-        ranking_history = ranking_service.get_book_ranking_history(
-            db, book_id, ranking_id, days
-        )
+    # 获取排名历史
+    ranking_history = ranking_service.get_book_ranking_history(
+        db, book_id, ranking_id, days
+    )
 
-        # 转换为响应模型
-        from ..models.book import BookRankingInfo
+    # 转换为响应模型
+    from ..models.book import BookRankingInfo
 
-        ranking_infos = [
-            BookRankingInfo.from_history_dict(book_id, history)
-            for history in ranking_history
-        ]
+    ranking_infos = [
+        BookRankingInfo.from_history_dict(book_id, history)
+        for history in ranking_history
+    ]
 
-        response_data = BookRankingHistoryResponse(
-            book_id=book_id, ranking_history=ranking_infos
-        )
+    response_data = BookRankingHistoryResponse(
+        book_id=book_id, ranking_history=ranking_infos
+    )
 
-        return DataResponse(data=response_data, message="获取排名历史成功")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取排名历史失败: {str(e)}")
+    return DataResponse(data=response_data, message="获取排名历史成功")

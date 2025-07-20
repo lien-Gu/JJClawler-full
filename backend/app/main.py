@@ -4,10 +4,14 @@ FastAPI应用程序入口
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api import api_router
+from .middleware import ExceptionMiddleware
+from .models.base import BaseResponse
 
 
 @asynccontextmanager
@@ -47,6 +51,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 添加异常处理中间件（必须在CORS之前添加）
+app.add_middleware(ExceptionMiddleware)
+
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +62,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加HTTP异常处理器（FastAPI HTTPException）
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """FastAPI HTTP异常处理器 - 使用统一的响应格式"""
+    return await _create_unified_error_response(request, exc.status_code, exc.detail)
+
+# 添加Starlette HTTP异常处理器（路由未找到等）
+@app.exception_handler(StarletteHTTPException)  
+async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Starlette HTTP异常处理器 - 使用统一的响应格式"""
+    detail = exc.detail if hasattr(exc, 'detail') else "页面未找到"
+    return await _create_unified_error_response(request, exc.status_code, detail)
+
+async def _create_unified_error_response(request: Request, status_code: int, detail: str):
+    """创建统一的错误响应格式"""
+    error_response = BaseResponse(
+        success=False,
+        code=status_code,
+        message=detail,
+    )
+    
+    # 转换为字典并添加错误详情（使用mode='json'确保datetime正确序列化）
+    error_data = error_response.model_dump(mode='json')
+    error_data["error"] = {
+        "type": "HTTP_ERROR",
+        "detail": detail,
+        "path": str(request.url.path),
+        "method": request.method,
+    }
+    
+    return JSONResponse(
+        status_code=status_code,
+        content=error_data
+    )
 
 # 注册路由
 app.include_router(api_router)

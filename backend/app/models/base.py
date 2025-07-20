@@ -5,13 +5,13 @@
 from datetime import datetime
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 # 泛型类型变量
 T = TypeVar("T")
 
 
-class BaseResponse(BaseModel, Generic[T]):
+class BaseResponse(BaseModel):
     """基础响应模型"""
 
     success: bool = Field(True, description="请求是否成功")

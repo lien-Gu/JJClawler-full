@@ -94,46 +94,41 @@ async def get_ranking_detail(
     Returns:
         RankingDetailResponse: 榜单详情
     """
-    try:
-        ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date, limit)
+    ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date, limit)
 
-        if not ranking_detail:
-            raise HTTPException(status_code=404, detail="榜单不存在")
+    if not ranking_detail:
+        raise HTTPException(status_code=404, detail="榜单不存在")
 
-        ranking = ranking_detail["ranking"]
-        books_data = ranking_detail["books"]
+    ranking = ranking_detail["ranking"]
+    books_data = ranking_detail["books"]
 
-        # 转换书籍数据
-        books_in_ranking = []
-        for book_data in books_data:
-            books_in_ranking.append(
-                BookInRanking(
-                    book_id=book_data["book_id"],
-                    title=book_data["title"],
-                    position=book_data["position"],
-                    score=book_data["score"],
-                    clicks=None,  # 这些数据需要从book_snapshot获取
-                    favorites=None,
-                    comments=None,
-                    word_count=None,
-                )
+    # 转换书籍数据
+    books_in_ranking = []
+    for book_data in books_data:
+        books_in_ranking.append(
+            BookInRanking(
+                book_id=book_data["book_id"],
+                title=book_data["title"],
+                position=book_data["position"],
+                score=book_data["score"],
+                clicks=None,  # 这些数据需要从book_snapshot获取
+                favorites=None,
+                comments=None,
+                word_count=None,
             )
-
-        response_data = RankingDetailResponse(
-            ranking_id=str(ranking.rank_id),  # 转换为字符串
-            name=ranking.name,
-            page_id=ranking.page_id,
-            category=ranking.rank_group_type,
-            snapshot_time=ranking_detail["snapshot_time"],
-            books=books_in_ranking,
-            total_books=ranking_detail["total_books"],
         )
 
-        return DataResponse(data=response_data, message="榜单详情获取成功")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取榜单详情失败: {str(e)}")
+    response_data = RankingDetailResponse(
+        ranking_id=str(ranking.rank_id),  # 转换为字符串
+        name=ranking.name,
+        page_id=ranking.page_id,
+        category=ranking.rank_group_type,
+        snapshot_time=ranking_detail["snapshot_time"],
+        books=books_in_ranking,
+        total_books=ranking_detail["total_books"],
+    )
+
+    return DataResponse(data=response_data, message="榜单详情获取成功")
 
 
 @router.get(
@@ -156,38 +151,35 @@ async def get_ranking_history(
     Returns:
         RankingHistoryResponse: 榜单历史数据
     """
-    try:
-        history_data = ranking_service.get_ranking_history(
-            db, ranking_id, start_date, end_date
-        )
+    history_data = ranking_service.get_ranking_history(
+        db, ranking_id, start_date, end_date
+    )
 
-        # 转换为响应模型
-        from ..models.ranking import RankingHistoryPoint
+    # 转换为响应模型
+    from ..models.ranking import RankingHistoryPoint
 
-        history_points = []
-        for trend_point in history_data["trend_data"]:
-            # 简化的历史点数据，实际应该包含更多信息
-            history_points.append(
-                RankingHistoryPoint(
-                    date=trend_point["snapshot_time"].date(),
-                    book_id=0,  # 占位符，实际需要更复杂的逻辑
-                    title="",
-                    position=0,
-                    score=None,
-                )
+    history_points = []
+    for trend_point in history_data["trend_data"]:
+        # 简化的历史点数据，实际应该包含更多信息
+        history_points.append(
+            RankingHistoryPoint(
+                date=trend_point["snapshot_time"].date(),
+                book_id=0,  # 占位符，实际需要更复杂的逻辑
+                title="",
+                position=0,
+                score=None,
             )
-
-        response_data = RankingHistoryResponse(
-            ranking_id=ranking_id,
-            ranking_name="榜单名称",  # 需要从数据库获取
-            start_date=start_date or Date.today(),
-            end_date=end_date or Date.today(),
-            history_data=history_points,
         )
 
-        return DataResponse(data=response_data, message="榜单历史数据获取成功")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取榜单历史失败: {str(e)}")
+    response_data = RankingHistoryResponse(
+        ranking_id=ranking_id,
+        ranking_name="榜单名称",  # 需要从数据库获取
+        start_date=start_date or Date.today(),
+        end_date=end_date or Date.today(),
+        history_data=history_points,
+    )
+
+    return DataResponse(data=response_data, message="榜单历史数据获取成功")
 
 
 @router.get("/{ranking_id}/stats", response_model=DataResponse[RankingStatsResponse])
@@ -201,29 +193,24 @@ async def get_ranking_stats(ranking_id: int, db: Session = Depends(get_db)):
     Returns:
         RankingStatsResponse: 榜单统计信息
     """
-    try:
-        ranking = ranking_service.get_ranking_by_id(db, ranking_id)
-        if not ranking:
-            raise HTTPException(status_code=404, detail="榜单不存在")
+    ranking = ranking_service.get_ranking_by_id(db, ranking_id)
+    if not ranking:
+        raise HTTPException(status_code=404, detail="榜单不存在")
 
-        stats = ranking_service.get_ranking_statistics(db, ranking_id)
+    stats = ranking_service.get_ranking_statistics(db, ranking_id)
 
-        response_data = RankingStatsResponse(
-            ranking_id=str(ranking.rank_id),  # 转换为字符串
-            ranking_name=ranking.name,
-            total_snapshots=stats.get("total_snapshots", 0),
-            unique_books=stats.get("unique_books", 0),
-            avg_books_per_snapshot=0.0,  # 需要计算
-            most_stable_book=None,
-            first_snapshot_time=stats.get("first_snapshot_time"),
-            last_snapshot_time=stats.get("last_snapshot_time"),
-        )
+    response_data = RankingStatsResponse(
+        ranking_id=str(ranking.rank_id),  # 转换为字符串
+        ranking_name=ranking.name,
+        total_snapshots=stats.get("total_snapshots", 0),
+        unique_books=stats.get("unique_books", 0),
+        avg_books_per_snapshot=0.0,  # 需要计算
+        most_stable_book=None,
+        first_snapshot_time=stats.get("first_snapshot_time"),
+        last_snapshot_time=stats.get("last_snapshot_time"),
+    )
 
-        return DataResponse(data=response_data, message="榜单统计信息获取成功")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取榜单统计失败: {str(e)}")
+    return DataResponse(data=response_data, message="榜单统计信息获取成功")
 
 
 @router.post("/compare", response_model=DataResponse[RankingCompareResponse])
@@ -239,62 +226,29 @@ async def compare_rankings(
     Returns:
         RankingCompareResponse: 榜单对比结果
     """
-    try:
-        if len(request.ranking_ids) < 2:
-            raise HTTPException(status_code=400, detail="至少需要选择2个榜单进行对比")
+    if len(request.ranking_ids) < 2:
+        raise HTTPException(status_code=400, detail="至少需要选择2个榜单进行对比")
 
-        comparison_result = ranking_service.compare_rankings(
-            db, request.ranking_ids, request.date
+    comparison_result = ranking_service.compare_rankings(
+        db, request.ranking_ids, request.date
+    )
+
+    # 转换为响应模型
+    ranking_details = []
+    for ranking_info in comparison_result["rankings"]:
+        # 获取该榜单的书籍数据
+        ranking_books = comparison_result["ranking_data"].get_by_id(
+            ranking_info["ranking_id"], []
         )
+        books_in_ranking = []
 
-        # 转换为响应模型
-        ranking_details = []
-        for ranking_info in comparison_result["rankings"]:
-            # 获取该榜单的书籍数据
-            ranking_books = comparison_result["ranking_data"].get_by_id(
-                ranking_info["ranking_id"], []
-            )
-            books_in_ranking = []
-
-            for book_data in ranking_books:
-                books_in_ranking.append(
-                    BookInRanking(
-                        book_id=book_data["book_id"],
-                        title=book_data["title"],
-                        position=book_data["position"],
-                        score=book_data["score"],
-                        clicks=None,
-                        favorites=None,
-                        comments=None,
-                        word_count=None,
-                    )
-                )
-
-            ranking_details.append(
-                RankingDetailResponse(
-                    ranking_id=ranking_info["ranking_id"],
-                    name=ranking_info["name"],
-                    page_id=ranking_info["page_id"],
-                    category=None,
-                    snapshot_time=(
-                        datetime.combine(request.date, datetime.min.time())
-                        if request.date
-                        else datetime.now()
-                    ),
-                    books=books_in_ranking,
-                    total_books=len(books_in_ranking),
-                )
-            )
-
-        # 转换共同书籍
-        common_books = []
-        for book_info in comparison_result["common_books"]:
-            common_books.append(
+        for book_data in ranking_books:
+            books_in_ranking.append(
                 BookInRanking(
-                    book_id=book_info["id"],
-                    title=book_info["title"],
-                    position=0,  # 共同书籍没有位置概念
-                    score=None,
+                    book_id=book_data["book_id"],
+                    title=book_data["title"],
+                    position=book_data["position"],
+                    score=book_data["score"],
                     clicks=None,
                     favorites=None,
                     comments=None,
@@ -302,15 +256,43 @@ async def compare_rankings(
                 )
             )
 
-        response_data = RankingCompareResponse(
-            compare_date=comparison_result["comparison_date"],
-            rankings=ranking_details,
-            common_books=common_books,
-            unique_books_count=comparison_result["stats"]["total_unique_books"],
+        ranking_details.append(
+            RankingDetailResponse(
+                ranking_id=ranking_info["ranking_id"],
+                name=ranking_info["name"],
+                page_id=ranking_info["page_id"],
+                category=None,
+                snapshot_time=(
+                    datetime.combine(request.date, datetime.min.time())
+                    if request.date
+                    else datetime.now()
+                ),
+                books=books_in_ranking,
+                total_books=len(books_in_ranking),
+            )
         )
 
-        return DataResponse(data=response_data, message="榜单对比完成")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"榜单对比失败: {str(e)}")
+    # 转换共同书籍
+    common_books = []
+    for book_info in comparison_result["common_books"]:
+        common_books.append(
+            BookInRanking(
+                book_id=book_info["id"],
+                title=book_info["title"],
+                position=0,  # 共同书籍没有位置概念
+                score=None,
+                clicks=None,
+                favorites=None,
+                comments=None,
+                word_count=None,
+            )
+        )
+
+    response_data = RankingCompareResponse(
+        compare_date=comparison_result["comparison_date"],
+        rankings=ranking_details,
+        common_books=common_books,
+        unique_books_count=comparison_result["stats"]["total_unique_books"],
+    )
+
+    return DataResponse(data=response_data, message="榜单对比完成")
