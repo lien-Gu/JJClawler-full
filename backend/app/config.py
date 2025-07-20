@@ -180,6 +180,7 @@ class Settings(BaseSettings):
                 Path(directory).mkdir(parents=True, exist_ok=True)
 
     @field_validator("env")
+    @classmethod
     def validate_environment(cls, v):
         """验证环境配置"""
         valid_environments = ["dev", "test", "prod"]
