@@ -28,21 +28,19 @@ ranking_service = RankingService()
 
 @router.get("/", response_model=ListResponse[BookResponse])
 async def get_books_list(
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db),
-):
+        page: int = Query(1, ge=1, description="页码"),
+        size: int = Query(20, ge=1, le=100, description="每页数量"),
+        db: Session = Depends(get_db),
+) -> ListResponse[BookResponse]:
     """
     获取书籍列表（分页）
     """
     try:
         book_result, _ = book_service.get_books_with_pagination(db, page, size)
 
-        # 转换为响应模型
-        book_responses = [BookResponse.from_book_table(book) for book in book_result]
-
         return ListResponse(
-            data=book_responses, count=len(book_responses), message="获取书籍列表成功"
+            data=[BookResponse.from_book_table(book) for book in book_result],
+            message="获取书籍列表成功"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取书籍列表失败: {str(e)}")
@@ -50,11 +48,11 @@ async def get_books_list(
 
 @router.get("/search", response_model=ListResponse[BookResponse])
 async def search_books(
-    keyword: str = Query(..., min_length=1, description="搜索关键词"),
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: Session = Depends(get_db),
-):
+        keyword: str = Query(..., min_length=1, description="搜索关键词"),
+        page: int = Query(1, ge=1, description="页码"),
+        size: int = Query(20, ge=1, le=100, description="每页数量"),
+        db: Session = Depends(get_db),
+) -> ListResponse[BookResponse]:
     """
     搜索书籍
 
@@ -63,10 +61,9 @@ async def search_books(
     try:
         books = book_service.search_books(db, keyword, page, size)
 
-        book_responses = [BookResponse.from_book_table(book) for book in books]
-
         return ListResponse(
-            data=book_responses, count=len(book_responses), message="搜索成功"
+            data=[BookResponse.from_book_table(book) for book in books],
+            message="搜索成功"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"搜索失败: {str(e)}")
@@ -104,13 +101,13 @@ async def get_book_detail(book_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{book_id}/trend", response_model=ListResponse[BookTrendPoint])
 async def get_book_trend(
-    book_id: int,
-    duration: str = Query(
-        "day",
-        pattern="^(day|week|month|half-year)$",
-        description="时间范围：day(24小时内每小时)/week(一周内每小时)/month(一月内每天1点)/half-year(半年内每天1点)",
-    ),
-    db: Session = Depends(get_db),
+        book_id: int,
+        duration: str = Query(
+            "day",
+            pattern="^(day|week|month|half-year)$",
+            description="时间范围：day(24小时内每小时)/week(一周内每小时)/month(一月内每天1点)/half-year(半年内每天1点)",
+        ),
+        db: Session = Depends(get_db),
 ):
     """
     获取书籍数据趋势（根据duration智能选择快照）
@@ -164,9 +161,9 @@ async def get_book_trend(
     "/{book_id}/trend/hourly", response_model=ListResponse[BookTrendAggregatedPoint]
 )
 async def get_book_trend_hourly(
-    book_id: int,
-    hours: int = Query(24, ge=1, le=168, description="统计小时数，最多1周"),
-    db: Session = Depends(get_db),
+        book_id: int,
+        hours: int = Query(24, ge=1, le=168, description="统计小时数，最多1周"),
+        db: Session = Depends(get_db),
 ):
     """
     按小时获取书籍聚合趋势数据
@@ -205,9 +202,9 @@ async def get_book_trend_hourly(
     "/{book_id}/trend/daily", response_model=ListResponse[BookTrendAggregatedPoint]
 )
 async def get_book_trend_daily(
-    book_id: int,
-    days: int = Query(7, ge=1, le=90, description="统计天数，最多90天"),
-    db: Session = Depends(get_db),
+        book_id: int,
+        days: int = Query(7, ge=1, le=90, description="统计天数，最多90天"),
+        db: Session = Depends(get_db),
 ):
     """
     按天获取书籍聚合趋势数据
@@ -246,9 +243,9 @@ async def get_book_trend_daily(
     "/{book_id}/trend/weekly", response_model=ListResponse[BookTrendAggregatedPoint]
 )
 async def get_book_trend_weekly(
-    book_id: int,
-    weeks: int = Query(4, ge=1, le=52, description="统计周数，最多52周"),
-    db: Session = Depends(get_db),
+        book_id: int,
+        weeks: int = Query(4, ge=1, le=52, description="统计周数，最多52周"),
+        db: Session = Depends(get_db),
 ):
     """
     按周获取书籍聚合趋势数据
@@ -287,9 +284,9 @@ async def get_book_trend_weekly(
     "/{book_id}/trend/monthly", response_model=ListResponse[BookTrendAggregatedPoint]
 )
 async def get_book_trend_monthly(
-    book_id: int,
-    months: int = Query(3, ge=1, le=24, description="统计月数，最多24个月"),
-    db: Session = Depends(get_db),
+        book_id: int,
+        months: int = Query(3, ge=1, le=24, description="统计月数，最多24个月"),
+        db: Session = Depends(get_db),
 ):
     """
     按月获取书籍聚合趋势数据
@@ -328,14 +325,14 @@ async def get_book_trend_monthly(
     "/{book_id}/trend/aggregated", response_model=ListResponse[BookTrendAggregatedPoint]
 )
 async def get_book_trend_aggregated(
-    book_id: int,
-    period_count: int = Query(7, ge=1, le=365, description="统计周期数"),
-    interval: str = Query(
-        "day",
-        pattern="^(hour|day|week|month)$",
-        description="时间间隔：hour/day/week/month",
-    ),
-    db: Session = Depends(get_db),
+        book_id: int,
+        period_count: int = Query(7, ge=1, le=365, description="统计周期数"),
+        interval: str = Query(
+            "day",
+            pattern="^(hour|day|week|month)$",
+            description="时间间隔：hour/day/week/month",
+        ),
+        db: Session = Depends(get_db),
 ):
     """
     按指定时间间隔获取书籍聚合趋势数据（通用接口）
@@ -382,7 +379,7 @@ async def get_book_trend_aggregated(
 
 
 def _convert_to_aggregated_points(
-    trend_data: list[dict[str, Any]]
+        trend_data: list[dict[str, Any]]
 ) -> list[BookTrendAggregatedPoint]:
     """
     将趋势数据转换为响应模型
@@ -417,10 +414,10 @@ def _convert_to_aggregated_points(
     "/{book_id}/rankings", response_model=DataResponse[BookRankingHistoryResponse]
 )
 async def get_book_ranking_history(
-    book_id: int,
-    ranking_id: int | None = Query(None, description="指定榜单ID"),
-    days: int = Query(30, ge=1, le=365, description="统计天数"),
-    db: Session = Depends(get_db),
+        book_id: int,
+        ranking_id: int | None = Query(None, description="指定榜单ID"),
+        days: int = Query(30, ge=1, le=365, description="统计天数"),
+        db: Session = Depends(get_db),
 ):
     """
     获取书籍排名历史

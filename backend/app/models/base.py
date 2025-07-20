@@ -5,7 +5,7 @@
 from datetime import datetime
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # 泛型类型变量
 T = TypeVar("T")
@@ -26,7 +26,6 @@ class DataResponse(BaseResponse, Generic[T]):
 
 class ListResponse(BaseResponse, Generic[T]):
     data: list[T] = Field(..., description="响应数据")
-    count: int = Field(0, description="数据条数")
 
 
 class HealthResponse(BaseModel):
