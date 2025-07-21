@@ -4,8 +4,9 @@
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
+from typing import Tuple
 
 from ..config import get_settings
 
@@ -47,3 +48,14 @@ def drop_tables():
     from .db.base import Base
 
     Base.metadata.drop_all(bind=engine)
+
+
+async def check_db() -> bool:
+    """检查数据库连接状态"""
+    try:
+        async with get_db() as db:
+            result = await db.execute(text("SELECT 1"))
+            await result.fetchone()
+        return True
+    except Exception as e:
+        return False
