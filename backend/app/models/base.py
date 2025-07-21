@@ -28,33 +28,3 @@ class ListResponse(BaseResponse, Generic[T]):
     data: list[T] = Field(..., description="响应数据")
 
 
-class ComponentHealth(BaseModel):
-    """组件健康状态"""
-    name: str = Field(..., description="组件名称")
-    status: str = Field(..., description="组件状态: healthy/degraded/unhealthy")
-    message: str = Field("", description="状态消息")
-    details: dict = Field(default_factory=dict, description="详细信息")
-
-
-class SystemInfo(BaseModel):
-    """系统信息"""
-    memory_usage: float | None = Field(None, description="内存使用率(%)")
-    disk_usage: float | None = Field(None, description="磁盘使用率(%)")
-    cpu_usage: float | None = Field(None, description="CPU使用率(%)")
-
-
-class HealthData(BaseModel):
-    """健康检查数据"""
-    status: str = Field("healthy", description="整体服务状态")
-    version: str = Field(..., description="版本号")
-    uptime: float = Field(..., description="运行时间（秒）")
-    components: list[ComponentHealth] = Field(..., description="组件状态列表")
-    system: SystemInfo = Field(..., description="系统信息")
-
-
-class AppInfo(BaseModel):
-    """应用基本信息"""
-    name: str = Field(..., description="应用名称")
-    version: str = Field(..., description="应用版本")
-    description: str = Field(..., description="应用描述")
-    environment: str = Field(..., description="运行环境")

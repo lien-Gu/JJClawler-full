@@ -2,20 +2,19 @@
 FastAPI应用程序入口
 """
 
-import asyncio
 import time
 from contextlib import asynccontextmanager
 from typing import Dict
-from fastapi import FastAPI, HTTPException, Request, status
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.models.error import ErrorResponse
+from .models.error import ErrorResponse
 from .api import api_router
 from .config import get_settings
 from .middleware import ExceptionMiddleware
-from .models.base import BaseResponse, DataResponse, HealthData, ComponentHealth, SystemInfo
+from .models.base import BaseResponse, DataResponse
 
 # 应用启动时间
 APP_START_TIME = time.time()
@@ -30,7 +29,6 @@ async def lifespan(app: FastAPI):
     # 启动调度器
     try:
         from .schedule import start_scheduler
-
         await start_scheduler()
         print("任务调度器启动成功")
     except Exception as e:
@@ -41,7 +39,6 @@ async def lifespan(app: FastAPI):
     # 关闭时的清理代码
     try:
         from .schedule import stop_scheduler
-
         await stop_scheduler()
         print("任务调度器已停止")
     except Exception as e:
@@ -110,136 +107,56 @@ async def root():
 
 @app.get("/health", response_model=DataResponse[Dict])
 async def health_check():
-    """健康检查 - 检查数据库、调度器、系统资源等"""
+    """健康检查 - 简洁的系统状态检查"""
     settings = get_settings()
-    components = {}
-    overall_status = "healthy"
-
-    # 检查数据库连接
-    from database.connection import check_db
-    db_component = await check_db()
-    components["database"] = db_component
-
-    # 检查调度器状态
-    scheduler_component = await _check_scheduler()
-    components.append(scheduler_component)
-
-    # 检查网络连接（可选）
-    network_component = await _check_network()
-    components.append(network_component)
-
-    # 获取系统信息
-    system_info = await _get_system_info()
-
+    
+    # 检查各个组件状态（简化为布尔值）
+    db_ok = await _check_database()
+    scheduler_ok = await _check_scheduler()
+    
     # 计算运行时间
     uptime = time.time() - APP_START_TIME
-
+    
     # 确定整体状态
-    if any(comp.status == "unhealthy" for comp in components):
-        overall_status = "unhealthy"
-    elif any(comp.status == "degraded" for comp in components):
-        overall_status = "degraded"
-
+    all_ok = db_ok and scheduler_ok
+    health_status = "healthy" if all_ok else "unhealthy"
+    
     health_data = {
-
+        "status": health_status,
+        "version": settings.project_version,
+        "uptime": round(uptime, 2),
+        "components": {
+            "database": "ok" if db_ok else "error",
+            "scheduler": "ok" if scheduler_ok else "error"
+        }
     }
-
+    
     return DataResponse(
-        success=overall_status != "unhealthy",
-        code=200 if overall_status != "unhealthy" else 503,
-        message=f"服务状态: {overall_status}",
+        success=all_ok,
+        code=200 if all_ok else 503,
+        message=f"服务状态: {health_status}",
         data=health_data
     )
 
 
-async def _check_scheduler() -> ComponentHealth:
-    """检查调度器状态"""
+async def _check_database() -> bool:
+    """检查数据库连接状态 - 简化版本"""
+    try:
+        from .database.connection import check_db
+        return await check_db()
+    except Exception:
+        return False
+
+
+async def _check_scheduler() -> bool:
+    """检查调度器状态 - 简化版本"""
     try:
         from .schedule.scheduler import scheduler
-
-        if scheduler and scheduler.running:
-            jobs = scheduler.get_jobs()
-            return ComponentHealth(
-                name="scheduler",
-                status="healthy",
-                message="调度器运行正常",
-                details={
-                    "running": True,
-                    "jobs_count": len(jobs),
-                    "next_run": str(min([job.next_run_time for job in jobs], default="N/A"))
-                }
-            )
-        else:
-            return ComponentHealth(
-                name="scheduler",
-                status="degraded",
-                message="调度器未运行",
-                details={"running": False}
-            )
-    except Exception as e:
-        return ComponentHealth(
-            name="scheduler",
-            status="unhealthy",
-            message=f"调度器检查失败: {str(e)[:100]}",
-            details={"error": str(e)}
-        )
-
-
-async def _check_network() -> ComponentHealth:
-    """检查网络连接状态（测试外部网络）"""
-    try:
-        import httpx
-
-        timeout = httpx.Timeout(5.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get("https://httpbin.org/status/200")
-            if response.status_code == 200:
-                return ComponentHealth(
-                    name="network",
-                    status="healthy",
-                    message="网络连接正常",
-                    details={"external_access": True, "test_url": "httpbin.org"}
-                )
-            else:
-                return ComponentHealth(
-                    name="network",
-                    status="degraded",
-                    message=f"网络连接异常: {response.status_code}",
-                    details={"external_access": False, "status_code": response.status_code}
-                )
-    except Exception as e:
-        return ComponentHealth(
-            name="network",
-            status="degraded",
-            message=f"网络检查失败: {str(e)[:100]}",
-            details={"error": str(e), "external_access": False}
-        )
-
-
-async def _get_system_info() -> SystemInfo:
-    """获取系统资源信息"""
-    try:
-        import psutil
-
-        # 获取系统资源信息
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        cpu = psutil.cpu_percent(interval=0.1)
-
-        return SystemInfo(
-            memory_usage=memory.percent,
-            disk_usage=disk.percent,
-            cpu_usage=cpu
-        )
-    except ImportError:
-        # psutil未安装，返回空信息
-        return SystemInfo()
+        return scheduler and scheduler.running
     except Exception:
-        # 其他错误，返回空信息
-        return SystemInfo()
+        return False
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)

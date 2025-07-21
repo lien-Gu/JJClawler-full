@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from httpx import Request
 from pydantic import BaseModel
 
-from base import BaseResponse
+from .base import BaseResponse
 
 
 class ErrorDetail(BaseModel):
