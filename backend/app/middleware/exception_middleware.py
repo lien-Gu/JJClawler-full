@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DatabaseError, IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.models.error import ErrorResponse
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,27 +28,26 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             return response
-            
+
         except HTTPException as e:
-            # 已知的HTTP异常直接抛出，不需要额外处理
-            return await self._create_error_response(
+            return ErrorResponse.generate_error_response(
+                request=request,
                 status_code=e.status_code,
-                error_type="HTTP_ERROR",
                 detail=e.detail,
-                request=request
+                err_type="HTTP_ERROR"
             )
-            
+
         except DatabaseError as e:
             # 数据库相关异常
             logger.error(f"数据库错误: {str(e)}", exc_info=True)
             return await self._create_error_response(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                error_type="DATABASE_ERROR", 
+                error_type="DATABASE_ERROR",
                 detail="数据库操作失败",
                 request=request,
                 original_error=str(e)
             )
-            
+
         except IntegrityError as e:
             # 数据完整性约束异常
             logger.error(f"数据完整性错误: {str(e)}", exc_info=True)
@@ -57,7 +58,7 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
                 request=request,
                 original_error=str(e)
             )
-            
+
         except ValueError as e:
             # 值错误（通常是业务逻辑错误）
             logger.warning(f"值错误: {str(e)}", exc_info=True)
@@ -67,7 +68,7 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
                 detail=str(e),
                 request=request
             )
-            
+
         except FileNotFoundError as e:
             # 文件未找到异常
             logger.error(f"文件未找到: {str(e)}", exc_info=True)
@@ -78,7 +79,7 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
                 request=request,
                 original_error=str(e)
             )
-            
+
         except PermissionError as e:
             # 权限错误
             logger.error(f"权限错误: {str(e)}", exc_info=True)
@@ -89,7 +90,7 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
                 request=request,
                 original_error=str(e)
             )
-            
+
         except Exception as e:
             # 所有其他未预期的异常
             logger.error(f"未捕获的异常: {str(e)}", exc_info=True)
@@ -102,12 +103,12 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
             )
 
     async def _create_error_response(
-        self, 
-        status_code: int, 
-        error_type: str,
-        detail: str, 
-        request: Request,
-        original_error: str = None
+            self,
+            status_code: int,
+            error_type: str,
+            detail: str,
+            request: Request,
+            original_error: str = None
     ) -> JSONResponse:
         """
         创建标准化的错误响应
@@ -135,12 +136,12 @@ class ExceptionMiddleware(BaseHTTPMiddleware):
                 "method": request.method,
             }
         }
-        
+
         # 在开发环境下添加更多调试信息
         if self._is_debug_mode():
             error_data["error"]["original_error"] = original_error
             error_data["error"]["traceback"] = traceback.format_exc()
-            
+
         return JSONResponse(
             status_code=status_code,
             content=error_data
