@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 from ..database.connection import get_db
 from ..database.service.book_service import BookService
 from ..database.service.ranking_service import RankingService
-from ..models import BookRankingInfoResponse
 from ..models.base import DataResponse, ListResponse
 from ..models.book import (
     BookDetailResponse,
+    BookRankingInfoResponse,
     BookResponse,
     BookSnapshotResponse,
 )
@@ -115,7 +115,7 @@ async def get_book_snapshots(
     )
 
 
-@router.get("/{novel_id}/rankings", response_model=DataResponse[BookRankingInfoResponse])
+@router.get("/{novel_id}/rankings", response_model=ListResponse[BookRankingInfoResponse])
 async def get_book_ranking_history(
         novel_id: str,
         ranking_id: int | None = Query(None, description="指定榜单ID"),
@@ -125,26 +125,28 @@ async def get_book_ranking_history(
     """
     获取书籍排名历史 - 使用novel_id
 
-    :param novel_id:
-    :param ranking_id:
-    :param days:
-    :param db:
-    :return:
+    :param novel_id: 书籍novel_id，晋江文学城的小说ID
+    :param ranking_id: 指定榜单ID，可选，如果不指定则查询所有榜单
+    :param days: 统计天数，查询最近多少天的排名历史
+    :param db: 数据库会话对象
+    :return: 书籍排名历史列表
     """
     # 检查书籍是否存在
     book = book_service.get_book_by_novel_id(db, novel_id)
 
-    # 获取排名历史（使用book.id）
-    ranking_history = ranking_service.get_book_ranking_history(
+    # 使用带详细信息的方法获取排名历史（已包含榜单信息）
+    ranking_history_data = ranking_service.get_book_ranking_history_with_details(
         db, book.id, ranking_id, days
     )
 
-    return DataResponse(
+    # 转换为响应模型
+    ranking_responses = [
+        BookRankingInfoResponse.from_snapshot(book.id,*history) for history in ranking_history_data
+    ]
+
+    return ListResponse(
         success=True,
         code=200,
-        data=[
-        BookRankingInfoResponse.from_history_dict(book.id, history)
-        for history in ranking_history
-    ],
-        message="获取排名历史成功"
+        data=ranking_responses,
+        message=f"获取{len(ranking_responses)}条排名历史成功"
     )

@@ -99,23 +99,27 @@ class BookRankingInfoResponse(BaseModel):
     book_id: int = Field(..., description="书籍ID")
     ranking_id: int = Field(..., description="榜单ID")
     ranking_name: str = Field(..., description="榜单名称")
+    sub_ranking_name: str = Field(..., description="子榜单名称")
+    ranking_page_id: str = Field(..., description="榜单页面ID")
     position: int = Field(..., description="排名位置")
     snapshot_time: datetime = Field(..., description="快照时间")
 
     @classmethod
-    def from_history_dict(cls, book_id: int, snapshot: RankingSnapshot, ranking: Ranking) -> "BookRankingSnapshot":
+    def from_snapshot(cls, book_id: int, ranking: Ranking, snapshot: RankingSnapshot) -> "BookRankingInfoResponse":
         """
-        从历史数据字典创建BookRankingInfo实例
+        从RankingSnapshot和Ranking对象创建BookRankingInfoResponse实例
 
         :param book_id: 书籍ID
-        :param snapshot:
-        :param ranking:
-        :return: 书籍排名信息实例
+        :param snapshot: 排名快照对象
+        :param ranking: 榜单对象
+        :return: 书籍排名信息响应实例
         """
         return cls(
             book_id=book_id,
             ranking_id=snapshot.ranking_id,
             ranking_name=ranking.name,
+            sub_ranking_name=ranking.sub_ranking_name,
+            ranking_page_id=ranking.page_id,
             position=snapshot.position,
             snapshot_time=snapshot.snapshot_time,
         )

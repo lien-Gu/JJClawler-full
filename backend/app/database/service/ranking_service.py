@@ -3,7 +3,7 @@
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Tuple
 
 from sqlalchemy import and_, desc, distinct, func, select
 from sqlalchemy.orm import Session
@@ -226,27 +226,17 @@ class RankingService:
         book_id: int,
         ranking_id: int | None = None,
         days: int = 30,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Tuple[Ranking, RankingSnapshot]]:
         """获取书籍在榜单中的排名历史（包含详细信息）"""
         start_time = datetime.now() - timedelta(days=days)
-
         snapshots = self.get_book_ranking_history(db, book_id, ranking_id, start_time)
-
-        history_data = []
+        results = []
         for snapshot in snapshots:
-            # 获取榜单信息
             ranking = self.get_ranking_by_id(db, snapshot.ranking_id)
-            history_data.append(
-                {
-                    "ranking_id": snapshot.ranking_id,
-                    "ranking_name": ranking.name if ranking else "未知榜单",
-                    "position": snapshot.position,
-                    "score": snapshot.score,
-                    "snapshot_time": snapshot.snapshot_time,
-                }
-            )
-
-        return history_data
+            if not ranking:
+                raise ValueError("can not get ranking!")
+            results.append((ranking, snapshot))
+        return results
 
     # ==================== 内部依赖方法 ====================
 

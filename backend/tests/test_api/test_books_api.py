@@ -116,15 +116,15 @@ class TestGetBookDetail:
         """测试成功获取书籍详情"""
         # 模拟service返回数据
         mock_service = mocker.patch("app.api.books.book_service")
-        mock_service.get_book_detail_with_latest_snapshot.return_value = {
-            "book": type("MockBook", (), mock_book_data["book"])(),
-            "latest_snapshot": type(
-                "MockSnapshot", (), mock_book_snapshot_data["latest_snapshot"]
-            )(),
-        }
+        mock_book_obj = type("MockBook", (), mock_book_data["book"])()
+        mock_service.get_book_by_novel_id.return_value = mock_book_obj
+        mock_service.get_book_detail_with_latest_snapshot.return_value = (
+            mock_book_obj,
+            type("MockSnapshot", (), mock_book_snapshot_data["latest_snapshot"])(),
+        )
 
-        # 发送请求
-        response = client.get("/api/v1/books/1")
+        # 发送请求（使用novel_id）
+        response = client.get("/api/v1/books/12345")
 
         # 验证响应
         assert response.status_code == 200
@@ -136,21 +136,25 @@ class TestGetBookDetail:
         assert data["data"]["clicks"] == 50000
 
         # 验证service被调用
+        mock_service.get_book_by_novel_id.assert_called_once_with(mocker.ANY, "12345")
         mock_service.get_book_detail_with_latest_snapshot.assert_called_once()
 
     def test_get_book_detail_not_found(self, client, mocker):
         """测试书籍不存在"""
-        # 模拟service返回None
+        # 模拟service抛出404异常
+        from fastapi import HTTPException
         mock_service = mocker.patch("app.api.books.book_service")
-        mock_service.get_book_detail_with_latest_snapshot.return_value = None
+        mock_service.get_book_by_novel_id.side_effect = HTTPException(
+            status_code=404, detail="书籍不存在: 99999"
+        )
 
-        # 发送请求
-        response = client.get("/api/v1/books/999")
+        # 发送请求（使用novel_id）
+        response = client.get("/api/v1/books/99999")
 
         # 验证响应
         assert response.status_code == 404
         data = response.json()
-        assert data["detail"] == "书籍不存在"
+        assert "书籍不存在" in data["detail"]
 
 
 class TestGetBookTrend:
@@ -306,60 +310,99 @@ class TestGetBookRankingHistory:
     """测试获取书籍排名历史接口"""
 
     def test_get_book_ranking_history_success(
-        self, client, mocker, mock_book_data, mock_ranking_history_data
+        self, client, mocker, mock_book_data
     ):
         """测试成功获取排名历史"""
-        # 模拟service
+        # 模拟book service
         mock_book_service = mocker.patch("app.api.books.book_service")
-        mock_book_service.get_book_by_id.return_value = type(
-            "MockBook", (), mock_book_data["book"]
-        )()
+        mock_book_data_obj = type("MockBook", (), mock_book_data["book"])()
+        mock_book_service.get_book_by_novel_id.return_value = mock_book_data_obj
 
+        # 模拟ranking service返回详细历史数据
         mock_ranking_service = mocker.patch("app.api.books.ranking_service")
-        mock_ranking_service.get_book_ranking_history.return_value = (
-            mock_ranking_history_data
+        mock_ranking_history_with_details = [
+            {
+                "ranking_id": 1,
+                "ranking_name": "总点击榜",
+                "position": 15,
+                "score": 95000,
+                "snapshot_time": "2023-10-15T12:00:00"
+            },
+            {
+                "ranking_id": 2,
+                "ranking_name": "收藏榜",
+                "position": 8,
+                "score": 75000,
+                "snapshot_time": "2023-10-15T11:00:00"
+            }
+        ]
+        mock_ranking_service.get_book_ranking_history_with_details.return_value = mock_ranking_history_with_details
+
+        # 发送请求（使用novel_id而不是book_id）
+        response = client.get("/api/v1/books/12345/rankings?ranking_id=1&days=30")
+
+        # 验证响应
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "获取2条排名历史成功" in data["message"]
+        assert data["count"] == 2
+        assert len(data["data"]) == 2
+        
+        # 验证数据结构 - 现在返回的是列表，不是包装对象
+        first_item = data["data"][0]
+        assert first_item["book_id"] == mock_book_data["book"]["id"]
+        assert first_item["ranking_id"] == 1
+        assert first_item["ranking_name"] == "总点击榜"
+        assert first_item["position"] == 15
+
+        # 验证service调用
+        mock_book_service.get_book_by_novel_id.assert_called_once_with(mocker.ANY, "12345")
+        mock_ranking_service.get_book_ranking_history_with_details.assert_called_once()
+
+    def test_get_book_ranking_history_no_ranking_id(
+        self, client, mocker, mock_book_data
+    ):
+        """测试不指定榜单ID获取排名历史"""
+        # 模拟book service
+        mock_book_service = mocker.patch("app.api.books.book_service")
+        mock_book_data_obj = type("MockBook", (), mock_book_data["book"])()
+        mock_book_service.get_book_by_novel_id.return_value = mock_book_data_obj
+
+        # 模拟ranking service
+        mock_ranking_service = mocker.patch("app.api.books.ranking_service")
+        mock_ranking_service.get_book_ranking_history_with_details.return_value = []
+
+        # 发送请求（不指定ranking_id）
+        response = client.get("/api/v1/books/12345/rankings?days=30")
+
+        # 验证响应
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["count"] == 0
+
+        # 验证service调用（ranking_id应该为None）
+        mock_ranking_service.get_book_ranking_history_with_details.assert_called_once_with(
+            mocker.ANY, mock_book_data_obj.id, None, 30
+        )
+
+    def test_get_book_ranking_history_book_not_found(self, client, mocker):
+        """测试书籍不存在的情况"""
+        # 模拟book service抛出404异常
+        from fastapi import HTTPException
+        mock_book_service = mocker.patch("app.api.books.book_service")
+        mock_book_service.get_book_by_novel_id.side_effect = HTTPException(
+            status_code=404, detail="书籍不存在: 99999"
         )
 
         # 发送请求
-        response = client.get("/api/v1/books/1/rankings?ranking_id=1&days=30")
+        response = client.get("/api/v1/books/99999/rankings?days=30")
 
         # 验证响应
-        assert response.status_code == 200
+        assert response.status_code == 404
         data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "获取排名历史成功"
-        assert data["data"]["book_id"] == 1
-        assert len(data["data"]["ranking_history"]) == 2
-
-        # 验证service调用
-        mock_book_service.get_book_by_id.assert_called_once()
-        mock_ranking_service.get_book_ranking_history.assert_called_once()
-
-    def test_get_book_ranking_history_no_ranking_id(
-        self, client, mocker, mock_book_data, mock_ranking_history_data
-    ):
-        """测试不指定榜单ID获取排名历史"""
-        # 模拟service
-        mock_book_service = mocker.patch("app.api.books.book_service")
-        mock_book_service.get_book_by_id.return_value = type(
-            "MockBook", (), mock_book_data["book"]
-        )()
-
-        mock_ranking_service = mocker.patch("app.api.books.ranking_service")
-        mock_ranking_service.get_book_ranking_history.return_value = (
-            mock_ranking_history_data
-        )
-
-        # 发送请求（不指定ranking_id）
-        response = client.get("/api/v1/books/1/rankings?days=30")
-
-        # 验证响应
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-
-        # 验证service调用（ranking_id应该为None）
-        mock_ranking_service.get_book_ranking_history.assert_called_once()
+        assert "书籍不存在" in data["detail"]
 
 
 class TestErrorHandling:
