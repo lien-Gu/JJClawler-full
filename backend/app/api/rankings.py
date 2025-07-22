@@ -29,51 +29,58 @@ ranking_service = RankingService()
 
 @router.get("/", response_model=ListResponse[RankingResponse])
 async def get_rankings(
-    group_type: str | None = Query(None, description="榜单分组类型筛选"),
+    page_id: str | None = Query(None, description="榜单页面ID筛选"),
+    sub_ranking_name: str | None = Query(None, description="子榜单名称筛选"),
+    name: str | None = Query(None, description="榜单名称筛选"),
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: Session = Depends(get_db),
 ):
     """
     获取榜单列表
-
-    Args:
-        group_type: 榜单分组类型筛选
-        page: 页码
-        size: 每页数量
-
-    Returns:
-        List[RankingResponse]: 榜单列表
+    
+    :param page_id: 榜单页面ID筛选
+    :param sub_ranking_name: 子榜单名称筛选  
+    :param name: 榜单名称筛选
+    :param page: 页码
+    :param size: 每页数量
+    :param db: 数据库会话对象
+    :return: 榜单列表
     """
-    try:
-        filters = {}
-        if group_type:
-            filters["rank_group_type"] = group_type
+    # 构建筛选条件
+    filters = {}
+    if page_id:
+        filters["page_id"] = page_id
+    if sub_ranking_name:
+        filters["sub_ranking_name"] = sub_ranking_name
+    if name:
+        filters["name"] = name
 
-        result = ranking_service.get_all_rankings(db, page, size, filters)
+    # 获取榜单数据
+    result = ranking_service.get_all_rankings(db, page, size, filters)
 
-        # 转换为响应模型
-        ranking_responses = []
-        for ranking in result["rankings"]:
-            ranking_responses.append(
-                RankingResponse(
-                    ranking_id=str(ranking.rank_id),  # 转换为字符串
-                    name=ranking.name,
-                    page_id=ranking.page_id,
-                    url="",  # URL字段不在数据库模型中，需要从配置获取
-                    category=ranking.rank_group_type,
-                    is_active=True,  # 模型中没有is_active字段，默认True
-                    crawl_frequency=60,  # 默认值
-                    last_crawl_time=None,
-                    create_time=ranking.created_at,
-                )
-            )
-
-        return ListResponse(
-            data=ranking_responses, count=result["total"], message="榜单列表获取成功"
+    # 转换为响应模型
+    ranking_responses = [
+        RankingResponse(
+            ranking_id=str(ranking.rank_id),
+            name=ranking.name,
+            page_id=ranking.page_id,
+            url="",  # URL字段需要从配置获取
+            category=getattr(ranking, 'rank_group_type', ''),
+            is_active=True,
+            crawl_frequency=60,
+            last_crawl_time=None,
+            create_time=ranking.created_at,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取榜单列表失败: {str(e)}")
+        for ranking in result["rankings"]
+    ]
+
+    return ListResponse(
+        success=True,
+        code=200,
+        data=ranking_responses,
+        message="榜单列表获取成功"
+    )
 
 
 @router.get("/{ranking_id}", response_model=DataResponse[RankingDetailResponse])

@@ -85,11 +85,13 @@ class BookDetailResponse(BookResponse, BookSnapshotResponse):
             id=book_t.id,
             novel_id=book_t.novel_id,
             title=book_t.title,
-            favorites=snapshot.favorites or None,
-            clicks=snapshot.clicks or None,
-            comments=snapshot.comments or None,
-            word_count=snapshot.word_count,
-            status=snapshot.status,
+            book_id=book_t.id,
+            snapshot_time=snapshot.snapshot_time if snapshot else None,
+            favorites=snapshot.favorites if snapshot else 0,
+            clicks=snapshot.clicks if snapshot else 0,
+            comments=snapshot.comments if snapshot else 0,
+            word_count=snapshot.word_count if snapshot else None,
+            status=snapshot.status if snapshot else None,
         )
 
 
