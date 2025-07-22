@@ -43,7 +43,7 @@ async def get_books_list(
     return ListResponse(
         success=True,
         code=200,
-        data=[BookResponse.from_book_table(book) for book in book_result],
+        data=[BookResponse.from_book(book) for book in book_result],
         message="获取书籍列表成功"
     )
 

@@ -3,8 +3,9 @@
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any, Tuple
+from typing import Any, Tuple, List
 
+from fastapi import HTTPException
 from sqlalchemy import and_, desc, distinct, func, select
 from sqlalchemy.orm import Session
 
@@ -42,19 +43,18 @@ class RankingService:
 
     # ==================== API使用的方法 ====================
 
-    def get_ranking_by_id(self, db: Session, ranking_id: int) -> Ranking | None:
-        """根据ID获取榜单"""
+    @staticmethod
+    def get_ranking_by_id(db: Session, ranking_id: int) -> Ranking | None:
+        """
+        根据ID获取榜单
+
+        :param self:
+        :param db:
+        :param ranking_id:
+        :return:
+        """
         return db.get(Ranking, ranking_id)
 
-    def get_all_rankings(
-        self,
-        db: Session,
-        page: int = 1,
-        size: int = 20,
-        filters: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """获取所有榜单（API使用）"""
-        return self.get_rankings_with_pagination(db, page, size, filters)
 
     def get_ranking_statistics(self, db: Session, ranking_id: int) -> dict[str, Any]:
         """获取榜单统计信息"""
@@ -85,14 +85,21 @@ class RankingService:
         target_date: date | None = None,
         limit: int = 50,
     ) -> dict[str, Any] | None:
-        """获取榜单详情"""
+        """
+        获取榜单详情
+        :param db:
+        :param ranking_id:
+        :param target_date:
+        :param limit:
+        :return:
+        """
         ranking = self.get_ranking_by_id(db, ranking_id)
         if not ranking:
-            return None
+            raise HTTPException(status_code=404, detail="榜单不存在")
 
         # 获取快照数据
         if target_date:
-            snapshots = self.get_snapshots_by_ranking_and_date(
+            snapshots = self.get_snapshots_by_date(
                 db, ranking_id, target_date, limit
             )
         else:
@@ -166,7 +173,7 @@ class RankingService:
         comparison_data = {}
         for ranking_id in ranking_ids:
             if target_date:
-                snapshots = self.get_snapshots_by_ranking_and_date(
+                snapshots = self.get_snapshots_by_date(
                     db, ranking_id, target_date
                 )
             else:
@@ -279,13 +286,13 @@ class RankingService:
         db.refresh(ranking)
         return ranking
 
+    @staticmethod
     def get_rankings_with_pagination(
-        self,
         db: Session,
         page: int = 1,
         size: int = 20,
         filters: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Tuple[List[Ranking], int]:
         """分页获取榜单列表"""
         skip = (page - 1) * size
 
@@ -308,14 +315,9 @@ class RankingService:
         )
 
         total = db.scalar(count_query)
+        total_pages = (total + size - 1) // size if total > 0 else 0
 
-        return {
-            "rankings": rankings,
-            "total": total,
-            "page": page,
-            "size": size,
-            "total_pages": (total + size - 1) // size if total > 0 else 0,
-        }
+        return rankings, total_pages
 
     def get_latest_snapshots_by_ranking_id(
         self, db: Session, ranking_id: int, limit: int = 50
@@ -344,10 +346,18 @@ class RankingService:
         )
         return list(result.scalars())
 
-    def get_snapshots_by_ranking_and_date(
-        self, db: Session, ranking_id: int, target_date: date, limit: int = 50
+    @staticmethod
+    def get_snapshots_by_date(
+        db: Session, ranking_id: int, target_date: date, limit: int = 50
     ) -> list[RankingSnapshot]:
-        """获取指定日期的榜单快照"""
+        """
+        获取指定日期的榜单快照
+        :param db:
+        :param ranking_id:
+        :param target_date:
+        :param limit:
+        :return:
+        """
         # 查找目标日期最接近的快照时间
         target_time = db.scalar(
             select(RankingSnapshot.snapshot_time)
@@ -362,7 +372,7 @@ class RankingService:
         )
 
         if not target_time:
-            return []
+            raise ValueError("Don't exist records in target time")
 
         result = db.execute(
             select(RankingSnapshot)

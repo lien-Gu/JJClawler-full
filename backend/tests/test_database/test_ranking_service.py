@@ -208,7 +208,7 @@ class TestRankingService:
         """测试获取指定日期的榜单快照"""
         target_date = create_test_ranking_snapshot.snapshot_time.date()
 
-        result = ranking_service.get_snapshots_by_ranking_and_date(
+        result = ranking_service.get_snapshots_by_date(
             db_session, create_test_ranking_snapshot.ranking_id, target_date
         )
 

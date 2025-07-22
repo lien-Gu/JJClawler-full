@@ -18,7 +18,7 @@ class BookResponse(BaseModel):
     title: str = Field(min_length=1, description="书名")
 
     @classmethod
-    def from_book_table(cls, book_t: Book) -> "BookResponse":
+    def from_book(cls, book_t: Book) -> "BookResponse":
         """
         从Book数据库模型创建BookResponse实例
 

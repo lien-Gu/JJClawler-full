@@ -6,20 +6,33 @@ from datetime import date as Date
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+from ..database.db.ranking import Ranking
 
 
 class RankingResponse(BaseModel):
     """榜单基础信息响应"""
-
-    ranking_id: str = Field(..., description="榜单ID")  # 修改为string类型
+    id: int = Field(..., description="id")
+    ranking_id: str = Field(..., description="榜单ID")
     name: str = Field(..., description="榜单名称")
+    sub_ranking_name: str = Field(..., description="子榜单名称")
     page_id: str = Field(..., description="页面ID")
-    url: str = Field(..., description="榜单URL")
-    category: str | None = Field(None, description="榜单分类")
-    is_active: bool = Field(True, description="是否启用")
-    crawl_frequency: int = Field(60, description="爬取频率（分钟）")
-    last_crawl_time: datetime | None = Field(None, description="最后爬取时间")
-    create_time: datetime = Field(..., description="创建时间")
+    rank_group_type: str = Field(..., description="榜单分组类型")
+
+    @classmethod
+    def from_ranking(cls, ranking: Ranking) -> "RankingResponse":
+        """
+
+        :param ranking:
+        :return:
+        """
+        return cls(
+            id=ranking.id,
+            ranking_id=ranking.rank_id,
+            name=ranking.name,
+            sub_ranking_name=ranking.sub_ranking_name,
+            page_id=ranking.page_id,
+            rank_group_type=ranking.rank_group_type
+        )
 
 
 class BookInRanking(BaseModel):
