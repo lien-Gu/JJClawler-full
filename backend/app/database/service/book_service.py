@@ -4,15 +4,13 @@
 
 from datetime import datetime, timedelta
 from typing import Any
+from typing import Tuple
 
 from fastapi import HTTPException
 from sqlalchemy import desc, func, select, text
 from sqlalchemy.orm import Session
-from typing import Optional, Tuple
 
 from app.database.sql.book_queries import (
-    BOOK_HOURLY_SNAPSHOTS_QUERY,
-    BOOK_DAILY_ONE_OCLOCK_SNAPSHOTS_QUERY,
     BOOK_HISTORY_QUERY,
 )
 from ..db.book import Book, BookSnapshot
@@ -225,8 +223,9 @@ class BookService:
         )
         return list(result.scalars())
 
+    @staticmethod
     def get_historical_snapshots(
-            self, db: Session, book_id: int, interval: str, count: int
+            db: Session, book_id: int, interval: str, count: int
     ) -> list[BookSnapshot]:
         """
         获取历史快照
@@ -262,18 +261,16 @@ class BookService:
         )
 
         # 转换为BookSnapshot对象
-        snapshots = []
-        for row in result:
-            snapshot = BookSnapshot()
-            snapshot.id = row.id
-            snapshot.book_id = row.book_id
-            snapshot.favorites = row.favorites
-            snapshot.clicks = row.clicks
-            snapshot.comments = row.comments
-            snapshot.recommendations = row.recommendations
-            snapshot.word_count = row.word_count
-            snapshot.status = row.status
-            snapshot.snapshot_time = row.snapshot_time
-            snapshots.append(snapshot)
-
-        return snapshots
+        return [
+            BookSnapshot(
+                id=row.id,
+                book_id=row.book_id,
+                favorites=row.favorites,
+                clicks=row.clicks,
+                comments=row.comments,
+                word_count=row.word_count,
+                status=row.status,
+                snapshot_time=row.snapshot_time
+            )
+            for row in result
+        ]

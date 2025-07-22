@@ -122,9 +122,17 @@ async def get_book_ranking_history(
         days: int = Query(30, ge=1, le=365, description="统计天数"),
         db: Session = Depends(get_db),
 ):
-    """获取书籍排名历史 - 使用novel_id"""
+    """
+    获取书籍排名历史 - 使用novel_id
+
+    :param novel_id:
+    :param ranking_id:
+    :param days:
+    :param db:
+    :return:
+    """
     # 检查书籍是否存在
-    book = book_service.get_book_by_novel_id(db, novel_id, raise_404=True)
+    book = book_service.get_book_by_novel_id(db, novel_id)
 
     # 获取排名历史（使用book.id）
     ranking_history = ranking_service.get_book_ranking_history(
