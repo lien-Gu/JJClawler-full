@@ -56,6 +56,7 @@ class RankingDetailResponse(BaseModel):
     page_id: str = Field(..., description="页面ID")
     category: str | None = Field(None, description="榜单分类")
     snapshot_time: datetime = Field(..., description="快照时间")
+    batch_id: str = Field(..., description="批次ID，用于标识数据一致性")
     books: list[BookInRanking] = Field([], description="榜单书籍列表")
     total_books: int = Field(0, description="书籍总数")
 
@@ -110,3 +111,19 @@ class RankingCompareResponse(BaseModel):
     rankings: list[RankingDetailResponse] = Field([], description="榜单详情列表")
     common_books: list[BookInRanking] = Field([], description="共同上榜书籍")
     unique_books_count: int = Field(0, description="各榜单独有书籍总数")
+
+
+class BatchInfoResponse(BaseModel):
+    """批次信息响应"""
+    
+    batch_id: str = Field(..., description="批次ID")
+    snapshot_time: datetime = Field(..., description="快照时间")
+    total_books: int = Field(0, description="此批次包含的书籍总数")
+
+
+class RankingBatchListResponse(BaseModel):
+    """榜单批次列表响应"""
+    
+    ranking_id: int = Field(..., description="榜单ID")
+    target_date: Date = Field(..., description="目标日期")
+    available_batches: list[BatchInfoResponse] = Field([], description="可用批次列表")

@@ -92,6 +92,11 @@ class RankingSnapshot(Base):
         index=True,
         comment="关联的书籍ID，对应Book表的主键id",
     )
+    batch_id: Mapped[str] = mapped_column(
+        String(36),
+        index=True,
+        comment="批次ID，用于标识同一次爬取任务产生的数据，确保数据时间一致性"
+    )
     # 排名信息
     position: Mapped[int] = mapped_column(
         Integer, index=True, comment="书籍在榜单中的排名位置，数字越小排名越高，从1开始"
@@ -122,8 +127,12 @@ class RankingSnapshot(Base):
         ),
         # 书籍排名索引 - 用于查询书籍的排名历史
         Index("idx_book_ranking_snapshot", "book_id", "ranking_id", "snapshot_time"),
-        # 唯一约束 - 确保同一时间点同一榜单中每本书只有一个排名
+        # 批次ID索引 - 用于快速查询同一批次的数据
+        Index("idx_ranking_batch_id", "batch_id"),
+        # 批次榜单索引 - 用于获取特定批次的榜单快照
+        Index("idx_ranking_batch_ranking", "ranking_id", "batch_id"),
+        # 唯一约束 - 确保同一批次中同一榜单每本书只有一个排名
         UniqueConstraint(
-            "ranking_id", "book_id", "snapshot_time", name="uq_ranking_book_snapshot"
+            "ranking_id", "book_id", "batch_id", name="uq_ranking_book_batch"
         ),
     )

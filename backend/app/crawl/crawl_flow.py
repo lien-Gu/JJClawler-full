@@ -316,7 +316,7 @@ class CrawlFlow:
             return None
 
     async def _save_crawl_result(self, rankings: list[dict], books: list[dict]) -> bool:
-        """保存爬取结果到数据库"""
+        """保存爬取结果到数据库 - 使用batch_id确保数据一致性"""
         try:
             for db in get_db():
                 try:
@@ -326,8 +326,9 @@ class CrawlFlow:
 
                     db.commit()
                     logger.info(
-                        f"成功保存 {len(rankings)} 个榜单和 {len(books)} 本书籍"
+                        f"成功保存 {len(rankings)} 个榜单和 {len(books)} 本书籍)"
                     )
+
                     return True
 
                 except Exception as e:
@@ -341,9 +342,9 @@ class CrawlFlow:
             return False
 
     async def _save_rankings(
-        self, db, rankings_data: list[dict], snapshot_time: datetime
+        self, db, rankings_data: list[dict], snapshot_time: datetime,
     ) -> None:
-        """保存榜单数据和快照"""
+        """保存榜单数据和快照 - 使用batch_id确保一致性"""
         for ranking_data in rankings_data:
             try:
                 # 保存或更新榜单基本信息
@@ -362,6 +363,9 @@ class CrawlFlow:
                 # 创建榜单快照
                 books = ranking_data.get("books", [])
                 ranking_snapshots = []
+                # 导入batch管理工具
+                from ..utils import generate_batch_id
+                batch_id = generate_batch_id()
 
                 for book in books:
                     # 确保书籍存在
@@ -375,16 +379,17 @@ class CrawlFlow:
                     snapshot_data = {
                         "ranking_id": ranking.id,
                         "book_id": book_obj.id,
+                        "batch_id": batch_id,
                         "position": book.get("position", 0),
                         "score": book.get("score", 0.0),
                         "snapshot_time": snapshot_time,
                     }
                     ranking_snapshots.append(snapshot_data)
 
-                # 批量保存榜单快照
+                # 批量保存榜单快照 - 传递batch_id
                 if ranking_snapshots:
                     self.ranking_service.batch_create_ranking_snapshots(
-                        db, ranking_snapshots
+                        db, ranking_snapshots, batch_id
                     )
 
                 logger.debug(

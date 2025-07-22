@@ -33,9 +33,26 @@ class RankingService:
             return self.create_ranking(db, ranking_data)
 
     def batch_create_ranking_snapshots(
-        self, db: Session, snapshots: list[dict[str, Any]]
+        self, db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
     ) -> list[RankingSnapshot]:
-        """批量创建榜单快照"""
+        """
+        批量创建榜单快照 - 支持batch_id
+        
+        :param db: 数据库会话
+        :param snapshots: 快照数据列表
+        :param batch_id: 批次ID，如果不提供则自动生成
+        :return: 创建的快照对象列表
+        """
+        from ...utils.batch import ensure_batch_id
+        
+        # 确保有batch_id
+        if batch_id is None:
+            batch_id = ensure_batch_id()
+        
+        # 为所有快照数据添加batch_id
+        for snapshot in snapshots:
+            snapshot['batch_id'] = batch_id
+        
         snapshot_objs = [RankingSnapshot(**snapshot) for snapshot in snapshots]
         db.add_all(snapshot_objs)
         db.commit()
@@ -322,23 +339,29 @@ class RankingService:
     def get_latest_snapshots_by_ranking_id(
         self, db: Session, ranking_id: int, limit: int = 50
     ) -> list[RankingSnapshot]:
-        """获取榜单最新快照"""
-        # 获取最新时间
-        latest_time = db.scalar(
-            select(func.max(RankingSnapshot.snapshot_time)).where(
-                RankingSnapshot.ranking_id == ranking_id
-            )
+        """
+        获取榜单最新快照 - 使用batch_id确保数据一致性
+        
+        优先获取最新batch_id的完整数据，确保所有书籍数据来自同一次爬取
+        """
+        # 获取最新的batch_id
+        latest_batch_id = db.scalar(
+            select(RankingSnapshot.batch_id)
+            .where(RankingSnapshot.ranking_id == ranking_id)
+            .order_by(desc(RankingSnapshot.snapshot_time))
+            .limit(1)
         )
 
-        if not latest_time:
+        if not latest_batch_id:
             return []
 
+        # 使用最新batch_id获取完整的快照数据
         result = db.execute(
             select(RankingSnapshot)
             .where(
                 and_(
                     RankingSnapshot.ranking_id == ranking_id,
-                    RankingSnapshot.snapshot_time == latest_time,
+                    RankingSnapshot.batch_id == latest_batch_id,
                 )
             )
             .order_by(RankingSnapshot.position)
@@ -351,16 +374,19 @@ class RankingService:
         db: Session, ranking_id: int, target_date: date, limit: int = 50
     ) -> list[RankingSnapshot]:
         """
-        获取指定日期的榜单快照
-        :param db:
-        :param ranking_id:
-        :param target_date:
-        :param limit:
-        :return:
+        获取指定日期的榜单快照 - 使用batch_id确保数据一致性
+        
+        优先使用batch_id来获取一致的批次数据，而不是依赖snapshot_time
+        
+        :param db: 数据库会话
+        :param ranking_id: 榜单ID
+        :param target_date: 目标日期
+        :param limit: 返回数量限制
+        :return: 榜单快照列表
         """
-        # 查找目标日期最接近的快照时间
-        target_time = db.scalar(
-            select(RankingSnapshot.snapshot_time)
+        # 首先查找目标日期最新的batch_id
+        latest_batch_id = db.scalar(
+            select(RankingSnapshot.batch_id)
             .where(
                 and_(
                     RankingSnapshot.ranking_id == ranking_id,
@@ -371,21 +397,72 @@ class RankingService:
             .limit(1)
         )
 
-        if not target_time:
+        if not latest_batch_id:
             raise ValueError("Don't exist records in target time")
 
+        # 使用batch_id获取同一批次的所有数据，确保时间一致性
         result = db.execute(
             select(RankingSnapshot)
             .where(
                 and_(
                     RankingSnapshot.ranking_id == ranking_id,
-                    RankingSnapshot.snapshot_time == target_time,
+                    RankingSnapshot.batch_id == latest_batch_id,
                 )
             )
             .order_by(RankingSnapshot.position)
             .limit(limit)
         )
         return list(result.scalars())
+
+    @staticmethod
+    def get_snapshots_by_batch_id(
+        db: Session, ranking_id: int, batch_id: str, limit: int = 50
+    ) -> list[RankingSnapshot]:
+        """
+        根据batch_id获取榜单快照
+        
+        :param db: 数据库会话
+        :param ranking_id: 榜单ID
+        :param batch_id: 批次ID
+        :param limit: 返回数量限制
+        :return: 榜单快照列表
+        """
+        result = db.execute(
+            select(RankingSnapshot)
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.batch_id == batch_id,
+                )
+            )
+            .order_by(RankingSnapshot.position)
+            .limit(limit)
+        )
+        return list(result.scalars())
+
+    @staticmethod
+    def get_available_batch_ids_by_date(
+        db: Session, ranking_id: int, target_date: date
+    ) -> list[str]:
+        """
+        获取指定日期的所有可用batch_id
+        
+        :param db: 数据库会话
+        :param ranking_id: 榜单ID
+        :param target_date: 目标日期
+        :return: batch_id列表
+        """
+        result = db.execute(
+            select(distinct(RankingSnapshot.batch_id))
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    func.date(RankingSnapshot.snapshot_time) == target_date,
+                )
+            )
+            .order_by(desc(RankingSnapshot.batch_id))
+        )
+        return [row for row in result.scalars()]
 
     def get_book_ranking_history(
         self,

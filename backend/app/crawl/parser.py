@@ -88,9 +88,7 @@ class Parser:
         """解析页面数据"""
         try:
             # 支持两种数据结构
-            # 结构1: content.data（旧版本）
             data_list = raw_data.get("content", {}).get("data", [])
-            # 结构2: 直接data（新版本index页面）
             if not data_list:
                 data_list = raw_data.get("data", [])
 
