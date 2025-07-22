@@ -68,13 +68,10 @@ class BookSnapshot(Base):
         Integer, default=0, comment="收藏数量，读者收藏该书籍的总数"
     )
     clicks: Mapped[int] = mapped_column(
-        Integer, default=0, comment="点击量，书籍详情页的访问次数"
+        Integer, default=0, comment="非V章点击量，书籍详情页的访问次数"
     )
     comments: Mapped[int] = mapped_column(
         Integer, default=0, comment="评论数量，读者对该书籍的评论总数"
-    )
-    recommendations: Mapped[int] = mapped_column(
-        Integer, default=0, comment="推荐数量，读者推荐该书籍的总数"
     )
 
     # 内容信息

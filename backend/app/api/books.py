@@ -13,7 +13,7 @@ from ..models.book import (
     BookDetailResponse,
     BookRankingHistoryResponse,
     BookResponse,
-    BookTrendPoint,
+    BookSnapshotResponse,
 )
 
 router = APIRouter()
@@ -23,26 +23,19 @@ book_service = BookService()
 ranking_service = RankingService()
 
 
-def _get_book_or_404(db: Session, novel_id: str):
-    """获取书籍或抛出404异常 - 使用novel_id"""
-    # 先通过novel_id获取book_id，再获取书籍
-    book = book_service.get_book_by_novel_id(db, novel_id) if hasattr(book_service, 'get_book_by_novel_id') else None
-    if not book:
-        # 如果没有novel_id方法，尝试通过搜索获取
-        books = book_service.search_books(db, novel_id, 1, 1)
-        if not books:
-            raise HTTPException(status_code=404, detail=f"书籍不存在: {novel_id}")
-        book = books[0]
-    return book
-
-
 @router.get("/", response_model=ListResponse[BookResponse])
 async def get_books_list(
         page: int = Query(1, ge=1, description="页码"),
         size: int = Query(20, ge=1, le=100, description="每页数量"),
         db: Session = Depends(get_db),
 ) -> ListResponse[BookResponse]:
-    """获取书籍列表（分页）"""
+    """
+    获取书籍列表（分页）
+    :param page:
+    :param size:
+    :param db:
+    :return:
+    """
     book_result, _ = book_service.get_books_with_pagination(db, page, size)
 
     return ListResponse(
@@ -53,121 +46,72 @@ async def get_books_list(
     )
 
 
-@router.get("/search", response_model=ListResponse[BookResponse])
-async def search_books(
-        keyword: str = Query(..., min_length=1, description="搜索关键词"),
-        page: int = Query(1, ge=1, description="页码"),
-        size: int = Query(20, ge=1, le=100, description="每页数量"),
-        db: Session = Depends(get_db),
-) -> ListResponse[BookResponse]:
-    """搜索书籍 - 支持按标题、作者搜索"""
-    books = book_service.search_books(db, keyword, page, size)
-
-    return ListResponse(
-        success=True,
-        code=200,
-        data=[BookResponse.from_book_table(book) for book in books],
-        message="搜索成功"
-    )
-
-
 @router.get("/{novel_id}", response_model=DataResponse[BookDetailResponse])
-async def get_book_detail(novel_id: str, db: Session = Depends(get_db)):
-    """获取书籍详细信息 - 使用novel_id"""
-    # 先获取书籍信息
-    book = _get_book_or_404(db, novel_id)
-    
+async def get_book_detail(novel_id: str, db: Session = Depends(get_db)) -> DataResponse[BookDetailResponse]:
+    """
+    获取书籍详细信息 - 使用novel_id
+    :param novel_id:
+    :param db:
+    :return:
+    """
+    # 获取书籍信息，如果不存在则抛出404异常
+    book = book_service.get_book_by_novel_id(db, novel_id)
+
     # 通过book_id获取详细信息
-    book_detail = book_service.get_book_detail_with_latest_snapshot(db, book.id)
-    if not book_detail:
+    book, snapshot = book_service.get_book_detail_with_latest_snapshot(db, book.id)
+    if not book or not snapshot:
         raise HTTPException(status_code=404, detail=f"书籍详情不存在: {novel_id}")
 
-    book_info = book_detail["book"]
-    latest_snapshot = book_detail["latest_snapshot"]
-
-    response_data = BookDetailResponse.from_book_and_snapshot(book_info, latest_snapshot)
-
     return DataResponse(
-        success=True,
-        code=200,
-        data=response_data,
+        data=BookDetailResponse.from_book_and_snapshot(book, snapshot),
         message="获取书籍详情成功"
     )
 
 
-@router.get("/{novel_id}/trend", response_model=ListResponse[BookTrendPoint])
-async def get_book_trend(
+@router.get("/{novel_id}/snapshots", response_model=ListResponse[BookSnapshotResponse])
+async def get_book_snapshots(
         novel_id: str,
         interval: str = Query(
             "day",
-            pattern="^(hour|day|week|month)$", 
+            pattern="^(hour|day|week|month)$",
             description="时间间隔: hour/day/week/month"
         ),
-        count: int = Query(24, ge=1, le=365, description="统计数量"),
+        count: int = Query(7, ge=1, le=365, description="时间段数量"),
         db: Session = Depends(get_db),
-):
+) -> ListResponse[BookSnapshotResponse]:
     """
-    获取书籍趋势数据 - 统一接口
-    
-    Args:
-        novel_id: 书籍novel_id
-        interval: 时间间隔 (hour/day/week/month)
-        count: 统计数量
-            - hour: 最多168（一周的小时数）
-            - day: 最多90天
-            - week: 最多52周  
-            - month: 最多24个月
-    
-    Returns:
-        趋势数据点列表
+    获取书籍历史快照
+
+    Examples:
+        - interval=hour, count=7: 获取7小时内每小时的第一个快照
+        - interval=day, count=7: 获取7天内每天的第一个快照
+        - interval=week, count=4: 获取4周内每周的第一个快照
+        - interval=month, count=3: 获取3个月内每月的第一个快照
+
+    :param novel_id: 书籍novel_id
+    :param interval: 时间间隔 (hour/day/week/month)
+    :param count: 时间段数量
+    :param db:
+    :return: 历史快照列表
     """
-    # 检查书籍是否存在，获取book对象
-    book = _get_book_or_404(db, novel_id)
+    # 参数范围限制
+    limits = {"hour": 168, "day": 90, "week": 52, "month": 24}
+    count = min(count, limits[interval])
 
-    # 根据间隔类型调用不同的服务方法（使用book.id）
-    if interval == "hour":
-        # 限制最多一周
-        count = min(count, 168)
-        trend_data = book_service.get_book_trend_hourly(db, book.id, count)
-        desc = f"{count}小时"
-    elif interval == "day":  
-        # 限制最多90天
-        count = min(count, 90)
-        trend_data = book_service.get_book_trend_daily(db, book.id, count)
-        desc = f"{count}天"
-    elif interval == "week":
-        # 限制最多52周
-        count = min(count, 52)
-        trend_data = book_service.get_book_trend_weekly(db, book.id, count)
-        desc = f"{count}周"
-    elif interval == "month":
-        # 限制最多24个月
-        count = min(count, 24)
-        trend_data = book_service.get_book_trend_monthly(db, book.id, count)
-        desc = f"{count}个月"
-    else:
-        raise HTTPException(status_code=400, detail="不支持的时间间隔")
+    # 获取书籍并验证存在性
+    book = book_service.get_book_by_novel_id(db, novel_id, raise_404=True)
 
-    # 转换为响应模型 - 处理可能的字典格式数据
-    trend_points = []
-    for snapshot in trend_data:
-        if isinstance(snapshot, dict):
-            # 如果是字典格式，直接创建BookTrendPoint
-            trend_points.append(BookTrendPoint(
-                snapshot_time=snapshot.get('snapshot_time'),
-                clicks=snapshot.get('total_clicks', 0),
-                favorites=snapshot.get('total_favorites', 0), 
-                comments=snapshot.get('comment_count', 0),
-            ))
-        else:
-            # 如果是模型对象，使用from_snapshot方法
-            trend_points.append(BookTrendPoint.from_snapshot(snapshot))
+    # 调用统一的历史快照获取方法
+    snapshots = book_service.get_historical_snapshots(db, book.id, interval, count)
+
+    # 转换为响应模型
+    snapshot_responses = [BookSnapshotResponse.from_snapshot(snapshot) for snapshot in snapshots]
 
     return ListResponse(
         success=True,
         code=200,
-        data=trend_points,
-        message=f"获取{desc}趋势数据成功"
+        data=snapshot_responses,
+        message=f"获取{len(snapshots)}个{interval}间隔的历史快照成功"
     )
 
 
@@ -180,8 +124,8 @@ async def get_book_ranking_history(
 ):
     """获取书籍排名历史 - 使用novel_id"""
     # 检查书籍是否存在
-    book = _get_book_or_404(db, novel_id)
-    
+    book = book_service.get_book_by_novel_id(db, novel_id, raise_404=True)
+
     # 获取排名历史（使用book.id）
     ranking_history = ranking_service.get_book_ranking_history(
         db, book.id, ranking_id, days

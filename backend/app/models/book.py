@@ -30,55 +30,45 @@ class BookResponse(BaseModel):
         return cls(id=book_t.id, novel_id=book_t.novel_id, title=book_t.title)
 
 
-class BookTrendPoint(BaseModel):
-    """书籍趋势数据点"""
+class BookSnapshotResponse(BaseModel):
+    """书籍快照响应模型"""
 
-    snapshot_time: datetime = Field(..., description="日期")
-    clicks: int | None = Field(None, description="点击数")
-    favorites: int | None = Field(None, description="收藏数")
-    comments: int | None = Field(None, description="评论数")
+    book_id: int = Field(..., description="书籍ID")
+    snapshot_time: datetime = Field(..., description="快照时间")
+    favorites: int = Field(default=0, description="收藏数")
+    clicks: int = Field(default=0, description="点击数")
+    comments: int = Field(default=0, description="评论数")
+    word_count: int | None = Field(None, description="字数")
+    status: str | None = Field(None, description="状态")
 
     @classmethod
-    def from_snapshot(cls, snapshot: BookSnapshot) -> "BookTrendPoint":
+    def from_snapshot(cls, snapshot: BookSnapshot) -> "BookSnapshotResponse":
         """
-        从BookSnapshot数据库模型创建BookTrendPoint实例
+        从BookSnapshot数据库模型创建BookSnapshotResponse实例
 
         Args:
             snapshot: BookSnapshot数据库模型实例
 
         Returns:
-            BookTrendPoint: 趋势数据点实例
+            BookSnapshotResponse: 快照响应模型实例
         """
         return cls(
+            book_id=snapshot.book_id,
             snapshot_time=snapshot.snapshot_time,
-            clicks=snapshot.clicks,
-            favorites=snapshot.favorites,
-            comments=snapshot.comments,
+            favorites=snapshot.favorites or 0,
+            clicks=snapshot.clicks or 0,
+            comments=snapshot.comments or 0,
+            word_count=snapshot.word_count,
+            status=snapshot.status
         )
 
 
-class BookTrendAggregatedPoint(BaseModel):
-    """书籍聚合趋势数据点"""
-
-    time_period: str = Field(..., description="时间周期")
-    avg_favorites: float = Field(..., description="平均收藏数")
-    avg_clicks: float = Field(..., description="平均点击数")
-    avg_comments: float = Field(..., description="平均评论数")
-    max_favorites: int = Field(..., description="最大收藏数")
-    max_clicks: int = Field(..., description="最大点击数")
-    min_favorites: int = Field(..., description="最小收藏数")
-    min_clicks: int = Field(..., description="最小点击数")
-    snapshot_count: int = Field(..., description="快照数量")
-    period_start: datetime = Field(..., description="周期开始时间")
-    period_end: datetime = Field(..., description="周期结束时间")
-
-
-class BookDetailResponse(BookResponse, BookTrendPoint):
+class BookDetailResponse(BookResponse, BookSnapshotResponse):
     """书籍详情响应，总是获取最新时间的point"""
 
     @classmethod
     def from_book_and_snapshot(
-        cls, book_t: Book, snapshot: BookSnapshot = None
+            cls, book_t: Book, snapshot: BookSnapshot = None
     ) -> "BookDetailResponse":
         """
         从Book和BookSnapshot数据库模型创建BookDetailResponse实例
@@ -94,10 +84,11 @@ class BookDetailResponse(BookResponse, BookTrendPoint):
             id=book_t.id,
             novel_id=book_t.novel_id,
             title=book_t.title,
-            snapshot_time=snapshot.snapshot_time if snapshot else datetime.now(),
-            clicks=snapshot.clicks if snapshot else None,
-            favorites=snapshot.favorites if snapshot else None,
-            comments=snapshot.comments if snapshot else None,
+            favorites=snapshot.favorites or None,
+            clicks=snapshot.clicks or None,
+            comments=snapshot.comments or None,
+            word_count=snapshot.word_count,
+            status=snapshot.status,
         )
 
 
