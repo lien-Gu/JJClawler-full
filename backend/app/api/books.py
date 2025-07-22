@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 from ..database.connection import get_db
 from ..database.service.book_service import BookService
 from ..database.service.ranking_service import RankingService
+from ..models import BookRankingInfoResponse
 from ..models.base import DataResponse, ListResponse
 from ..models.book import (
     BookDetailResponse,
-    BookRankingHistoryResponse,
     BookResponse,
     BookSnapshotResponse,
 )
@@ -115,7 +115,7 @@ async def get_book_snapshots(
     )
 
 
-@router.get("/{novel_id}/rankings", response_model=DataResponse[BookRankingHistoryResponse])
+@router.get("/{novel_id}/rankings", response_model=DataResponse[BookRankingInfoResponse])
 async def get_book_ranking_history(
         novel_id: str,
         ranking_id: int | None = Query(None, description="指定榜单ID"),
@@ -139,21 +139,12 @@ async def get_book_ranking_history(
         db, book.id, ranking_id, days
     )
 
-    # 转换为响应模型
-    from ..models.book import BookRankingInfo
-
-    ranking_infos = [
-        BookRankingInfo.from_history_dict(book.id, history)
-        for history in ranking_history
-    ]
-
-    response_data = BookRankingHistoryResponse(
-        book_id=book.id, ranking_history=ranking_infos
-    )
-
     return DataResponse(
         success=True,
         code=200,
-        data=response_data,
+        data=[
+        BookRankingInfoResponse.from_history_dict(book.id, history)
+        for history in ranking_history
+    ],
         message="获取排名历史成功"
     )

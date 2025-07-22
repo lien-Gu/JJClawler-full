@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from ..database.db.book import Book, BookSnapshot
+from .. database.db.ranking import RankingSnapshot
 
 
 class BookResponse(BaseModel):
@@ -92,7 +93,7 @@ class BookDetailResponse(BookResponse, BookSnapshotResponse):
         )
 
 
-class BookRankingInfo(BaseModel):
+class BookRankingInfoResponse(BaseModel):
     """书籍排名信息"""
 
     book_id: int = Field(..., description="书籍ID")
@@ -102,28 +103,24 @@ class BookRankingInfo(BaseModel):
     snapshot_time: datetime = Field(..., description="快照时间")
 
     @classmethod
-    def from_history_dict(cls, book_id: int, history_dict: dict) -> "BookRankingInfo":
+    def from_history_dict(cls, book_id: int, snapshot: RankingSnapshot) -> "BookRankingSnapshot":
         """
         从历史数据字典创建BookRankingInfo实例
 
         Args:
             book_id: 书籍ID
-            history_dict: 包含排名历史信息的字典
+            snapshot:
 
         Returns:
-            BookRankingInfo: 书籍排名信息实例
+            BookRankingSnapshot: 书籍排名信息实例
         """
+        ranking_name = snapshot.ranking_name
         return cls(
             book_id=book_id,
-            ranking_id=history_dict["ranking_id"],
-            ranking_name=history_dict["ranking_name"],
-            position=history_dict["position"],
-            snapshot_time=history_dict["snapshot_time"],
+            ranking_id=snapshot.ranking_id,
+            ranking_name=ranking_name,
+            position=snapshot.position,
+            snapshot_time=snapshot.snapshot_time,
         )
 
 
-class BookRankingHistoryResponse(BaseModel):
-    """书籍排名历史响应"""
-
-    book_id: int = Field(..., description="书籍ID")
-    ranking_history: list[BookRankingInfo] = Field([], description="排名历史")
