@@ -75,7 +75,6 @@ class BookService:
             db: Session,
             page: int = 1,
             size: int = 20,
-            filters: Optional[dict[str, Any]] = None,
     ) -> tuple[list[Book], int]:
         """
         分页获取书籍列表
@@ -83,24 +82,16 @@ class BookService:
         :param db: 数据库会话对象，用于执行数据库操作
         :param page: 页码，从1开始的页面索引，默认为第1页
         :param size: 每页数量，单页返回的最大记录数，默认20条，建议1-100之间
-        :param filters: 过滤条件字典，键为Book模型的属性名，值为对应的过滤值，支持等值查询
         :return: 元组(书籍列表, 总页数)，第一个元素为Book对象列表，第二个元素为总页数
         """
         # 构建查询
-        query = select(Book)
+        query = select(Book).order_by(desc(Book.created_at))
         count_query = select(func.count(Book.id))
-        
-        # 应用过滤条件
-        if filters:
-            for key, value in filters.items():
-                if hasattr(Book, key):
-                    query = query.where(getattr(Book, key) == value)
-                    count_query = count_query.where(getattr(Book, key) == value)
         
         # 获取数据
         books = list(
             db.execute(
-                query.order_by(desc(Book.created_at)).offset((page - 1) * size).limit(size)
+                query.offset((page - 1) * size).limit(size)
             ).scalars()
         )
 

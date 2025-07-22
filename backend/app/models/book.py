@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from ..database.db.book import Book, BookSnapshot
-from .. database.db.ranking import RankingSnapshot
+from ..database.db.ranking import RankingSnapshot, Ranking
 
 
 class BookResponse(BaseModel):
@@ -103,24 +103,19 @@ class BookRankingInfoResponse(BaseModel):
     snapshot_time: datetime = Field(..., description="快照时间")
 
     @classmethod
-    def from_history_dict(cls, book_id: int, snapshot: RankingSnapshot) -> "BookRankingSnapshot":
+    def from_history_dict(cls, book_id: int, snapshot: RankingSnapshot, ranking: Ranking) -> "BookRankingSnapshot":
         """
         从历史数据字典创建BookRankingInfo实例
 
-        Args:
-            book_id: 书籍ID
-            snapshot:
-
-        Returns:
-            BookRankingSnapshot: 书籍排名信息实例
+        :param book_id: 书籍ID
+        :param snapshot:
+        :param ranking:
+        :return: 书籍排名信息实例
         """
-        ranking_name = snapshot.ranking_name
         return cls(
             book_id=book_id,
             ranking_id=snapshot.ranking_id,
-            ranking_name=ranking_name,
+            ranking_name=ranking.name,
             position=snapshot.position,
             snapshot_time=snapshot.snapshot_time,
         )
-
-
