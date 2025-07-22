@@ -227,7 +227,15 @@ class RankingService:
         ranking_id: int | None = None,
         days: int = 30,
     ) -> list[Tuple[Ranking, RankingSnapshot]]:
-        """获取书籍在榜单中的排名历史（包含详细信息）"""
+        """
+        获取书籍在榜单中的排名历史
+
+        :param db:
+        :param book_id:
+        :param ranking_id:
+        :param days:
+        :return:
+        """
         start_time = datetime.now() - timedelta(days=days)
         snapshots = self.get_book_ranking_history(db, book_id, ranking_id, start_time)
         results = []
@@ -239,12 +247,18 @@ class RankingService:
         return results
 
     # ==================== 内部依赖方法 ====================
-
-    def get_ranking_by_rank_id(self, db: Session, rank_id: str) -> Ranking | None:
-        """根据rank_id获取榜单"""
+    @staticmethod
+    def get_ranking_by_rank_id(db: Session, rank_id: str) -> Ranking | None:
+        """
+        根据rank_id获取榜单
+        :param db:
+        :param rank_id:
+        :return:
+        """
         return db.scalar(select(Ranking).where(Ranking.rank_id == rank_id))
 
-    def create_ranking(self, db: Session, ranking_data: dict[str, Any]) -> Ranking:
+    @staticmethod
+    def create_ranking(db: Session, ranking_data: dict[str, Any]) -> Ranking:
         """创建榜单"""
         ranking = Ranking(**ranking_data)
         db.add(ranking)
@@ -252,8 +266,8 @@ class RankingService:
         db.refresh(ranking)
         return ranking
 
-    def update_ranking(
-        self, db: Session, ranking: Ranking, ranking_data: dict[str, Any]
+    @staticmethod
+    def update_ranking(db: Session, ranking: Ranking, ranking_data: dict[str, Any]
     ) -> Ranking:
         """更新榜单"""
         for key, value in ranking_data.items():

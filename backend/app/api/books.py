@@ -2,6 +2,8 @@
 书籍相关API接口 - 简化版本
 """
 
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -58,11 +60,13 @@ async def get_book_detail(novel_id: str, db: Session = Depends(get_db)) -> DataR
     book = book_service.get_book_by_novel_id(db, novel_id)
 
     # 通过book_id获取详细信息
-    book, snapshot = book_service.get_book_detail_with_latest_snapshot(db, book.id)
+    book, snapshot = book_service.get_book_detail_with_latest_snapshot(db, cast(int, book.id))
     if not book or not snapshot:
         raise HTTPException(status_code=404, detail=f"书籍详情不存在: {novel_id}")
 
     return DataResponse(
+        success=True,
+        code=200,
         data=BookDetailResponse.from_book_and_snapshot(book, snapshot),
         message="获取书籍详情成功"
     )
@@ -102,7 +106,7 @@ async def get_book_snapshots(
     book = book_service.get_book_by_novel_id(db, novel_id, raise_404=True)
 
     # 调用统一的历史快照获取方法
-    snapshots = book_service.get_historical_snapshots(db, book.id, interval, count)
+    snapshots = book_service.get_historical_snapshots(db, cast(int, book.id), interval, count)
 
     # 转换为响应模型
     snapshot_responses = [BookSnapshotResponse.from_snapshot(snapshot) for snapshot in snapshots]
@@ -135,13 +139,15 @@ async def get_book_ranking_history(
     book = book_service.get_book_by_novel_id(db, novel_id)
 
     # 使用带详细信息的方法获取排名历史（已包含榜单信息）
+    book_id = cast(int, book.id)  # 类型断言，避免Mapped[int]警告
     ranking_history_data = ranking_service.get_book_ranking_history_with_details(
-        db, book.id, ranking_id, days
+        db, book_id, ranking_id, days
     )
 
     # 转换为响应模型
     ranking_responses = [
-        BookRankingInfoResponse.from_snapshot(book.id,*history) for history in ranking_history_data
+        BookRankingInfoResponse.from_snapshot(book_id, ranking, snapshot)
+        for ranking, snapshot in ranking_history_data
     ]
 
     return ListResponse(
