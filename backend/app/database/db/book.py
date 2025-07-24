@@ -26,13 +26,13 @@ class Book(Base):
 
     # 书籍基本信息
     novel_id: Mapped[int] = mapped_column(
-        Integer,
-        unique=True,
-        index=True,
-        comment="书籍唯一标识ID，来源于晋江文学城的小说ID",
+        Integer,unique=True,index=True,comment="书籍唯一标识ID，来源于晋江文学城的小说ID",
     )
     title: Mapped[str] = mapped_column(
         String(200), index=True, comment="书籍标题，中文名称"
+    )
+    author_id: Mapped[int] = mapped_column(
+        Integer,unique=True,index=True,comment="作者唯一标识ID，来源于晋江文学城的作者ID",
     )
 
     # 索引优化
@@ -73,10 +73,19 @@ class BookSnapshot(Base):
     comments: Mapped[int] = mapped_column(
         Integer, default=0, comment="评论数量，读者对该书籍的评论总数"
     )
+    nutrition: Mapped[int] = mapped_column(
+        Integer, default=0, comment="营养液数量，读者对该书籍的喜爱数量"
+    )
 
     # 内容信息
-    word_count: Mapped[int | None] = mapped_column(
+    word_counts: Mapped[int | None] = mapped_column(
         Integer, nullable=True, comment="字数统计，书籍当前的总字数"
+    )
+    chapter_counts: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="章节统计，书籍当前的总章节数"
+    )
+    vip_chapter_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="入v的章节，0表示没有入V"
     )
     status: Mapped[str | None] = mapped_column(
         String(50), nullable=True, comment="书籍状态，如：连载中、已完结等"

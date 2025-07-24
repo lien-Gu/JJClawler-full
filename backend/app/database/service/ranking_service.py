@@ -21,16 +21,45 @@ class RankingService:
     def create_or_update_ranking(
         self, db: Session, ranking_data: dict[str, Any]
     ) -> Ranking:
-        """根据rank_id创建或更新榜单"""
+        """
+        根据ranking_data中的信息创建或更新榜单。
+        """
         rank_id = ranking_data.get("rank_id")
         if not rank_id:
-            raise ValueError("rank_id is required")
+            raise ValueError("ranking_data中必须包含rank_id")
 
-        ranking = self.get_ranking_by_rank_id(db, rank_id)
-        if ranking:
-            return self.update_ranking(db, ranking, ranking_data)
-        else:
+        # 1. 根据rank_id查找所有可能的榜单
+        candidate_rankings = self.get_rankings_by_rank_id(db, rank_id)
+        # 2. 根据查找结果进行逻辑判断
+        if not candidate_rankings:
+            # 榜单不存在，直接创建
             return self.create_ranking(db, ranking_data)
+        elif len(candidate_rankings) == 1:
+            # 列表只有一个元素，直接更新
+            return self.update_ranking(db, candidate_rankings[0], ranking_data)
+        else:
+            # 列表有多个元素，channel_id进行二次筛选
+            channel_id = ranking_data.get("channel_id")
+            if not channel_id:
+                raise ValueError(
+                    f"rank_id '{rank_id}' 对应多个榜单，必须提供channel_id进行区分"
+                )
+
+            # 进行二次筛选
+            filtered_rankings = [
+                r for r in candidate_rankings if r.channel_id == channel_id
+            ]
+
+            if len(filtered_rankings) == 1:
+                # 精准匹配到一个，更新它
+                return self.update_ranking(db, filtered_rankings[0], ranking_data)
+            elif len(filtered_rankings) == 0:
+                return self.create_ranking(db, ranking_data)
+            else:
+                # 理论上不应该发生，除非(rank_id, channel_id)组合在数据库中不唯一
+                raise SystemError(
+                    f"数据库中存在重复的(rank_id, channel_id)组合: ('{rank_id}', '{channel_id}')"
+                )
 
     def batch_create_ranking_snapshots(
         self, db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
@@ -272,14 +301,14 @@ class RankingService:
 
     # ==================== 内部依赖方法 ====================
     @staticmethod
-    def get_ranking_by_rank_id(db: Session, rank_id: str) -> Ranking | None:
+    def get_rankings_by_rank_id(db: Session, rank_id: str) -> List[Ranking]:
         """
-        根据rank_id获取榜单
+        根据rank_id获取所有匹配的榜单列表
         :param db:
         :param rank_id:
-        :return:
+        :return: 一个榜单对象的列表
         """
-        return db.scalar(select(Ranking).where(Ranking.rank_id == rank_id))
+        return list(db.execute(select(Ranking).where(Ranking.rank_id == rank_id)).scalars())
 
     @staticmethod
     def create_ranking(db: Session, ranking_data: dict[str, Any]) -> Ranking:
