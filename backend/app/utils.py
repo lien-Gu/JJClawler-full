@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from time import strftime
 from typing import Dict, List
+import re
 
 
 def generate_batch_id() -> str:
@@ -32,3 +33,14 @@ def update_dict(base_d: Dict, new_d: Dict, check_none: bool = True) -> Dict:
     result = base_d.copy()
     result.update(update_info)
     return result
+
+
+def extract_number(string: str) -> int:
+    """
+    将数字从字符串中提取出来
+    :param string:
+    :return:
+    """
+    digits_str = ''.join(re.findall(r'\d', string))
+    number = int(digits_str)
+    return number
