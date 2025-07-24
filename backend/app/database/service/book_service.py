@@ -13,6 +13,7 @@ from app.database.sql.book_queries import (
     BOOK_HISTORY_QUERY,
 )
 from ..db.book import Book, BookSnapshot
+from ...utils import filter_dict, get_model_fields
 
 
 class BookService:
@@ -111,7 +112,10 @@ class BookService:
         :param book_data: 书籍数据字典，包含novel_id、title等Book模型字段的键值对
         :return: 创建后的Book对象，包含自动生成的ID和时间戳等信息
         """
-        book = Book(**book_data)
+        valid_fields = get_model_fields(Book)
+        filtered_data = filter_dict(book_data, valid_fields)
+        
+        book = Book(**filtered_data)
         db.add(book)
         db.commit()
         db.refresh(book)
@@ -127,7 +131,10 @@ class BookService:
         :param book_data: 更新数据字典，包含要更新的字段名和新值的键值对
         :return: 更新后的Book对象，updated_at字段会被自动设置为当前时间
         """
-        for key, value in book_data.items():
+        valid_fields = get_model_fields(Book)
+        filtered_data = filter_dict(book_data, valid_fields)
+        
+        for key, value in filtered_data.items():
             if hasattr(book, key):
                 setattr(book, key, value)
         book.updated_at = datetime.now()
@@ -267,7 +274,9 @@ class BookService:
         :param snapshots: 快照数据列表，每个元素为包含BookSnapshot字段的字典
         :return: 创建后的BookSnapshot对象列表，包含自动生成的ID等信息
         """
-        snapshot_objs = [BookSnapshot(**snapshot) for snapshot in snapshots]
+        valid_fields = get_model_fields(BookSnapshot)
+        filtered_snapshots = [filter_dict(snapshot, valid_fields) for snapshot in snapshots]
+        snapshot_objs = [BookSnapshot(**snapshot) for snapshot in filtered_snapshots]
         db.add_all(snapshot_objs)
         db.commit()
         return snapshot_objs

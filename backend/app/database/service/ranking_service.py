@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..db.book import Book
 from ..db.ranking import Ranking, RankingSnapshot
+from ...utils import filter_dict, get_model_fields
 
 
 class RankingService:
@@ -82,7 +83,10 @@ class RankingService:
         for snapshot in snapshots:
             snapshot['batch_id'] = batch_id
         
-        snapshot_objs = [RankingSnapshot(**snapshot) for snapshot in snapshots]
+        # 过滤数据并创建对象
+        valid_fields = get_model_fields(RankingSnapshot)
+        filtered_snapshots = [filter_dict(snapshot, valid_fields) for snapshot in snapshots]
+        snapshot_objs = [RankingSnapshot(**snapshot) for snapshot in filtered_snapshots]
         db.add_all(snapshot_objs)
         db.commit()
         return snapshot_objs
@@ -313,7 +317,10 @@ class RankingService:
     @staticmethod
     def create_ranking(db: Session, ranking_data: dict[str, Any]) -> Ranking:
         """创建榜单"""
-        ranking = Ranking(**ranking_data)
+        valid_fields = get_model_fields(Ranking)
+        filtered_data = filter_dict(ranking_data, valid_fields)
+        
+        ranking = Ranking(**filtered_data)
         db.add(ranking)
         db.commit()
         db.refresh(ranking)
@@ -323,7 +330,10 @@ class RankingService:
     def update_ranking(db: Session, ranking: Ranking, ranking_data: dict[str, Any]
     ) -> Ranking:
         """更新榜单"""
-        for key, value in ranking_data.items():
+        valid_fields = get_model_fields(Ranking)
+        filtered_data = filter_dict(ranking_data, valid_fields)
+        
+        for key, value in filtered_data.items():
             if hasattr(ranking, key):
                 setattr(ranking, key, value)
         ranking.updated_at = datetime.now()

@@ -3,7 +3,8 @@ from datetime import datetime
 from time import strftime
 from typing import Dict, List
 import re
-
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import inspect
 
 def generate_batch_id() -> str:
     """
@@ -44,3 +45,24 @@ def extract_number(string: str) -> int:
     digits_str = ''.join(re.findall(r'\d', string))
     number = int(digits_str)
     return number
+
+
+def filter_dict(raw_dict: dict, valid_field: set | list):
+    """
+    过滤字典
+    :param raw_dict:
+    :param valid_field:
+    :return:
+    """
+    return {k: v for k, v in raw_dict.items() if k in valid_field}
+
+
+def get_model_fields(model_class) -> set[str]:
+    """
+    获取 SQLAlchemy 模型的所有字段名
+    
+    :param model_class: SQLAlchemy 模型类
+    :return: 字段名集合
+    """
+    mapper = inspect(model_class)
+    return set(mapper.columns.keys())
