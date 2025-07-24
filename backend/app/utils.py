@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from time import strftime
+from typing import Dict, List
 
 
 def generate_batch_id() -> str:
@@ -14,3 +15,20 @@ def generate_batch_id() -> str:
         strftime("%Y%m%d%H%M%S", datetime.now()),
         str(uuid.uuid4().hex[:8])
     )
+
+
+def update_dict(base_d: Dict, new_d: Dict, check_none: bool = True) -> Dict:
+    """
+    更新字典，使用新的字典来更新原来的字典
+    :param base_d:
+    :param new_d:
+    :param check_none:
+    :return:
+    """
+    if check_none:
+        update_info = {key: value for key, value in new_d.items() if value not in [None, ""]}
+    else:
+        update_info = new_d.copy()
+    result = base_d.copy()
+    result.update(update_info)
+    return result

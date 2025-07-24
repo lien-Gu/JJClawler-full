@@ -13,7 +13,7 @@ class CrawlConfig:
     """爬取配置类"""
 
     def __init__(self):
-        self.urls_file = Path(__file__).parent.parent.parent / "data" / "urls.json"
+        self.urls_file = Path(__file__).parent.parent.parent.joinpath("data/urls.json")
         self._config = None
         self.params = None
         self.templates = None
@@ -86,11 +86,15 @@ class CrawlConfig:
         available_ids = {task.get("id", "") for task in all_tasks}
         return page_id in available_ids
 
-    def build_url(self, task_config: dict) -> str:
-        """根据任务配置构建URL"""
+    def build_url(self, task_id: str) -> str:
+        """
+        根据任务id构建URL
+        :param task_id:
+        :return:
+        """
+        task_config = self.get_task_config(task_id)
         template_name = task_config["template"]
         template = self.templates.get(template_name)
-
         if not template:
             raise ValueError(f"模板不存在: {template_name}")
 
@@ -100,33 +104,12 @@ class CrawlConfig:
         # 格式化URL
         return template.format(**params)
 
+    def build_novel_url(self, novel_id: str) -> str:
+        """
+        根据小说id构建url
 
-class HttpClient:
-    """HTTP客户端"""
-
-    def __init__(self, request_delay: float = 1.0, timeout: float = 15.0):
-        self.request_delay = request_delay
-        self.session = httpx.AsyncClient(
-            timeout=timeout,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            },
-        )
-
-    async def get(self, url: str) -> dict:
-        """发送GET请求"""
-        try:
-            # 请求限速
-            await asyncio.sleep(self.request_delay)
-
-            response = await self.session.get(url)
-            response.raise_for_status()
-
-            return response.json()
-
-        except Exception as e:
-            raise Exception(f"请求失败 {url}: {e}")
-
-    async def close(self):
-        """关闭连接"""
-        await self.session.aclose()
+        :param novel_id:
+        :return:
+        """
+        template = self.templates.get("novel_detail")
+        return template.format(novel_id)

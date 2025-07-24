@@ -7,15 +7,15 @@ import logging
 import re
 import time
 from datetime import datetime
-from typing import Any
-
+from typing import Any, List
+import itertools
 from app.config import settings
 from app.database.connection import get_db
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
-
-from .base import CrawlConfig, HttpClient
-from .parser import DataType, Parser
+from .http import Crawler
+from .base import CrawlConfig
+from .parser import DataType, Parser, RankingParseInfo, BookParseInfo
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +31,9 @@ class CrawlFlow:
     4. 模块化设计，提高代码复用率
     """
 
-    def __init__(
-        self,
-        request_delay: float | None = None,
-        concurrent_mode: bool | None = None,
-    ) -> None:
+    def __init__(self) -> None:
         """
         初始化爬取流程管理器
-
-        Args:
-            request_delay: 请求间隔时间（秒）
-            concurrent_mode: 是否启用并发模式（None时使用配置文件设置）
         """
         self.config = CrawlConfig()
         self.parser = Parser()
@@ -51,24 +43,18 @@ class CrawlFlow:
         # 从配置文件获取设置
         crawler_config = settings.crawler
 
+
+
         # 配置HTTP客户端
-        if concurrent_mode is None:
-            # 根据配置的并发请求数判断是否启用并发模式
-            self.concurrent_mode = crawler_config.concurrent_requests > 1
-        else:
-            self.concurrent_mode = concurrent_mode
-
+        self.concurrent_requests = crawler_config.concurrent_requests
+        self.concurrent_mode = self.concurrent_requests >= 1
+        delay = crawler_config.request_delay
+        timeout = crawler_config.timeout
         if self.concurrent_mode:
-            delay = request_delay or (
-                crawler_config.request_delay / 10
-            )  # 并发时减少延迟
-            timeout = crawler_config.timeout / 2  # 并发时减少超时
+            # 并发时减少延迟和超时
+            self.client = HttpClient(request_delay=delay/10, timeout=timeout/2)
         else:
-            delay = request_delay or crawler_config.request_delay
-            timeout = crawler_config.timeout
-
-        self.client = HttpClient(request_delay=delay, timeout=timeout)
-
+            self.client = HttpClient(request_delay=delay, timeout=timeout)
         # 初始化数据容器
         self._reset_data()
 
@@ -104,30 +90,28 @@ class CrawlFlow:
             logger.info(f"开始爬取页面: {page_id}")
 
             # 生成页面URL
-            page_url = self._generate_page_url(page_id)
+            page_url = self.config.build_url(page_id)
             if not page_url:
                 return self._create_error_result(
                     page_id, "无法生成页面地址", start_time
                 )
 
             # 爬取页面内容
-            page_content = await self._crawl_page_content(page_url)
+            self.stats["total_requests"] += 1
+            page_content = await self.client.get(page_url)
             if not page_content:
                 return self._create_error_result(
                     page_id, "页面内容爬取失败", start_time
                 )
 
             # 解析榜单
-            rankings = self._parse_rankings_from_page(page_content, page_id)
+            rankings: List[RankingParseInfo] = self.parser.parse(page_content, page_id=page_id)
             logger.debug(f"发现 {len(rankings)} 个榜单")
 
-            # 提取书籍ID
-            book_ids = self._extract_unique_book_ids(rankings)
-            logger.debug(f"发现 {len(book_ids)} 个唯一书籍ID")
-
             # 爬取书籍详情
-            books = await self._crawl_books_details(book_ids)
-            logger.debug(f"成功爬取 {len(books)} 个书籍详情")
+            book_list = BookParseInfo.unique_book_items(itertools.chain.from_iterable(ranking.books for ranking in rankings))
+            book_responses = await self._crawl_books_details(book_list)
+            logger.debug(f"成功爬取 {len(book_responses)} 个书籍详情")
 
             # 保存数据
             save_success = await self._save_crawl_result(rankings, books)
@@ -146,17 +130,7 @@ class CrawlFlow:
             logger.error(f"页面 {page_id} 爬取异常: {e}")
             return self._create_error_result(page_id, f"爬取异常: {str(e)}", start_time)
 
-    def _generate_page_url(self, task_id: str) -> str | None:
-        """生成页面URL"""
-        try:
-            task_config = self.config.get_task_config(task_id)
-            if not task_config:
-                logger.error(f"未找到任务配置: {task_id}")
-                return None
-            return self.config.build_url(task_config)
-        except Exception as e:
-            logger.error(f"生成URL失败: {e}")
-            return None
+
 
     async def _crawl_page_content(self, url: str) -> dict | None:
         """爬取页面内容"""
@@ -167,153 +141,7 @@ class CrawlFlow:
             logger.error(f"爬取页面内容失败: {e}")
             return None
 
-    def _parse_rankings_from_page(self, page_content: dict, page_id: str) -> list[dict]:
-        """从页面解析榜单数据"""
-        try:
-            context = {"page_id": page_id}
-            parsed_items = self.parser.parse(page_content, context)
 
-            rankings = []
-            for item in parsed_items:
-                if item.data_type == DataType.PAGE:
-                    self.pages_data.append(item.data)
-                elif item.data_type == DataType.RANKING:
-                    rankings.append(item.data)
-                    self.rankings_data.append(item.data)
-
-            return rankings
-        except Exception as e:
-            logger.error(f"解析榜单数据失败: {e}")
-            return []
-
-    def _extract_unique_book_ids(self, rankings: list[dict]) -> list[str]:
-        """
-        从榜单中提取唯一的书籍ID
-
-        注意：这里只是去除当前会话中的重复ID，
-        不跳过数据库中已存在的书籍，因为需要创建新的快照
-        """
-        all_book_ids = []
-
-        for ranking in rankings:
-            books = ranking.get("books", [])
-            for book in books:
-                book_id = book.get("book_id")
-                if book_id:
-                    all_book_ids.append(str(book_id))
-
-        # 去除当前会话中的重复ID
-        unique_ids = []
-        for book_id in all_book_ids:
-            if book_id not in self.crawled_book_ids:
-                unique_ids.append(book_id)
-                self.crawled_book_ids.add(book_id)
-
-        return unique_ids
-
-    async def _crawl_books_details(self, book_ids: list[str]) -> list[dict]:
-        """
-        并发爬取书籍详情
-
-        Args:
-            book_ids: 书籍ID列表
-
-        Returns:
-            书籍详情列表
-        """
-        if not book_ids:
-            return []
-
-        logger.info(f"开始爬取 {len(book_ids)} 个书籍详情")
-
-        if self.concurrent_mode:
-            return await self._crawl_books_concurrent(book_ids)
-        else:
-            return await self._crawl_books_sequential(book_ids)
-
-    async def _crawl_books_concurrent(self, book_ids: list[str]) -> list[dict]:
-        """并发模式爬取书籍"""
-        books = []
-        # 使用配置的并发请求数作为批处理大小
-        batch_size = min(settings.crawler.concurrent_requests * 2, 10)  # 最多10个一批
-
-        for i in range(0, len(book_ids), batch_size):
-            batch_ids = book_ids[i : i + batch_size]
-            batch_num = i // batch_size + 1
-            total_batches = (len(book_ids) - 1) // batch_size + 1
-
-            logger.debug(
-                f"处理第 {batch_num}/{total_batches} 批，{len(batch_ids)} 个书籍"
-            )
-
-            batch_results = await self._crawl_books_batch(batch_ids)
-            books.extend(batch_results)
-
-            # 批次间延迟，使用配置的请求延迟
-            if i + batch_size < len(book_ids):
-                await asyncio.sleep(settings.crawler.request_delay)
-
-        return books
-
-    async def _crawl_books_sequential(self, book_ids: list[str]) -> list[dict]:
-        """顺序模式爬取书籍"""
-        books = []
-        for i, book_id in enumerate(book_ids, 1):
-            logger.debug(f"爬取书籍 {i}/{len(book_ids)}: {book_id}")
-            book_data = await self._crawl_single_book(book_id)
-            if book_data:
-                books.append(book_data)
-        return books
-
-    async def _crawl_books_batch(self, book_ids: list[str]) -> list[dict]:
-        """并发爬取一批书籍"""
-        semaphore = asyncio.Semaphore(settings.crawler.concurrent_requests)
-
-        async def crawl_with_semaphore(book_id: str) -> dict | None:
-            async with semaphore:
-                return await self._crawl_single_book(book_id)
-
-        # 创建并发任务
-        tasks = [crawl_with_semaphore(book_id) for book_id in book_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # 过滤有效结果
-        books = []
-        for result in results:
-            if isinstance(result, dict):
-                books.append(result)
-            elif isinstance(result, Exception):
-                logger.warning(f"爬取书籍时出现异常: {result}")
-
-        return books
-
-    async def _crawl_single_book(self, book_id: str) -> dict | None:
-        """爬取单个书籍详情"""
-        try:
-            # 构建URL
-            book_url = self.config.templates["novel_detail"].format(
-                novel_id=book_id, **self.config.params
-            )
-
-            # 发起请求
-            self.stats["total_requests"] += 1
-            book_content = await self.client.get(book_url)
-
-            # 解析数据
-            parsed_items = self.parser.parse(book_content)
-
-            for item in parsed_items:
-                if item.data_type == DataType.BOOK:
-                    self.books_data.append(item.data)
-                    self.stats["books_crawled"] += 1
-                    return item.data
-
-            logger.warning(f"未能解析书籍 {book_id} 的详情数据")
-            return None
-
-        except Exception as e:
-            logger.error(f"爬取书籍 {book_id} 失败: {e}")
-            return None
 
     async def _save_crawl_result(self, rankings: list[dict], books: list[dict]) -> bool:
         """保存爬取结果到数据库 - 使用batch_id确保数据一致性"""
@@ -342,7 +170,7 @@ class CrawlFlow:
             return False
 
     async def _save_rankings(
-        self, db, rankings_data: list[dict], snapshot_time: datetime,
+            self, db, rankings_data: list[dict], snapshot_time: datetime,
     ) -> None:
         """保存榜单数据和快照 - 使用batch_id确保一致性"""
         for ranking_data in rankings_data:
@@ -402,7 +230,7 @@ class CrawlFlow:
                 raise
 
     async def _save_books(
-        self, db, books_data: list[dict], snapshot_time: datetime
+            self, db, books_data: list[dict], snapshot_time: datetime
     ) -> None:
         """保存书籍数据和快照"""
         if not books_data:
@@ -473,7 +301,7 @@ class CrawlFlow:
         return 0
 
     def _create_success_result(
-        self, page_id: str, books_crawled: int, execution_time: float
+            self, page_id: str, books_crawled: int, execution_time: float
     ) -> dict[str, Any]:
         """创建成功结果"""
         return {
@@ -484,7 +312,7 @@ class CrawlFlow:
         }
 
     def _create_error_result(
-        self, page_id: str, error_msg: str, start_time: float
+            self, page_id: str, error_msg: str, start_time: float
     ) -> dict[str, Any]:
         """创建错误结果"""
         execution_time = time.time() - start_time
@@ -496,23 +324,7 @@ class CrawlFlow:
             "error_message": error_msg,
         }
 
-    def get_all_data(self) -> dict[str, list]:
-        """获取所有爬取的数据"""
-        return {
-            "books": self.books_data,
-            "rankings": self.rankings_data,
-            "pages": self.pages_data,
-        }
 
-    def get_stats(self) -> dict[str, Any]:
-        """获取统计信息"""
-        stats = self.stats.copy()
-        if stats["start_time"] and stats["end_time"]:
-            stats["execution_time"] = stats["end_time"] - stats["start_time"]
-        stats["total_data_items"] = (
-            len(self.pages_data) + len(self.rankings_data) + len(self.books_data)
-        )
-        return stats
 
     async def close(self) -> None:
         """关闭资源"""

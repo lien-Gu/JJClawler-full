@@ -92,6 +92,11 @@ class RankingSnapshot(Base):
         index=True,
         comment="关联的书籍ID，对应Book表的主键id",
     )
+    novel_id: Mapped[int] =mapped_column(
+        Integer,
+        index=True,
+        comment="晋江app上的书籍id，可用于后续构建url"
+    )
     batch_id: Mapped[str] = mapped_column(
         String(36),
         index=True,
@@ -100,9 +105,6 @@ class RankingSnapshot(Base):
     # 排名信息
     position: Mapped[int] = mapped_column(
         Integer, index=True, comment="书籍在榜单中的排名位置，数字越小排名越高，从1开始"
-    )
-    score: Mapped[float | None] = mapped_column(
-        Float, nullable=True, comment="排名分数，某些榜单会提供具体的评分数据，可选字段"
     )
 
     # 快照时间
