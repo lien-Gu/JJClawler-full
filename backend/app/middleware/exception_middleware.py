@@ -1,7 +1,6 @@
 """
 统一异常处理中间件
 """
-import logging
 from typing import Callable
 
 from fastapi import HTTPException, Request, status
@@ -9,8 +8,9 @@ from sqlalchemy.exc import DatabaseError, IntegrityError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.models.error import ErrorResponse
+from app.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExceptionMiddleware(BaseHTTPMiddleware):

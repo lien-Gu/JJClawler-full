@@ -2,7 +2,6 @@
 任务调度器
 """
 
-import logging
 from datetime import datetime
 from typing import Any
 
@@ -12,6 +11,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import get_settings
+from app.logger import get_logger
 from app.models.schedule import (
     PREDEFINED_JOB_CONFIGS,
     JobConfigModel,
@@ -31,7 +31,7 @@ class TaskScheduler:
         self.settings = get_settings()
         self.scheduler: AsyncIOScheduler | None = None
         self.job_handlers: dict[str, type[BaseJobHandler]] = {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.start_time = None
 
         # 注册默认任务处理器

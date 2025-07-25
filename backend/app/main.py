@@ -13,8 +13,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .models.error import ErrorResponse
 from .api import api_router
 from .config import get_settings
+from .logger import get_logger, setup_logging
 from .middleware import ExceptionMiddleware
 from .models.base import BaseResponse, DataResponse
+
+# 初始化日志系统
+setup_logging()
+logger = get_logger(__name__)
 
 # 应用启动时间
 APP_START_TIME = time.time()
@@ -24,15 +29,15 @@ APP_START_TIME = time.time()
 async def lifespan(app: FastAPI):
     """应用程序生命周期管理"""
     # 启动时的初始化代码
-    print("应用程序启动")
+    logger.info("应用程序启动")
 
     # 启动调度器
     try:
         from .schedule import start_scheduler
         await start_scheduler()
-        print("任务调度器启动成功")
+        logger.info("任务调度器启动成功")
     except Exception as e:
-        print(f"任务调度器启动失败: {e}")
+        logger.error(f"任务调度器启动失败: {e}")
 
     yield
 
@@ -40,11 +45,11 @@ async def lifespan(app: FastAPI):
     try:
         from .schedule import stop_scheduler
         await stop_scheduler()
-        print("任务调度器已停止")
+        logger.info("任务调度器已停止")
     except Exception as e:
-        print(f"任务调度器停止失败: {e}")
+        logger.error(f"任务调度器停止失败: {e}")
 
-    print("应用程序关闭")
+    logger.info("应用程序关闭")
 
 
 # 创建FastAPI应用实例

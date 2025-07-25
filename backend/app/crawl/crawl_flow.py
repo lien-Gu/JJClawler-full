@@ -3,21 +3,21 @@
 """
 
 import itertools
-import logging
 import time
 from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.database.connection import get_db
+from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
+from app.logger import get_logger
 from .base import CrawlConfig
 from .http import HttpClient
 from .parser import NovelPageParser, PageParser, RankingParser
 from ..utils import generate_batch_id
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CrawlFlow:
@@ -81,7 +81,7 @@ class CrawlFlow:
             logger.debug(f"发现 {len(rankings)} 个榜单")
             
             # 创建数据库会话
-            db = get_db()
+            db = SessionLocal()
             try:
                 self.save_ranking_parsers(rankings, db)
 

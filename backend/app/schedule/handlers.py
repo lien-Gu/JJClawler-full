@@ -3,13 +3,13 @@
 """
 
 import asyncio
-import logging
 import time
 from abc import ABC, abstractmethod
 
 from app.config import get_settings
 from app.crawl.base import CrawlConfig
 from app.crawl.crawl_flow import CrawlFlow
+from app.logger import get_logger
 from app.models.schedule import JobContextModel, JobResultModel
 
 
@@ -18,7 +18,7 @@ class BaseJobHandler(ABC):
 
     def __init__(self, scheduler=None):
         self.scheduler = scheduler
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = get_logger(self.__class__.__name__)
         self.settings = get_settings()
         self.max_retries = self.settings.crawler.retry_times
 
