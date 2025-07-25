@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.database.connection import get_db
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
 from .base import CrawlConfig
@@ -78,17 +79,24 @@ class CrawlFlow:
             page_parser = PageParser(page_content, page_id=page_id)
             rankings: List[RankingParser] = page_parser.rankings
             logger.debug(f"发现 {len(rankings)} 个榜单")
-            self.save_ranking_parsers(rankings)
+            
+            # 创建数据库会话
+            db = get_db()
+            try:
+                self.save_ranking_parsers(rankings, db)
 
-            # 爬取书籍详情
-            novel_id_list = list(set(itertools.chain.from_iterable(ranking.get_novel_ids() for ranking in rankings)))
-            book_responses = await self.client.run(
-                [self.config.build_novel_url(novel_id) for novel_id in novel_id_list])
-            logger.debug(f"成功爬取 {len(book_responses)} 个书籍详情")
+                # 爬取书籍详情
+                novel_id_list = list(set(itertools.chain.from_iterable(ranking.get_novel_ids() for ranking in rankings)))
+                self.stats["total_requests"] += 1
+                book_responses = await self.client.run(
+                    [self.config.build_novel_url(novel_id) for novel_id in novel_id_list])
+                logger.debug(f"成功爬取 {len(book_responses)} 个书籍详情")
 
-            # 解析书籍信息并且保存
-            books = [NovelPageParser(i) for i in book_responses]
-            self.save_novel_parsers(books)
+                # 解析书籍信息并且保存
+                books = [NovelPageParser(i) for i in book_responses]
+                self.save_novel_parsers(books, db)
+            finally:
+                db.close()
 
             # 返回结果
             self.stats["end_time"] = time.time()

@@ -14,7 +14,7 @@ def generate_batch_id() -> str:
         str: 23位UUID字符串格式的批次ID
     """
     return "{}-{}".format(
-        strftime("%Y%m%d%H%M%S", datetime.now()),
+        datetime.now().strftime("%Y%m%d%H%M%S"),
         str(uuid.uuid4().hex[:8])
     )
 

@@ -112,4 +112,4 @@ class CrawlConfig:
         :return:
         """
         template = self.templates.get("novel_detail")
-        return template.format(novel_id)
+        return template.format(novel_id=novel_id)

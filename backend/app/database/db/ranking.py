@@ -64,10 +64,10 @@ class Ranking(Base):
     # 索引优化
     __table_args__ = (
         Index("idx_ranking_rank_id", "rank_id"),
-        Index("idx_ranking_name", "name"),
+        Index("idx_ranking_channel_name", "channel_name"),
         Index("idx_ranking_page_id", "page_id"),
         Index("idx_ranking_group_type", "rank_group_type"),
-        Index("idx_ranking_sub_name", "sub_ranking_name"),
+        Index("idx_ranking_sub_channel_name", "sub_channel_name"),
     )
 
 

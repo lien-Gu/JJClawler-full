@@ -41,7 +41,7 @@ class RankingParser:
             self.ranking_info = update_dict(parent_ranking_info, self.ranking_info)
 
         else:
-            self.ranking_info = self._parse_ranking_info(raw_data)
+            self.ranking_info = self._parse_ranking_info(raw_data, is_sub_ranking=False)
         data_list = self._get_ranking_data(raw_data)
         if self.has_sub_ranking:
             self.sub_rankings = data_list
@@ -60,17 +60,27 @@ class RankingParser:
         """
 
         data_list = raw_data.get("data", [])
+        
+        # 处理嵌套结构（如夹子榜的 data.list 格式）
+        if isinstance(data_list, dict) and "list" in data_list:
+            data_list = data_list["list"]
+        
+        # 如果data字段为空，尝试直接获取list字段
         if not data_list:
             data_list = raw_data.get("list", [])
+            
         if not data_list:
             raise ValueError("该榜单中内容为空")
-        if not isinstance(raw_data, list) and not isinstance(raw_data[0], dict):
+            
+        if not isinstance(data_list, list) or not isinstance(data_list[0], dict):
             raise TypeError("响应体data结构错误")
+            
         if "channelName" in data_list[0]:
             self.has_sub_ranking = True
+            
         return data_list
 
-    def _parse_ranking_info(self, raw_ranking_data: Dict, is_sub_ranking: False) -> Dict[str:Any]:
+    def _parse_ranking_info(self, raw_ranking_data: Dict, is_sub_ranking: bool = False) -> Dict[str, Any]:
         res = self._jiazi_info() if self.page_id == "jiazi" else {
             "rank_id": str(raw_ranking_data.get("rankid", None)),
             "rank_group_type": str(raw_ranking_data.get("rank_group_type", None)),

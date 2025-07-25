@@ -4,69 +4,38 @@
 """
 
 import os
-
 import pytest
-from pytest_mock import MockerFixture
+from unittest.mock import AsyncMock, Mock
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-from app.crawl.parser import DataType, ParsedItem
-from app.database.connection import create_tables, drop_tables
+from app.database.db.base import Base
+from app.database.connection import get_db
+
 
 # ==================== 数据库初始化 ====================
 
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database():
-    """测试数据库初始化
-
-    这个fixture会在所有测试开始前创建数据库表，
-    并在测试结束后清理数据库
-    """
-    # 设置测试环境使用独立的数据库
-    original_db_url = os.environ.get("DATABASE_URL")
-    test_db_url = "sqlite:///./test.db"
-    os.environ["DATABASE_URL"] = test_db_url
-
-    # 导入需要在设置环境变量后重新导入
-    from app.database.connection import create_tables as create_test_tables
-
-    try:
-        # 创建数据库表
-        create_test_tables()
-
-        yield
-
-    finally:
-        # 恢复原始数据库配置
-        if original_db_url:
-            os.environ["DATABASE_URL"] = original_db_url
-        else:
-            os.environ.pop("DATABASE_URL", None)
-
-        # 清理测试数据库文件
-        if os.path.exists("test.db"):
-            os.remove("test.db")
+@pytest.fixture(scope="session")
+def test_engine():
+    """测试数据库引擎"""
+    # 使用内存SQLite数据库进行测试
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    Base.metadata.create_all(engine)
+    return engine
 
 
 @pytest.fixture
-def clean_database():
-    """清理数据库数据的fixture
-
-    在需要干净数据库环境的测试中使用
-    """
-    # 导入当前的数据库连接
-
-    # 清理现有数据
-    drop_tables()
-    create_tables()
-
-    yield
-
-    # 测试后可以选择保留数据用于调试
-    # drop_tables()
+def test_db_session(test_engine):
+    """测试数据库会话"""
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 # ==================== 爬虫配置数据 ====================
-
 
 @pytest.fixture
 def sample_config_data():
@@ -76,7 +45,7 @@ def sample_config_data():
             "base_params": {"version": 20, "use_cdn": "1"},
             "templates": {
                 "jiazi_ranking": "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day={day}&use_cdn={use_cdn}&version={version}",
-                "page_ranking": "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={channel}&version={version}",
+                "page_ranking": "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel={channel}&version={version}&use_cdn={use_cdn}",
                 "novel_detail": "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId={novel_id}",
             },
         },
@@ -93,237 +62,163 @@ def sample_config_data():
     }
 
 
-@pytest.fixture
-def test_page_ids():
-    """测试页面ID"""
-    return {
-        "valid": ["jiazi", "index", "yq"],
-        "invalid": ["invalid", "nonexistent"],
-        "special": ["all", "jiazi", "category"],
-        "single": ["jiazi"],
-        "multiple": ["jiazi", "index"],
-    }
-
-
 # ==================== HTTP 响应数据 ====================
 
-
 @pytest.fixture
-def mock_http_response():
-    """模拟HTTP响应"""
-    return {
-        "success": {"status": "success", "data": []},
-        "failure": {"status": "error", "message": "Request failed"},
-    }
-
-
-@pytest.fixture
-def mock_page_content():
-    """模拟页面内容"""
-    return {
-        "content": {
-            "code": "200",
-            "data": [
-                {
-                    "rankid": "1",
-                    "channelName": "测试榜单",
-                    "rank_group_type": "热门",
-                    "data": [
-                        {
-                            "novelId": "12345",
-                            "novelName": "测试小说1",
-                            "novelClickCount": 1000,
-                            "novelFavoriteCount": 500,
-                        },
-                        {
-                            "novelId": "12346",
-                            "novelName": "测试小说2",
-                            "novelClickCount": 2000,
-                            "novelFavoriteCount": 800,
-                        },
-                    ],
-                }
-            ],
-        }
-    }
-
-
-@pytest.fixture
-def mock_jiazi_content():
-    """模拟夹子榜内容"""
+def mock_jiazi_response():
+    """模拟夹子榜API响应"""
     return {
         "code": "200",
         "data": {
             "list": [
                 {
-                    "novelId": "55555",
-                    "novelName": "夹子测试小说1",
-                    "novelClickCount": 8000,
-                    "novelFavoriteCount": 2000,
+                    "novelId": "123456",
+                    "novelName": "测试小说1",
+                    "authorid": "1001",
                 },
                 {
-                    "novelId": "55556",
-                    "novelName": "夹子测试小说2",
-                    "novelClickCount": 9000,
-                    "novelFavoriteCount": 2500,
-                },
+                    "novelId": "123457",
+                    "novelName": "测试小说2", 
+                    "authorid": "1002",
+                }
             ]
-        },
+        }
     }
 
 
 @pytest.fixture
-def mock_book_detail():
-    """模拟书籍详情"""
+def mock_page_response():
+    """模拟页面API响应"""
     return {
-        "novelId": "12345",
-        "novelName": "测试小说详情",
-        "novelClickCount": 5000,
-        "novelFavoriteCount": 1200,
-        "CommentCount": 100,
-        "nutritionNovel": 95,
-    }
-
-
-# ==================== 解析器数据 ====================
-
-
-@pytest.fixture
-def mock_parsed_items():
-    """模拟解析结果"""
-    return {
-        "ranking": ParsedItem(
-            DataType.RANKING,
+        "code": "200",
+        "data": [
             {
-                "rank_id": "1",
-                "rank_name": "测试榜单",
-                "books": [
-                    {"book_id": "12345", "title": "测试小说1", "position": 1},
-                    {"book_id": "12346", "title": "测试小说2", "position": 2},
-                ],
-            },
-        ),
-        "book": ParsedItem(
-            DataType.BOOK,
-            {"book_id": "12345", "title": "测试小说", "clicks": 1000, "favorites": 500},
-        ),
-        "page": ParsedItem(DataType.PAGE, {"page_info": "test"}),
+                "rankid": "hottest",
+                "channelName": "热门榜单",
+                "rank_group_type": "热门",
+                "channelMoreId": "index_hot",
+                "data": [
+                    {
+                        "novelId": "789101",
+                        "novelName": "页面测试小说1",
+                        "authorid": "2001",
+                    },
+                    {
+                        "novelId": "789102", 
+                        "novelName": "页面测试小说2",
+                        "authorid": "2002",
+                    }
+                ]
+            }
+        ]
     }
 
 
-# ==================== 爬取结果数据 ====================
-
-
 @pytest.fixture
-def mock_crawl_result():
-    """模拟爬取结果"""
+def mock_book_detail_response():
+    """模拟书籍详情API响应"""
     return {
-        "success": {
-            "success": True,
-            "page_id": "test_page",
-            "books_crawled": 25,
-            "execution_time": 5.0,
-            "data": {"url": "https://test.com", "rankings_count": 1},
-        },
-        "failure": {
-            "success": False,
-            "page_id": "test_page",
-            "books_crawled": 0,
-            "execution_time": 1.0,
-            "error_message": "网络连接失败",
-        },
+        "novelId": "123456",
+        "novelName": "测试小说详情",
+        "authorId": "1001",
+        "series": "连载中",
+        "novelSize": 50000,
+        "novelChapterCount": 25,
+        "vipChapterid": "chapter_10",
+        "novelbefavoritedcount": 1200,
+        "novip_clicks": 5000,
+        "comment_count": 100,
+        "nutrition_novel": 95,
     }
 
 
+# ==================== Mock工厂函数 ====================
+
 @pytest.fixture
-def mock_rankings_data():
-    """模拟榜单数据"""
-    return [
-        {
-            "rank_id": "1",
-            "rank_name": "测试榜单",
-            "page_id": "test_page",
-            "rank_group_type": "热门",
-            "books": [
-                {"book_id": "12345", "title": "测试小说1", "position": 1, "score": 95.0}
-            ],
-        }
-    ]
+def mock_http_client():
+    """模拟HTTP客户端"""
+    client = Mock()
+    client.run = AsyncMock()
+    client.close = AsyncMock()
+    return client
 
 
 @pytest.fixture
-def mock_books_data():
-    """模拟书籍数据"""
-    return [
-        {
-            "book_id": "12345",
-            "title": "测试小说1",
-            "clicks": 1000,
-            "favorites": 500,
-            "comments": 100,
-            "word_count": 50000,
-        }
-    ]
+def mock_crawl_config(mocker, sample_config_data):
+    """模拟爬虫配置"""
+    mock_config = Mock()
+    mock_config._config = sample_config_data
+    mock_config.params = sample_config_data["global"]["base_params"]
+    mock_config.templates = sample_config_data["global"]["templates"]
+    
+    # 模拟配置方法
+    def get_task_config(task_id):
+        for task in sample_config_data["crawl_tasks"]:
+            if task["id"] == task_id:
+                return task
+        return None
+    
+    def build_url(task_id):
+        task = get_task_config(task_id)
+        if not task:
+            return None
+        template = mock_config.templates[task["template"]]
+        params = {**mock_config.params, **task.get("params", {})}
+        return template.format(**params)
+        
+    def build_novel_url(novel_id):
+        return mock_config.templates["novel_detail"].format(novel_id=novel_id)
+    
+    mock_config.get_task_config = get_task_config
+    mock_config.build_url = build_url
+    mock_config.build_novel_url = build_novel_url
+    mock_config.get_all_tasks = lambda: sample_config_data["crawl_tasks"]
+    mock_config.validate_page_id = lambda pid: pid in ["jiazi", "index", "yq"]
+    
+    return mock_config
 
 
 # ==================== 数据库Mock ====================
 
-
 @pytest.fixture
-def mock_db_objects():
-    """模拟数据库对象"""
-
-    class MockRanking:
-        def __init__(self):
-            self.id = 1
-
-    class MockBook:
-        def __init__(self):
-            self.id = 1
-
-    return {"ranking": MockRanking(), "book": MockBook()}
-
-
-# ==================== Service Mock ====================
+def mock_book_service(mocker):
+    """模拟书籍服务"""
+    service = Mock()
+    
+    # 模拟返回的书籍对象
+    mock_book = Mock()
+    mock_book.id = 1
+    mock_book.novel_id = 123456
+    
+    service.create_or_update_book.return_value = mock_book
+    service.batch_create_book_snapshots.return_value = []
+    
+    return service
 
 
 @pytest.fixture
-def mock_services(mocker: MockerFixture):
-    """模拟服务对象"""
-    book_service = mocker.Mock()
-    ranking_service = mocker.Mock()
-
-    # 设置默认返回值
-    book_service.create_or_update_book.return_value = type("MockBook", (), {"id": 1})()
-    book_service.batch_create_book_snapshots.return_value = None
-
-    ranking_service.create_or_update_ranking.return_value = type(
-        "MockRanking", (), {"id": 1}
-    )()
-    ranking_service.batch_create_ranking_snapshots.return_value = None
-
-    return {"book_service": book_service, "ranking_service": ranking_service}
+def mock_ranking_service(mocker):
+    """模拟榜单服务"""
+    service = Mock()
+    
+    # 模拟返回的榜单对象
+    mock_ranking = Mock()
+    mock_ranking.id = 1
+    mock_ranking.rank_id = "test_rank"
+    
+    service.create_or_update_ranking.return_value = mock_ranking
+    service.batch_create_ranking_snapshots.return_value = []
+    
+    return service
 
 
-# ==================== 测试工厂函数 ====================
+# ==================== 真实网络测试标记 ====================
 
-
-def create_mock_config(mocker: MockerFixture, config_data: dict):
-    """创建模拟配置对象"""
-    mocker.patch("builtins.open", mocker.mock_open())
-    mocker.patch("json.load", return_value=config_data)
-
-
-def create_mock_http_client(mocker: MockerFixture, response_data: dict):
-    """创建模拟HTTP客户端"""
-    mock_client = mocker.Mock()
-    mock_client.get = mocker.AsyncMock(return_value=response_data)
-    mock_client.close = mocker.AsyncMock()
-    return mock_client
-
-
-def create_mock_parser(mocker: MockerFixture, parsed_items: list):
-    """创建模拟解析器"""
-    mock_parser = mocker.Mock()
-    mock_parser.parse.return_value = parsed_items
-    return mock_parser
+def pytest_configure(config):
+    """配置pytest标记"""
+    config.addinivalue_line(
+        "markers", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
+    )
+    config.addinivalue_line(  
+        "markers", "real_network: marks tests that require real network access"
+    )

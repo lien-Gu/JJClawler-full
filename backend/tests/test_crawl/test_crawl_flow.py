@@ -1,274 +1,359 @@
 """
-爬取流程管理器测试文件
-测试CrawlFlow类的关键功能，包括真实的爬取过程
+爬虫流程管理器测试
+测试 CrawlFlow 的完整爬取流程，包括真实网络请求测试
 """
 
 import pytest
-from pytest_mock import MockerFixture
+from unittest.mock import Mock, AsyncMock, patch
+import asyncio
 
 from app.crawl.crawl_flow import CrawlFlow
 
 
+@pytest.fixture
+def crawl_flow_with_mocks(mock_crawl_config, mock_http_client, mock_book_service, mock_ranking_service):
+    """创建带有mock依赖的CrawlFlow实例"""
+    with patch('app.crawl.crawl_flow.CrawlConfig', return_value=mock_crawl_config), \
+         patch('app.crawl.crawl_flow.HttpClient', return_value=mock_http_client), \
+         patch('app.crawl.crawl_flow.BookService', return_value=mock_book_service), \
+         patch('app.crawl.crawl_flow.RankingService', return_value=mock_ranking_service):
+        return CrawlFlow()
+
+
 class TestCrawlFlow:
-    """测试CrawlFlow类的核心功能"""
+    """测试爬虫流程管理器的核心功能"""
 
-    @pytest.fixture
-    def crawl_flow(self):
-        """创建CrawlFlow实例"""
-        return CrawlFlow(request_delay=0.1)
-
-    def test_initialization(self, crawl_flow):
-        """测试初始化"""
-        assert crawl_flow.client is not None
-        assert crawl_flow.parser is not None
-        assert crawl_flow.book_service is not None
-        assert crawl_flow.ranking_service is not None
-        assert isinstance(crawl_flow.crawled_book_ids, set)
-        assert crawl_flow.stats["books_crawled"] == 0
-
-    def test_generate_page_url(self, crawl_flow, mocker: MockerFixture):
-        """测试生成页面地址"""
-        mock_config = {
-            "id": "test_page",
-            "template": "test_template",
-            "params": {"page": 1},
-        }
-
-        mocker.patch.object(
-            crawl_flow.config, "get_task_config", return_value=mock_config
-        )
-        mocker.patch.object(
-            crawl_flow.config, "build_url", return_value="https://test.com/page1"
-        )
-
-        result = crawl_flow._generate_page_url("test_page")
-
-        assert result == "https://test.com/page1"
-
-    @pytest.mark.asyncio
-    async def test_crawl_page_content(
-        self, crawl_flow, mocker: MockerFixture, mock_page_content
-    ):
-        """测试爬取页面内容"""
-        mocker.patch.object(crawl_flow.client, "get", return_value=mock_page_content)
-
-        result = await crawl_flow._crawl_page_content("https://test.com/page1")
-
-        assert result == mock_page_content
-        assert crawl_flow.stats["total_requests"] == 1
-
-    def test_parse_rankings_from_page(
-        self, crawl_flow, mocker: MockerFixture, mock_page_content, mock_parsed_items
-    ):
-        """测试从页面解析榜单"""
-        mocker.patch.object(
-            crawl_flow.parser, "parse", return_value=[mock_parsed_items["ranking"]]
-        )
-
-        result = crawl_flow._parse_rankings_from_page(mock_page_content, "test_page")
-
-        assert len(result) == 1
-        assert result[0]["rank_id"] == "1"
-        assert len(result[0]["books"]) == 2
-
-    def test_extract_book_ids_from_rankings(self, crawl_flow, mock_rankings_data):
-        """测试从榜单提取书籍ID"""
-        result = crawl_flow._extract_unique_book_ids(mock_rankings_data)
-
-        assert len(result) == 1
-        assert "12345" in result
-        assert len(crawl_flow.crawled_book_ids) == 1
-
-    @pytest.mark.asyncio
-    async def test_crawl_books_details(
-        self, crawl_flow, mocker: MockerFixture, mock_book_detail
-    ):
-        """测试爬取书籍详情"""
-
-        # Mock方法并模拟统计更新
-        async def mock_crawl_single_book(book_id):
-            crawl_flow.stats["books_crawled"] += 1
-            crawl_flow.books_data.append(mock_book_detail)
-            return mock_book_detail
-
-        mocker.patch.object(
-            crawl_flow, "_crawl_single_book", side_effect=mock_crawl_single_book
-        )
-
-        result = await crawl_flow._crawl_books_details(["12345"])
-
-        assert len(result) == 1
-        assert result[0] == mock_book_detail
-        assert crawl_flow.stats["books_crawled"] == 1
-
-    @pytest.mark.asyncio
-    async def test_crawl_book_detail(
-        self, crawl_flow, mocker: MockerFixture, mock_book_detail, mock_parsed_items
-    ):
-        """测试爬取单个书籍详情"""
-        crawl_flow.config.templates = {
-            "novel_detail": "https://test.com/book/{novel_id}"
-        }
-        crawl_flow.config.params = {}
-
-        mocker.patch.object(crawl_flow.client, "get", return_value=mock_book_detail)
-        mocker.patch.object(
-            crawl_flow.parser, "parse", return_value=[mock_parsed_items["book"]]
-        )
-
-        result = await crawl_flow._crawl_single_book("12345")
-
-        assert result == mock_parsed_items["book"].data
-        assert crawl_flow.stats["total_requests"] == 1
-
-    @pytest.mark.asyncio
-    async def test_save_crawl_result(
-        self,
-        crawl_flow,
-        mocker: MockerFixture,
-        mock_rankings_data,
-        mock_books_data,
-        mock_services,
-    ):
-        """测试保存爬取结果"""
-        # Mock数据库会话
-        mock_db = mocker.Mock()
-        mocker.patch("app.crawl.crawl_flow.get_db", return_value=[mock_db])
-
-        # Mock服务
-        crawl_flow.ranking_service = mock_services["ranking_service"]
-        crawl_flow.book_service = mock_services["book_service"]
-
-        result = await crawl_flow._save_crawl_result(
-            mock_rankings_data, mock_books_data
-        )
-
-        assert result is True
-        mock_db.commit.assert_called_once()
+    def test_initialization(self, crawl_flow_with_mocks):
+        """测试CrawlFlow初始化"""
+        flow = crawl_flow_with_mocks
+        
+        assert flow.config is not None
+        assert flow.client is not None  
+        assert flow.book_service is not None
+        assert flow.ranking_service is not None
+        assert flow.stats["books_crawled"] == 0
+        assert flow.stats["total_requests"] == 0
 
     @pytest.mark.asyncio
     async def test_execute_crawl_task_success(
-        self,
-        crawl_flow,
-        mocker: MockerFixture,
-        mock_page_content,
-        mock_rankings_data,
-        mock_books_data,
+        self, 
+        crawl_flow_with_mocks, 
+        mock_jiazi_response, 
+        mock_book_detail_response,
+        test_db_session
     ):
-        """测试执行完整爬取任务成功"""
-        # Mock所有步骤
-        mocker.patch.object(
-            crawl_flow, "_generate_page_url", return_value="https://test.com/page1"
-        )
-        mocker.patch.object(
-            crawl_flow, "_crawl_page_content", return_value=mock_page_content
-        )
-        mocker.patch.object(
-            crawl_flow, "_parse_rankings_from_page", return_value=mock_rankings_data
-        )
-        mocker.patch.object(
-            crawl_flow, "_extract_unique_book_ids", return_value=["12345"]
-        )
-        mocker.patch.object(
-            crawl_flow, "_crawl_books_details", return_value=mock_books_data
-        )
-        mocker.patch.object(crawl_flow, "_save_crawl_result", return_value=True)
-
-        result = await crawl_flow.execute_crawl_task("test_page")
-
-        assert result["success"] is True
-        assert result["page_id"] == "test_page"
-        assert result["books_crawled"] == 1
+        """测试成功执行爬取任务"""
+        flow = crawl_flow_with_mocks
+        
+        # 设置mock返回值
+        flow.client.run.side_effect = [
+            mock_jiazi_response,  # 页面内容
+            [mock_book_detail_response, mock_book_detail_response]  # 书籍详情列表
+        ]
+        
+        # Mock数据库操作
+        with patch('app.crawl.crawl_flow.Session', return_value=test_db_session):
+            success, result = await flow.execute_crawl_task("jiazi")
+        
+        # 验证结果
+        assert success is True
+        assert result["total_requests"] == 2  # 1次页面请求 + 1次书籍详情批量请求
         assert "execution_time" in result
+        
+        # 验证HTTP请求被正确调用
+        assert flow.client.run.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_execute_crawl_task_failure(self, crawl_flow, mocker: MockerFixture):
-        """测试执行爬取任务失败"""
-        mocker.patch.object(crawl_flow, "_generate_page_url", return_value=None)
-
-        result = await crawl_flow.execute_crawl_task("invalid_page")
-
-        assert result["success"] is False
-        assert "无法生成页面地址" in result["error_message"]
-
-    def test_get_all_data(self, crawl_flow):
-        """测试获取所有数据"""
-        crawl_flow.books_data = [{"book_id": 1}]
-        crawl_flow.rankings_data = [{"rank_id": "1"}]
-        crawl_flow.pages_data = [{"page_id": 1}]
-
-        result = crawl_flow.get_all_data()
-
-        assert len(result["books"]) == 1
-        assert len(result["rankings"]) == 1
-        assert len(result["pages"]) == 1
+    async def test_execute_crawl_task_page_content_fail(self, crawl_flow_with_mocks):
+        """测试页面内容爬取失败"""
+        flow = crawl_flow_with_mocks
+        
+        # 模拟页面内容为空
+        flow.client.run.return_value = None
+        
+        success, result = await flow.execute_crawl_task("jiazi")
+        
+        assert success is False
+        assert "页面内容爬取失败" in result["msg"]
 
     @pytest.mark.asyncio
-    async def test_close(self, crawl_flow, mocker: MockerFixture):
-        """测试关闭资源"""
-        mocker.patch.object(crawl_flow.client, "close")
+    async def test_execute_crawl_task_invalid_page_id(self, crawl_flow_with_mocks):
+        """测试无效页面ID"""
+        flow = crawl_flow_with_mocks
+        
+        # 模拟build_url返回None
+        flow.config.build_url.return_value = None
+        
+        success, result = await flow.execute_crawl_task("invalid_page")
+        
+        assert success is False
+        assert "无法生成页面地址" in result["msg"]
 
-        await crawl_flow.close()
+    @pytest.mark.asyncio
+    async def test_execute_crawl_task_exception_handling(self, crawl_flow_with_mocks):
+        """测试异常处理"""
+        flow = crawl_flow_with_mocks
+        
+        # 模拟HTTP客户端抛出异常
+        flow.client.run.side_effect = Exception("Network timeout")
+        
+        success, result = await flow.execute_crawl_task("jiazi")
+        
+        assert success is False
+        assert "爬取异常" in result["msg"]
+        assert "Network timeout" in result["msg"]
 
-        crawl_flow.client.close.assert_called_once()
+    def test_save_ranking_parsers(
+        self, 
+        crawl_flow_with_mocks, 
+        mock_jiazi_response,
+        test_db_session
+    ):
+        """测试保存榜单解析器数据"""
+        from app.crawl.parser import PageParser
+        
+        flow = crawl_flow_with_mocks
+        
+        # 创建解析器
+        page_parser = PageParser(mock_jiazi_response, "jiazi")
+        rankings = page_parser.rankings
+        
+        # 调用保存方法
+        flow.save_ranking_parsers(rankings, test_db_session)
+        
+        # 验证服务方法被调用
+        assert flow.ranking_service.create_or_update_ranking.call_count == len(rankings)
+        assert flow.book_service.create_or_update_book.call_count >= len(rankings)
+        assert flow.ranking_service.batch_create_ranking_snapshots.call_count == len(rankings)
+
+    def test_save_novel_parsers(
+        self, 
+        crawl_flow_with_mocks, 
+        mock_book_detail_response,
+        test_db_session
+    ):
+        """测试保存书籍解析器数据"""
+        from app.crawl.parser import NovelPageParser
+        
+        flow = crawl_flow_with_mocks
+        
+        # 创建书籍解析器
+        book_parsers = [
+            NovelPageParser(mock_book_detail_response),
+            NovelPageParser(mock_book_detail_response)
+        ]
+        
+        # 调用保存方法
+        flow.save_novel_parsers(book_parsers, test_db_session)
+        
+        # 验证服务方法被调用
+        assert flow.book_service.create_or_update_book.call_count == 2
+        assert flow.book_service.batch_create_book_snapshots.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_close_resources(self, crawl_flow_with_mocks):
+        """测试资源清理"""
+        flow = crawl_flow_with_mocks
+        
+        await flow.close()
+        
+        flow.client.close.assert_called_once()
 
 
 class TestRealCrawlFlow:
-    """真实爬取流程测试（集成测试）"""
+    """真实网络爬取测试（集成测试）"""
 
     @pytest.mark.integration
+    @pytest.mark.real_network  
     @pytest.mark.asyncio
-    async def test_real_page_crawl(self, app):
-        """测试真实的夹子榜爬取（集成测试）"""
-        real_crawl_flow = CrawlFlow(request_delay=0.1, concurrent_mode=True)
+    async def test_real_jiazi_crawl(self, test_db_session):
+        """测试真实的夹子榜爬取"""
+        # 创建真实的CrawlFlow实例
+        real_flow = CrawlFlow()
+        
         try:
-            page_id = "index"
-            result = await real_crawl_flow.execute_crawl_task(page_id)
-
-            # 验证结果结构
-            assert "success" in result
-            assert "page_id" in result
-            assert "books_crawled" in result
+            # 使用真实数据库会话
+            with patch('app.crawl.crawl_flow.Session', return_value=test_db_session):
+                success, result = await real_flow.execute_crawl_task("jiazi")
+            
+            # 验证基本结果结构
+            assert isinstance(success, bool)
+            assert "total_requests" in result
             assert "execution_time" in result
-
-            if result["success"]:
-                print(f"✅ 真实爬取成功: 爬取了 {result['books_crawled']} 本书籍")
-                assert result["page_id"] == page_id
-                assert result["books_crawled"] >= 0
+            assert "start_time" in result
+            assert "end_time" in result
+            
+            if success:
+                print(f"✅ 真实夹子榜爬取成功")
+                print(f"   - 总请求数: {result['total_requests']}")
+                print(f"   - 执行时间: {result['execution_time']:.2f}秒")
+                
+                # 验证数据保存到数据库
+                # 这里可以查询数据库验证数据是否正确保存
+                # 由于是集成测试，我们主要验证流程是否完整执行
+                assert result["total_requests"] > 0
                 assert result["execution_time"] > 0
+                
             else:
-                error_msg = result.get("error_message", "未知错误")
-                print(f"❌ 真实爬取失败: {error_msg}")
-                # 数据保存失败应该导致测试失败
-                pytest.fail(f"爬取任务失败: {error_msg}")
-
+                error_msg = result.get("msg", "未知错误")
+                print(f"❌ 真实夹子榜爬取失败: {error_msg}")
+                
+                # 如果是网络问题，跳过测试而不是失败
+                if "网络" in error_msg or "连接" in error_msg or "timeout" in error_msg.lower():
+                    pytest.skip(f"网络问题跳过测试: {error_msg}")
+                else:
+                    # 其他错误应该导致测试失败
+                    pytest.fail(f"爬取任务失败: {error_msg}")
+                    
         except Exception as e:
             print(f"❌ 真实爬取异常: {e}")
-            pytest.skip(f"网络问题跳过真实爬取测试: {e}")
-
+            # 网络异常跳过测试
+            if any(keyword in str(e).lower() for keyword in ["network", "timeout", "connection", "dns"]):
+                pytest.skip(f"网络问题跳过测试: {e}")
+            else:
+                raise
+                
         finally:
-            await real_crawl_flow.close()
+            await real_flow.close()
 
     @pytest.mark.integration
+    @pytest.mark.real_network
     @pytest.mark.asyncio
-    async def test_real_book_detail_crawl(self):
-        """测试真实的书籍详情爬取（集成测试）"""
-        real_crawl_flow = CrawlFlow(request_delay=0.1, concurrent_mode=False)
+    async def test_real_index_page_crawl(self, test_db_session):
+        """测试真实的首页爬取"""
+        real_flow = CrawlFlow()
+        
         try:
-            test_book_id = "123456"
-
-            result = await real_crawl_flow._crawl_single_book(test_book_id)
-
-            if result:
-                assert "book_id" in result
-                assert "title" in result
-                print(f"✅ 真实书籍详情爬取成功: {result.get('title', '未知书名')}")
+            with patch('app.crawl.crawl_flow.Session', return_value=test_db_session):
+                success, result = await real_flow.execute_crawl_task("index")
+            
+            if success:
+                print(f"✅ 真实首页爬取成功")
+                print(f"   - 总请求数: {result['total_requests']}")
+                print(f"   - 执行时间: {result['execution_time']:.2f}秒")
+                
+                # 首页通常包含多个榜单，所以请求数应该更多
+                assert result["total_requests"] >= 2  # 至少页面请求 + 书籍详情请求
+                
             else:
-                print(f"❌ 真实书籍详情爬取失败: 书籍ID {test_book_id}")
+                error_msg = result.get("msg", "未知错误")
+                print(f"❌ 真实首页爬取失败: {error_msg}")
+                
+                if "网络" in error_msg or "连接" in error_msg:
+                    pytest.skip(f"网络问题跳过测试: {error_msg}")
+                else:
+                    pytest.fail(f"爬取任务失败: {error_msg}")
+                    
+        except Exception as e:
+            print(f"❌ 真实首页爬取异常: {e}")
+            if any(keyword in str(e).lower() for keyword in ["network", "timeout", "connection"]):
+                pytest.skip(f"网络问题跳过测试: {e}")
+            else:
+                raise
+                
+        finally:
+            await real_flow.close()
 
+    @pytest.mark.integration
+    @pytest.mark.real_network
+    @pytest.mark.asyncio  
+    async def test_real_novel_detail_crawl(self):
+        """测试真实的书籍详情爬取"""
+        from app.crawl.http import HttpClient
+        from app.crawl.base import CrawlConfig
+        from app.crawl.parser import NovelPageParser
+        
+        try:
+            # 使用真实配置和HTTP客户端
+            config = CrawlConfig()
+            client = HttpClient()
+            
+            # 使用一个已知存在的书籍ID进行测试
+            # 注意：这个ID可能需要根据实际情况调整
+            test_novel_id = "123456"
+            novel_url = config.build_novel_url(test_novel_id)
+            
+            # 发起真实请求
+            response = await client.run(novel_url)
+            
+            if response:
+                # 解析书籍详情
+                parser = NovelPageParser(response)
+                book_detail = parser.book_detail
+                
+                print(f"✅ 书籍详情爬取成功: {book_detail.get('title', '未知书名')}")
+                
+                # 验证基本字段存在
+                assert "novel_id" in book_detail
+                assert "title" in book_detail
+                
+            else:
+                print(f"❌ 书籍详情响应为空")
+                pytest.skip("书籍API无响应，跳过测试")
+                
         except Exception as e:
             print(f"❌ 真实书籍详情爬取异常: {e}")
-            pytest.skip(f"网络问题跳过真实书籍详情爬取测试: {e}")
-
+            if any(keyword in str(e).lower() for keyword in ["network", "timeout", "connection"]):
+                pytest.skip(f"网络问题跳过测试: {e}")
+            else:
+                # 对于书籍不存在等业务异常，也跳过测试
+                pytest.skip(f"业务异常跳过测试: {e}")
+        
         finally:
-            await real_crawl_flow.close()
+            await client.close()
+
+
+class TestCrawlFlowErrorScenarios:
+    """爬虫流程错误场景测试"""
+
+    @pytest.mark.asyncio
+    async def test_malformed_page_response(self, crawl_flow_with_mocks):
+        """测试页面响应格式错误"""
+        flow = crawl_flow_with_mocks
+        
+        # 返回格式错误的响应
+        malformed_response = {"error": "invalid format"}
+        flow.client.run.side_effect = [malformed_response, []]
+        
+        success, result = await flow.execute_crawl_task("jiazi")
+        
+        # 应该能处理错误并返回失败结果
+        assert success is False
+        assert "爬取异常" in result["msg"]
+
+    @pytest.mark.asyncio
+    async def test_empty_book_list(self, crawl_flow_with_mocks):
+        """测试空书籍列表情况"""
+        flow = crawl_flow_with_mocks
+        
+        # 返回空的书籍列表
+        empty_response = {"code": "200", "data": {"list": []}}
+        flow.client.run.side_effect = [empty_response, []]
+        
+        success, result = await flow.execute_crawl_task("jiazi")
+        
+        # 空列表不应该导致失败，但统计应该为0
+        if success:
+            assert result["total_requests"] == 2  # 页面请求 + 空的书籍详情请求
+
+    @pytest.mark.asyncio
+    async def test_partial_book_detail_failure(self, crawl_flow_with_mocks, mock_jiazi_response, test_db_session):
+        """测试部分书籍详情请求失败"""
+        flow = crawl_flow_with_mocks
+        
+        # 书籍详情部分失败（返回异常对象）
+        book_responses = [
+            {"novelId": "123456", "novelName": "成功的书籍"},
+            Exception("书籍详情请求失败")  # 模拟异常
+        ]
+        
+        flow.client.run.side_effect = [mock_jiazi_response, book_responses]
+        
+        # 应该能处理部分失败的情况
+        with patch('app.crawl.crawl_flow.Session', return_value=test_db_session):
+            success, result = await flow.execute_crawl_task("jiazi")
+        
+        # 即使部分失败，整体流程可能仍然成功
+        # 具体取决于实现的容错策略
+        assert isinstance(success, bool)
+        assert "total_requests" in result

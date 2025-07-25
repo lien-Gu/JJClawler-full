@@ -2,8 +2,9 @@
 晋江文学城爬虫模块
 """
 
-from .base import CrawlConfig, HttpClient
+from .base import CrawlConfig
+from .http import HttpClient
 from .crawl_flow import CrawlFlow
-from .parser import DataType, ParsedItem, Parser
+from .parser import RankingParser, PageParser, NovelPageParser
 
-__all__ = ["Parser", "DataType", "ParsedItem", "CrawlConfig", "HttpClient", "CrawlFlow"]
+__all__ = ["RankingParser", "PageParser", "NovelPageParser", "CrawlConfig", "HttpClient", "CrawlFlow"]

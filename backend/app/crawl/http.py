@@ -91,10 +91,10 @@ class HttpClient:
         response.raise_for_status()
         return json.loads(response.content)
 
-    def close(self):
+    async def close(self):
         """
         关闭请求连接池
         :return:
         """
         self.client.close()
-        self.async_client.aclose()
+        await self.async_client.aclose()
