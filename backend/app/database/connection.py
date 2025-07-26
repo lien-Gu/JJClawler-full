@@ -273,9 +273,9 @@ def ensure_database():
 async def check_db() -> bool:
     """检查数据库连接状态"""
     try:
-        async with get_db() as db:
-            result = await db.execute(text("SELECT 1"))
-            await result.fetchone()
+        with SessionLocal() as db:
+            result = db.execute(text("SELECT 1"))
+            result.fetchone()
         return True
-    except Exception as e:
+    except Exception:
         return False

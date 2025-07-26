@@ -31,6 +31,15 @@ async def lifespan(app: FastAPI):
     # 启动时的初始化代码
     logger.info("应用程序启动")
 
+    # 数据库初始化
+    try:
+        from .database.connection import ensure_database
+        ensure_database()
+        logger.info("数据库初始化成功")
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        raise  # 数据库初始化失败应该阻止应用启动
+
     # 启动调度器
     try:
         from .schedule import start_scheduler
