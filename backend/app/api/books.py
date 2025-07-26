@@ -12,10 +12,10 @@ from ..database.service.book_service import BookService
 from ..database.service.ranking_service import RankingService
 from ..models.base import DataResponse, ListResponse
 from ..models.book import (
-    BookDetailResponse,
-    BookRankingInfoResponse,
-    BookResponse,
-    BookSnapshotResponse,
+    BookDetail,
+    BookRankingInfo,
+    BookBasic,
+    BookSnapshot,
 )
 
 router = APIRouter()
@@ -25,12 +25,12 @@ book_service = BookService()
 ranking_service = RankingService()
 
 
-@router.get("/", response_model=ListResponse[BookResponse])
+@router.get("/", response_model=ListResponse[BookBasic])
 async def get_books_list(
         page: int = Query(1, ge=1, description="页码"),
         size: int = Query(20, ge=1, le=100, description="每页数量"),
         db: Session = Depends(get_db),
-) -> ListResponse[BookResponse]:
+) -> ListResponse[BookBasic]:
     """
     获取书籍列表（分页）
     :param page:
@@ -43,13 +43,13 @@ async def get_books_list(
     return ListResponse(
         success=True,
         code=200,
-        data=[BookResponse.from_book(book) for book in book_result],
+        data=[BookBasic.from_book(book) for book in book_result],
         message="获取书籍列表成功"
     )
 
 
-@router.get("/{novel_id}", response_model=DataResponse[BookDetailResponse])
-async def get_book_detail(novel_id: str, db: Session = Depends(get_db)) -> DataResponse[BookDetailResponse]:
+@router.get("/{novel_id}", response_model=DataResponse[BookDetail])
+async def get_book_detail(novel_id: str, db: Session = Depends(get_db)) -> DataResponse[BookDetail]:
     """
     获取书籍详细信息 - 使用novel_id
     :param novel_id:
@@ -67,12 +67,12 @@ async def get_book_detail(novel_id: str, db: Session = Depends(get_db)) -> DataR
     return DataResponse(
         success=True,
         code=200,
-        data=BookDetailResponse.from_book_and_snapshot(book, snapshot),
+        data=BookDetail.from_book_and_snapshot(book, snapshot),
         message="获取书籍详情成功"
     )
 
 
-@router.get("/{novel_id}/snapshots", response_model=ListResponse[BookSnapshotResponse])
+@router.get("/{novel_id}/snapshots", response_model=ListResponse[BookSnapshot])
 async def get_book_snapshots(
         novel_id: str,
         interval: str = Query(
@@ -82,7 +82,7 @@ async def get_book_snapshots(
         ),
         count: int = Query(7, ge=1, le=365, description="时间段数量"),
         db: Session = Depends(get_db),
-) -> ListResponse[BookSnapshotResponse]:
+) -> ListResponse[BookSnapshot]:
     """
     获取书籍历史快照
 
@@ -109,7 +109,7 @@ async def get_book_snapshots(
     snapshots = book_service.get_historical_snapshots(db, cast(int, book.id), interval, count)
 
     # 转换为响应模型
-    snapshot_responses = [BookSnapshotResponse.from_snapshot(snapshot) for snapshot in snapshots]
+    snapshot_responses = [BookSnapshot.from_snapshot(snapshot) for snapshot in snapshots]
 
     return ListResponse(
         success=True,
@@ -119,7 +119,7 @@ async def get_book_snapshots(
     )
 
 
-@router.get("/{novel_id}/rankings", response_model=ListResponse[BookRankingInfoResponse])
+@router.get("/{novel_id}/rankings", response_model=ListResponse[BookRankingInfo])
 async def get_book_ranking_history(
         novel_id: str,
         ranking_id: int | None = Query(None, description="指定榜单ID"),
@@ -146,7 +146,7 @@ async def get_book_ranking_history(
 
     # 转换为响应模型
     ranking_responses = [
-        BookRankingInfoResponse.from_snapshot(book_id, ranking, snapshot)
+        BookRankingInfo.from_snapshot(book_id, ranking, snapshot)
         for ranking, snapshot in ranking_history_data
     ]
 

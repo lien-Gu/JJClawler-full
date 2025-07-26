@@ -28,3 +28,6 @@ class ListResponse(BaseResponse, Generic[T]):
     data: list[T] = Field(..., description="响应数据")
 
 
+class BaseSchema(BaseModel):
+    class Config:
+        from_attributes = True

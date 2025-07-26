@@ -14,8 +14,8 @@ __all__ = [
     "PaginatedResponse",
     "ErrorResponse",
     # 书籍相关模型
-    "BookResponse",
-    "BookDetailResponse",
+    "BookBasic",
+    "BookDetail",
     "BookTrendResponse",
     "BookSearchRequest",
     # 榜单相关模型

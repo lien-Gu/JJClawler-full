@@ -6,10 +6,10 @@ from datetime import date as Date
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from ..database.db.ranking import Ranking
+from base import BaseSchema
 
 
-class RankingResponse(BaseModel):
+class RankingResponse(BaseSchema):
     """榜单基础信息响应"""
     id: int = Field(..., description="id")
     ranking_id: str = Field(..., description="榜单ID")
@@ -18,24 +18,9 @@ class RankingResponse(BaseModel):
     page_id: str = Field(..., description="页面ID")
     rank_group_type: str = Field(..., description="榜单分组类型")
 
-    @classmethod
-    def from_ranking(cls, ranking: Ranking) -> "RankingResponse":
-        """
-
-        :param ranking:
-        :return:
-        """
-        return cls(
-            id=ranking.id,
-            ranking_id=ranking.rank_id,
-            name=ranking.name,
-            sub_ranking_name=ranking.sub_ranking_name,
-            page_id=ranking.page_id,
-            rank_group_type=ranking.rank_group_type
-        )
 
 
-class BookInRanking(BaseModel):
+class BookInRanking(BaseSchema):
     """榜单中的书籍信息"""
 
     book_id: int = Field(..., description="书籍ID")
@@ -48,7 +33,7 @@ class BookInRanking(BaseModel):
     word_count: int | None = Field(None, description="字数")
 
 
-class RankingDetailResponse(BaseModel):
+class RankingDetailResponse(BaseSchema):
     """榜单详情响应"""
 
     ranking_id: str = Field(..., description="榜单ID")  # 修改为string类型
@@ -61,7 +46,7 @@ class RankingDetailResponse(BaseModel):
     total_books: int = Field(0, description="书籍总数")
 
 
-class RankingHistoryPoint(BaseModel):
+class RankingHistoryPoint(BaseSchema):
     """榜单历史数据点"""
 
     date: Date = Field(..., description="日期")
@@ -71,7 +56,7 @@ class RankingHistoryPoint(BaseModel):
     score: float | None = Field(None, description="得分")
 
 
-class RankingHistoryResponse(BaseModel):
+class RankingHistoryResponse(BaseSchema):
     """榜单历史响应"""
 
     ranking_id: int = Field(..., description="榜单ID")
@@ -81,7 +66,7 @@ class RankingHistoryResponse(BaseModel):
     history_data: list[RankingHistoryPoint] = Field([], description="历史数据")
 
 
-class RankingStatsResponse(BaseModel):
+class RankingStatsResponse(BaseSchema):
     """榜单统计响应"""
 
     ranking_id: int = Field(..., description="榜单ID")
@@ -94,7 +79,7 @@ class RankingStatsResponse(BaseModel):
     last_snapshot_time: datetime | None = Field(None, description="最新快照时间")
 
 
-class RankingCompareRequest(BaseModel):
+class RankingCompareRequest(BaseSchema):
     """榜单对比请求"""
 
     ranking_ids: list[int] = Field(
@@ -104,7 +89,7 @@ class RankingCompareRequest(BaseModel):
     limit: int = Field(50, ge=1, le=200, description="每个榜单显示的书籍数量")
 
 
-class RankingCompareResponse(BaseModel):
+class RankingCompareResponse(BaseSchema):
     """榜单对比响应"""
 
     compare_date: Date = Field(..., description="对比日期")
@@ -113,7 +98,7 @@ class RankingCompareResponse(BaseModel):
     unique_books_count: int = Field(0, description="各榜单独有书籍总数")
 
 
-class BatchInfoResponse(BaseModel):
+class BatchInfoResponse(BaseSchema):
     """批次信息响应"""
     
     batch_id: str = Field(..., description="批次ID")
@@ -121,7 +106,7 @@ class BatchInfoResponse(BaseModel):
     total_books: int = Field(0, description="此批次包含的书籍总数")
 
 
-class RankingBatchListResponse(BaseModel):
+class RankingBatchListResponse(BaseSchema):
     """榜单批次列表响应"""
     
     ranking_id: int = Field(..., description="榜单ID")
