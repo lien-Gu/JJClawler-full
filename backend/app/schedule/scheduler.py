@@ -50,7 +50,7 @@ class TaskScheduler:
         scheduler_config = self.settings.scheduler
 
         # 配置job store - 使用SQLAlchemyJobStore存储到数据库
-        jobstores = {
+        job_stores = {
             "default": SQLAlchemyJobStore(
                 url=scheduler_config.job_store_url or self.settings.database.url
             )
@@ -61,7 +61,7 @@ class TaskScheduler:
 
         # 创建调度器
         scheduler = AsyncIOScheduler(
-            jobstores=jobstores,
+            jobstores=job_stores,
             executors=executors,
             job_defaults=scheduler_config.job_defaults,
             timezone=scheduler_config.timezone,

@@ -125,8 +125,10 @@ async def health_check():
     settings = get_settings()
     
     # 检查各个组件状态（简化为布尔值）
-    db_ok = await _check_database()
-    scheduler_ok = await _check_scheduler()
+    from .database.connection import check_db
+    db_ok = await check_db()
+    from .schedule.scheduler import get_scheduler
+    scheduler_ok = get_scheduler().is_running()
     
     # 计算运行时间
     uptime = time.time() - APP_START_TIME
@@ -153,13 +155,6 @@ async def health_check():
     )
 
 
-async def _check_database() -> bool:
-    """检查数据库连接状态 - 简化版本"""
-    try:
-        from .database.connection import check_db
-        return await check_db()
-    except Exception:
-        return False
 
 
 async def _check_scheduler() -> bool:
