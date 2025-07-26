@@ -33,8 +33,8 @@ async def lifespan(app: FastAPI):
 
     # 数据库初始化
     try:
-        from .database.connection import ensure_database
-        ensure_database()
+        from .database.connection import ensure_db
+        ensure_db()
         logger.info("数据库初始化成功")
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")

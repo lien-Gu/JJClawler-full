@@ -58,3 +58,26 @@ async def check_db() -> bool:
         return True
     except Exception:
         return False
+
+
+def ensure_db():
+    """
+    确保数据库存在且结构正确
+    简化版本：创建数据库表或建立连接
+    """
+    logger = get_logger(__name__)
+    logger.info("初始化数据库连接...")
+    
+    try:
+        # 检查数据库连接
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        logger.info("数据库连接正常")
+        
+        # 创建表结构（如果不存在）
+        create_tables()
+        logger.info("数据库表结构确认完成")
+        
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        raise RuntimeError(f"数据库初始化失败: {e}")
