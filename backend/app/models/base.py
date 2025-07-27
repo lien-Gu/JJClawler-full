@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -20,12 +20,15 @@ class BaseResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now, description="响应时间")
 
 
+class PaginationData(BaseModel, Generic[T]):
+    data_list: List[T] = Field([], description="内容列表")
+    page: int = Field(0, description="第几页")
+    size: int = Field(20, description="一页的数量")
+    total_pages: int = Field(0, description="总页数")
+
+
 class DataResponse(BaseResponse, Generic[T]):
-    data: T = Field(..., description="响应数据")
-
-
-class ListResponse(BaseResponse, Generic[T]):
-    data: list[T] = Field(..., description="响应数据")
+    data: Optional[T] = None
 
 
 class BaseSchema(BaseModel):

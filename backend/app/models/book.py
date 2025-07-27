@@ -33,6 +33,7 @@ class BookDetail(BookBasic, BookSnapshot):
     """书籍详情响应，总是获取最新时间的point"""
     vip_chapter_id: int = Field(default=0, description="入v的章节，0表示没有入V")
 
+
 class BookRankingInfo(BaseSchema):
     """书籍排名信息"""
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from time import strftime
-from typing import Dict, List
+from typing import Dict, List, Any
 import re
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import inspect
@@ -47,13 +47,15 @@ def extract_number(string: str) -> int:
     return number
 
 
-def filter_dict(raw_dict: dict, valid_field: set | list):
+def filter_dict(raw_dict: dict, valid_field: set | list | Any):
     """
     过滤字典
     :param raw_dict:
     :param valid_field:
     :return:
     """
+    if isinstance(valid_field, set) or isinstance(valid_field, list):
+        valid_field = get_model_fields(valid_field)
     return {k: v for k, v in raw_dict.items() if k in valid_field}
 
 
