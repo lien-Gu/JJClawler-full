@@ -23,28 +23,17 @@ class BookService:
     # ==================== 基础查询操作 ====================
 
     @staticmethod
-    def get_book_by_id(db: Session, book_id: int) -> Optional[Book]:
-        """
-        根据主键ID获取书籍
-
-        :param db: 数据库会话对象，用于执行数据库操作
-        :param book_id: 书籍主键ID，数据库中的唯一标识符
-        :return: Book对象，如果存在则返回书籍实例，不存在则返回None
-        """
-        return db.get(Book, book_id)
-
-    @staticmethod
     def get_book_by_novel_id(db: Session, novel_id: int) -> Optional[Book]:
         """
-        根据novel_id获取书籍
+        根据novel_id获取书籍（现在作为主键）
 
         :param db: 数据库会话对象，用于执行数据库操作
-        :param novel_id: 书籍novel_id，支持字符串和整数格式，来源于晋江文学城的小说ID
-        :return: Book对象，如果存在则返回书籍实例，不存在时根据raise_404参数决定抛异常或返回None
+        :param novel_id: 书籍主键novel_id，数据库中的唯一标识符
+        :return: Book对象，如果存在则返回书籍实例，不存在则返回None
         """
         if not isinstance(novel_id, int):
             novel_id = cast(int, novel_id)
-        return db.scalar(select(Book).where(Book.novel_id == novel_id))
+        return db.get(Book, novel_id)
 
     # ==================== 批量查询操作 ====================
 
@@ -79,7 +68,7 @@ class BookService:
         book_records = db.execute(query.offset((page - 1) * size).limit(size)).scalars()
 
         # 计算页码数
-        total_books = db.scalar(select(func.count(Book.id))) or 0
+        total_books = db.scalar(select(func.count(Book.novel_id))) or 0
         import math
         total_pages = math.ceil(total_books * 1.0 / size)
 
@@ -142,25 +131,25 @@ class BookService:
     # ==================== 快照查询操作 ====================
 
     @staticmethod
-    def get_latest_snapshot_by_book_id(db: Session, book_id: int) -> Optional[BookSnapshot]:
+    def get_latest_snapshot_by_novel_id(db: Session, novel_id: int) -> Optional[BookSnapshot]:
         """
         获取指定书籍的最新快照
 
         :param db: 数据库会话对象，用于执行数据库操作
-        :param book_id: 书籍主键ID，对应Book.id字段
+        :param novel_id: 书籍主键novel_id，对应Book.novel_id字段
         :return: BookSnapshot对象，如果存在快照则返回最新的一个，不存在则返回None
         """
         return db.scalar(
             select(BookSnapshot)
-            .where(BookSnapshot.book_id == book_id)
+            .where(BookSnapshot.novel_id == novel_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(1)
         )
 
     @staticmethod
-    def get_snapshots_by_book_id(
+    def get_snapshots_by_novel_id(
             db: Session,
-            book_id: int,
+            novel_id: int,
             start_time: Optional[datetime] = None,
             end_time: Optional[datetime] = None,
             limit: int = 30,
@@ -169,13 +158,13 @@ class BookService:
         获取指定书籍的快照列表（支持时间范围过滤）
 
         :param db: 数据库会话对象，用于执行数据库操作
-        :param book_id: 书籍主键ID，对应Book.id字段
+        :param novel_id: 书籍主键novel_id，对应Book.novel_id字段
         :param start_time: 开始时间，可选，如果指定则只返回此时间之后的快照
         :param end_time: 结束时间，可选，如果指定则只返回此时间之前的快照
         :param limit: 返回记录数限制，默认30条，按时间倒序排列
         :return: BookSnapshot对象列表，按snapshot_time倒序排列
         """
-        query = select(BookSnapshot).where(BookSnapshot.book_id == book_id)
+        query = select(BookSnapshot).where(BookSnapshot.novel_id == novel_id)
 
         if start_time:
             query = query.where(BookSnapshot.snapshot_time >= start_time)
@@ -188,14 +177,14 @@ class BookService:
         return list(result.scalars())
 
     @staticmethod
-    def get_historical_snapshots(
-            db: Session, book_id: int, interval: str, count: int
+    def get_historical_snapshots_by_novel_id(
+            db: Session, novel_id: int, interval: str, count: int
     ) -> list[book.BookSnapshot]:
         """
         获取指定时间间隔的历史快照
 
         :param db: 数据库会话对象，用于执行数据库操作
-        :param book_id: 书籍主键ID，对应Book.id字段
+        :param novel_id: 书籍主键novel_id，对应Book.novel_id字段
         :param interval: 时间间隔类型，支持"hour"（小时）、"day"（天）、"week"（周）、"month"（月）
         :param count: 时间段数量，表示向前追溯多少个时间间隔单位
         :return: BookSnapshot对象列表，每个时间间隔的第一个快照，按时间倒序排列
@@ -217,7 +206,7 @@ class BookService:
         result = db.execute(
             text(BOOK_HISTORY_QUERY),
             {
-                "book_id": book_id,
+                "novel_id": novel_id,
                 "interval": interval,
                 "start_time": start_time,
                 "end_time": end_time,
@@ -246,18 +235,18 @@ class BookService:
     # ==================== 复合查询操作 ====================
 
     @staticmethod
-    def get_book_detail_with_latest_snapshot(db: Session, book_id: int) -> Optional[BookDetail]:
+    def get_book_detail_by_novel_id(db: Session, novel_id: int) -> Optional[book.BookDetail]:
         """
         获取书籍详情和最新快照数据, 并聚合成一个Pydantic模型返回。
 
         :param db: 数据库会话对象，用于执行数据库操作
-        :param book_id: 书籍主键ID，对应Book.id字段
+        :param novel_id: 书籍主键novel_id，对应Book.novel_id字段
         :return: BookDetail Pydantic模型实例，如果书籍不存在则返回None
         """
-        book_record = db.get(Book, book_id)
+        book_record = db.get(Book, novel_id)
         latest_snapshot = db.execute(
             select(BookSnapshot)
-            .where(BookSnapshot.book_id == book_id)
+            .where(BookSnapshot.novel_id == novel_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(1)
         ).first()
@@ -265,6 +254,6 @@ class BookService:
             return None
         book_dict = {
             "novel_id": book_record.novel_id,
-            "title": book_record.novel_id
+            "title": book_record.title
         }
-        return BookDetail.model_validate({**book_dict, **latest_snapshot._asdict()})
+        return book.BookDetail.model_validate({**book_dict, **latest_snapshot._asdict()})

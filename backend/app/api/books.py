@@ -62,7 +62,7 @@ async def get_book_detail(novel_id: int, db: Session = Depends(get_db)) -> DataR
     book = book_service.get_book_by_novel_id(db, novel_id)
 
     # 通过book_id获取详细信息
-    book_detail = book_service.get_book_detail_with_latest_snapshot(db, cast(int, book.id))
+    book_detail = book_service.get_book_detail_by_novel_id(db, cast(int, book.id))
     if not book_detail:
         raise HTTPException(status_code=404, detail=f"书籍详情不存在: {novel_id}")
 
@@ -106,7 +106,7 @@ async def get_book_snapshots(
     book = book_service.get_book_by_novel_id(db, novel_id)
 
     # 调用统一的历史快照获取方法
-    snapshots = book_service.get_historical_snapshots(db, book.id, interval, count)
+    snapshots = book_service.get_historical_snapshots_by_novel_id(db, book.id, interval, count)
 
     return DataResponse(
         data=snapshots,

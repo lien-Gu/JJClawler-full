@@ -22,7 +22,7 @@ BOOK_HISTORY_QUERY = """
                                             ORDER BY bs.snapshot_time ASC
                                             ) as rn
                                  FROM book_snapshots bs
-                                 WHERE bs.book_id = :book_id
+                                 WHERE bs.novel_id = :novel_id
                                    AND bs.snapshot_time >= :start_time
                                    AND bs.snapshot_time <= :end_time)
       SELECT *
@@ -39,7 +39,7 @@ BOOK_HOURLY_SNAPSHOTS_QUERY = """
                                                           MIN(ABS(strftime('%M', snapshot_time) * 60 + strftime('%S', snapshot_time))) as min_seconds_from_hour,
                                                           MIN(snapshot_time)                                                           as first_snapshot_time
                                                    FROM book_snapshots
-                                                   WHERE book_id = :book_id
+                                                   WHERE novel_id = :novel_id
                                                      AND snapshot_time >= :start_time
                                                      AND snapshot_time <= :end_time
                                                    GROUP BY strftime('%Y-%m-%d %H', snapshot_time)) hourly_min
@@ -48,7 +48,7 @@ BOOK_HOURLY_SNAPSHOTS_QUERY = """
                                                               strftime('%S', bs.snapshot_time)) =
                                                           hourly_min.min_seconds_from_hour
                                                       AND bs.snapshot_time = hourly_min.first_snapshot_time
-                              WHERE bs.book_id = :book_id
+                              WHERE bs.novel_id = :novel_id
                                 AND bs.snapshot_time >= :start_time
                                 AND bs.snapshot_time <= :end_time
                               ORDER BY bs.snapshot_time DESC \
@@ -65,7 +65,7 @@ BOOK_DAILY_ONE_OCLOCK_SNAPSHOTS_QUERY = """
                                                                         ))              as min_minutes_from_1pm,
                                                                     MIN(snapshot_time)  as first_snapshot_time
                                                              FROM book_snapshots
-                                                             WHERE book_id = :book_id
+                                                             WHERE novel_id = :novel_id
                                                                AND snapshot_time >= :start_time
                                                                AND snapshot_time <= :end_time
                                                              GROUP BY DATE(snapshot_time)) daily_min
@@ -75,7 +75,7 @@ BOOK_DAILY_ONE_OCLOCK_SNAPSHOTS_QUERY = """
                                                                              strftime('%M', bs.snapshot_time)) - 60
                                                                     ) = daily_min.min_minutes_from_1pm
                                                                 AND bs.snapshot_time = daily_min.first_snapshot_time
-                                        WHERE bs.book_id = :book_id
+                                        WHERE bs.novel_id = :novel_id
                                           AND bs.snapshot_time >= :start_time
                                           AND bs.snapshot_time <= :end_time
                                         ORDER BY bs.snapshot_time DESC \
@@ -108,7 +108,7 @@ SELECT
     MIN(snapshot_time) as period_start,
     MAX(snapshot_time) as period_end
 FROM book_snapshots
-WHERE book_id = :book_id 
+WHERE novel_id = :novel_id 
     AND snapshot_time >= :start_time 
     AND snapshot_time <= :end_time
 GROUP BY strftime('{time_format}', snapshot_time)
@@ -120,7 +120,7 @@ ORDER BY period_start DESC
 BOOK_BY_ID_QUERY = """
                    SELECT *
                    FROM books
-                   WHERE id = :book_id \
+                   WHERE novel_id = :novel_id \
                    """
 
 BOOK_BY_NOVEL_ID_QUERY = """
@@ -133,7 +133,7 @@ BOOK_BY_NOVEL_ID_QUERY = """
 LATEST_SNAPSHOT_BY_BOOK_ID_QUERY = """
                                    SELECT *
                                    FROM book_snapshots
-                                   WHERE book_id = :book_id
+                                   WHERE novel_id = :novel_id
                                    ORDER BY snapshot_time DESC
                                    LIMIT 1 \
                                    """
@@ -146,7 +146,7 @@ BOOK_STATISTICS_QUERY = """
                                MIN(snapshot_time) as first_snapshot_time,
                                MAX(snapshot_time) as last_snapshot_time
                         FROM book_snapshots
-                        WHERE book_id = :book_id \
+                        WHERE novel_id = :novel_id \
                         """
 
 # 书籍搜索查询

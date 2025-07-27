@@ -91,14 +91,9 @@ class RankingSnapshot(Base):
         index=True,
         comment="关联的榜单ID，对应Ranking表的主键id",
     )
-    book_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("books.id"),
-        index=True,
-        comment="关联的书籍ID，对应Book表的主键id",
-    )
     novel_id: Mapped[int] =mapped_column(
         Integer,
+        ForeignKey("books.novel_id"),
         index=True,
         comment="晋江app上的书籍id，可用于后续构建url"
     )
@@ -133,13 +128,13 @@ class RankingSnapshot(Base):
             "idx_ranking_snapshot_position", "ranking_id", "position", "snapshot_time"
         ),
         # 书籍排名索引 - 用于查询书籍的排名历史
-        Index("idx_book_ranking_snapshot", "book_id", "ranking_id", "snapshot_time"),
+        Index("idx_book_ranking_snapshot", "novel_id", "ranking_id", "snapshot_time"),
         # 批次ID索引 - 用于快速查询同一批次的数据
         Index("idx_ranking_batch_id", "batch_id"),
         # 批次榜单索引 - 用于获取特定批次的榜单快照
         Index("idx_ranking_batch_ranking", "ranking_id", "batch_id"),
         # 唯一约束 - 确保同一批次中同一榜单每本书只有一个排名
         UniqueConstraint(
-            "ranking_id", "book_id", "batch_id", name="uq_ranking_book_batch"
+            "ranking_id", "novel_id", "batch_id", name="uq_ranking_book_batch"
         ),
     )

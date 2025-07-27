@@ -321,7 +321,7 @@ def mock_book_service(mocker):
         "total_pages": 0,
     }
     service.search_books.return_value = []
-    service.get_book_detail_with_latest_snapshot.return_value = None
+    service.get_book_detail_by_novel_id.return_value = None
     service.get_book_trend.return_value = []
     service.get_book_trend_hourly.return_value = []
     service.get_book_trend_daily.return_value = []

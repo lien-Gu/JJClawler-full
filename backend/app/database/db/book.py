@@ -23,22 +23,23 @@ class Book(Base):
     """
 
     __tablename__ = "books"
-
-    # 书籍基本信息
+    id = None
+    
+    # 书籍基本信息 - novel_id作为主键
     novel_id: Mapped[int] = mapped_column(
-        Integer,unique=True,index=True,comment="书籍唯一标识ID，来源于晋江文学城的小说ID",
+        Integer, primary_key=True, comment="书籍唯一标识ID，来源于晋江文学城的小说ID"
     )
     title: Mapped[str] = mapped_column(
         String(200), index=True, comment="书籍标题，中文名称"
     )
     author_id: Mapped[int] = mapped_column(
-        Integer,unique=True,index=True,comment="作者唯一标识ID，来源于晋江文学城的作者ID",
+        Integer, index=True, comment="作者唯一标识ID，来源于晋江文学城的作者ID"
     )
 
     # 索引优化
     __table_args__ = (
-        Index("idx_book_novel_id", "novel_id"),
         Index("idx_book_title", "title"),
+        Index("idx_book_author", "author_id"),
     )
 
 
@@ -56,11 +57,11 @@ class BookSnapshot(Base):
     __tablename__ = "book_snapshots"
 
     # 关联信息
-    book_id: Mapped[int] = mapped_column(
+    novel_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("books.id"),
+        ForeignKey("books.novel_id"),
         index=True,
-        comment="关联的书籍ID，对应Book表的主键id",
+        comment="关联的书籍novel_id，对应Book表的主键novel_id",
     )
 
     # 互动统计数据
@@ -105,6 +106,6 @@ class BookSnapshot(Base):
 
     # 复合索引 - 优化查询性能
     __table_args__ = (
-        Index("idx_book_snapshot_time", "book_id", "snapshot_time"),
-        Index("idx_book_snapshot_novel", "book_id", "snapshot_time"),
+        Index("idx_book_snapshot_time", "novel_id", "snapshot_time"),
+        Index("idx_book_snapshot_novel", "novel_id", "snapshot_time"),
     )

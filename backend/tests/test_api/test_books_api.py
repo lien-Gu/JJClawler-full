@@ -118,7 +118,7 @@ class TestGetBookDetail:
         mock_service = mocker.patch("app.api.books.book_service")
         mock_book_obj = type("MockBook", (), mock_book_data["book"])()
         mock_service.get_book_by_novel_id.return_value = mock_book_obj
-        mock_service.get_book_detail_with_latest_snapshot.return_value = (
+        mock_service.get_book_detail_by_novel_id.return_value = (
             mock_book_obj,
             type("MockSnapshot", (), mock_book_snapshot_data["latest_snapshot"])(),
         )
@@ -137,7 +137,7 @@ class TestGetBookDetail:
 
         # 验证service被调用
         mock_service.get_book_by_novel_id.assert_called_once_with(mocker.ANY, "12345")
-        mock_service.get_book_detail_with_latest_snapshot.assert_called_once()
+        mock_service.get_book_detail_by_novel_id.assert_called_once()
 
     def test_get_book_detail_not_found(self, client, mocker):
         """测试书籍不存在"""
@@ -427,7 +427,7 @@ class TestErrorHandling:
         """测试HTTPException直接传递"""
         # 模拟service返回None触发404
         mock_service = mocker.patch("app.api.books.book_service")
-        mock_service.get_book_detail_with_latest_snapshot.return_value = None
+        mock_service.get_book_detail_by_novel_id.return_value = None
 
         # 发送请求
         response = client.get("/api/v1/books/999")
