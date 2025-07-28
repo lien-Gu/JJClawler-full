@@ -2,7 +2,7 @@
 书籍相关API接口 - 简化版本
 """
 
-from typing import cast, List
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -117,7 +117,6 @@ async def get_book_snapshots(
 @router.get("/{novel_id}/rankings", response_model=DataResponse[List[BookRankingInfo]])
 async def get_book_ranking_history(
         novel_id: int,
-        ranking_id: int | None = Query(None, description="指定榜单ID"),
         days: int = Query(30, ge=1, le=365, description="统计天数"),
         db: Session = Depends(get_db),
 ) -> DataResponse:
@@ -125,7 +124,6 @@ async def get_book_ranking_history(
     获取书籍排名历史 - 使用novel_id
 
     :param novel_id: 书籍novel_id，晋江文学城的小说ID
-    :param ranking_id: 指定榜单ID，可选，如果不指定则查询所有榜单
     :param days: 统计天数，查询最近多少天的排名历史
     :param db: 数据库会话对象
     :return: 书籍排名历史列表
@@ -133,17 +131,11 @@ async def get_book_ranking_history(
     # 检查书籍是否存在
     book = book_service.get_book_by_novel_id(db, novel_id)
 
-    ranking_history_data = ranking_service.get_book_ranking_history_with_details(
-        db, book.novel_id, ranking_id, days
+    ranking_infos = ranking_service.get_book_ranking_history_with_details(
+        db, book.novel_id, days
     )
 
-    # 转换为响应模型
-    ranking_responses = [
-        BookRankingInfo.from_snapshot(book.novel_id, ranking, snapshot)
-        for ranking, snapshot in ranking_history_data
-    ]
-
     return DataResponse(
-        data=ranking_responses,
-        message=f"获取{len(ranking_responses)}条排名历史成功"
+        data=ranking_infos,
+        message=f"获取{len(ranking_infos)}条排名历史成功"
     )
