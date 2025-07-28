@@ -14,6 +14,7 @@ from base import BaseSchema
 
 class RankingBasic(BaseSchema):
     """榜单基础信息响应"""
+    id: int = Field(..., description="榜单的内部唯一ID")
     ranking_id: str = Field(..., description="榜单ID")
     channel_name: str = Field(..., description="榜单名称")
     sub_channel_name: str = Field(..., description="子榜单名称")

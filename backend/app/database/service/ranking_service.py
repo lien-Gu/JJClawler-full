@@ -3,7 +3,7 @@
 """
 
 from datetime import date, datetime, timedelta
-from typing import Any, Tuple, List
+from typing import Any, Tuple, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import and_, desc, distinct, func, or_, select, text
@@ -134,48 +134,18 @@ class RankingService:
             ranking_id: int,
             target_date: date | None = None,
             limit: int = 50,
-    ) -> dict[str, Any] | None:
+    ) -> Optional[ranking.RankingDetail]:
         """
-        获取榜单详情
+        获取某一天的榜单详情
+        根据ranking_id在RankingSnapshot查询到此表格当天最后一批次的快照，然后再与Ranking中的榜单信息join
+
         :param db:
         :param ranking_id:
         :param target_date:
         :param limit:
         :return:
         """
-        ranking = self.get_ranking_by_id(db, ranking_id)
-        if not ranking:
-            raise HTTPException(status_code=404, detail="榜单不存在")
 
-        # 获取快照数据
-        if target_date:
-            snapshots = self.get_snapshots_by_date(
-                db, ranking_id, target_date, limit
-            )
-        else:
-            snapshots = self.get_latest_snapshots_by_ranking_id(db, ranking_id, limit)
-
-        # 构造详情数据
-        books_data = []
-        for snapshot in snapshots:
-            # 获取书籍信息
-            book = db.get(Book, snapshot.novel_id)
-            book_data = {
-                "novel_id": snapshot.novel_id,
-                "title": book.title if book else "未知书籍",
-                "position": snapshot.position,
-                "score": snapshot.score,
-                "snapshot_time": snapshot.snapshot_time,
-            }
-            books_data.append(book_data)
-
-        return {
-            "ranking": ranking,
-            "books": books_data,
-            "snapshot_time": snapshots[0].snapshot_time if snapshots else None,
-            "total_books": len(books_data),
-            "statistics": self.get_ranking_statistics(db, ranking_id),
-        }
 
     def get_ranking_history(
             self,

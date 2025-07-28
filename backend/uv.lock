@@ -250,10 +250,21 @@ dependencies = [
     { name = "pytz" },
     { name = "sqlalchemy" },
     { name = "sqlmodel" },
+    { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
+dev = [
+    { name = "black" },
+    { name = "isort" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "black" },
     { name = "isort" },
@@ -280,9 +291,20 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "sqlalchemy", specifier = ">=2.0.41" },
     { name = "sqlmodel", specifier = ">=0.0.24" },
+    { name = "starlette", specifier = ">=0.47.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.35.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black", specifier = ">=25.1.0" },
+    { name = "isort", specifier = ">=6.0.1" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
+    { name = "pytest-mock", specifier = ">=3.14.1" },
+    { name = "ruff", specifier = ">=0.12.5" },
+]
 
 [[package]]
 name = "mypy-extensions"

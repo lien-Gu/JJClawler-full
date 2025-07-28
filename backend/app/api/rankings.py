@@ -9,9 +9,8 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
-from ..models import PaginationData
-from ..models.base import DataResponse
-from ..models.ranking import RankingBasic
+from ..models.base import DataResponse, PaginationData
+from ..models.ranking import RankingBasic, RankingDetail
 
 router = APIRouter()
 
@@ -28,7 +27,7 @@ async def get_rankings(
         db: Session = Depends(get_db),
 ) -> DataResponse:
     """
-    获取榜单列表，首先根据page id查找榜单，如果page id为空或者没有查找到就使用name在Ranking
+    查询榜单列表，首先根据page id查找榜单，如果page id为空或者没有查找到就使用name在Ranking
     表格中的channel name 和 sub channel name中进行模糊匹配。
     
     :param page_id: 榜单页面ID筛选
@@ -52,96 +51,47 @@ async def get_rankings(
     )
 
 
-@router.get("/{ranking_id}", response_model=DataResponse[RankingDetailResponse])
+@router.get("/{rank_id}", response_model=DataResponse[RankingDetail])
 async def get_ranking_detail(
-        ranking_id: int,
+        ranking_id: int = Query(0, description="榜单的内部ID"),
         date: Date | None = Query(None, description="指定日期，默认为最新"),
-        batch_id: str | None = Query(None, description="指定批次ID，优先级高于date"),
-        limit: int = Query(50, ge=1, le=200, description="榜单书籍数量限制"),
         db: Session = Depends(get_db),
-):
+)->DataResponse:
     """
-    获取榜单详情 - 支持batch_id查询确保数据一致性
+    获取榜单详情
 
-    Args:
-        ranking_id: 榜单ID
-        date: 指定日期的榜单快照
-        batch_id: 指定批次ID，如果提供则忽略date参数
-        limit: 返回的书籍数量
-
-    Returns:
-        RankingDetailResponse: 榜单详情
+    :param ranking_id: 榜单内部ID
+    :param date: 指定日期，精确到天
+    :param db:
+    :return: 榜单详情
     """
-    # 优先使用batch_id查询
-    if batch_id:
-        snapshots = ranking_service.get_snapshots_by_batch_id(db, ranking_id, batch_id, limit)
-        if not snapshots:
-            raise HTTPException(status_code=404, detail=f"批次ID {batch_id} 的数据不存在")
-        # 获取榜单基本信息
-        ranking = ranking_service.get_ranking_by_id(db, ranking_id)
-        if not ranking:
-            raise HTTPException(status_code=404, detail="榜单不存在")
-
-        # 使用batch_id查询到的第一个快照的时间作为快照时间
-        snapshot_time = snapshots[0].snapshot_time
-        books_data = [
-            {
-                "book_id": snapshot.book_id,
-                "title": "待获取书籍信息",  # 需要关联查询书籍表
-                "position": snapshot.position,
-                "score": snapshot.score,
-            }
-            for snapshot in snapshots
-        ]
-    else:
-        # 使用原有的方法
-        ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date, limit)
-        if not ranking_detail:
-            raise HTTPException(status_code=404, detail="榜单不存在")
-
-        ranking = ranking_detail["ranking"]
-        books_data = ranking_detail["books"]
-        snapshot_time = ranking_detail["snapshot_time"]
-        # 获取batch_id - 从现有快照数据中获取
-        if "snapshots" in ranking_detail and ranking_detail["snapshots"]:
-            batch_id = ranking_detail["snapshots"][0].batch_id
-        else:
-            batch_id = "unknown"
-
-    # 转换书籍数据
-    books_in_ranking = []
-    for book_data in books_data:
-        books_in_ranking.append(
-            BookInRanking(
-                book_id=book_data["book_id"],
-                title=book_data["title"],
-                position=book_data["position"],
-                score=book_data["score"],
-                clicks=None,  # 这些数据需要从book_snapshot获取
-                favorites=None,
-                comments=None,
-                word_count=None,
-            )
-        )
-
-    response_data = RankingDetailResponse(
-        ranking_id=str(ranking.rank_id),  # 转换为字符串
-        name=ranking.name,
-        page_id=ranking.page_id,
-        category=ranking.rank_group_type,
-        snapshot_time=snapshot_time,
-        batch_id=batch_id,
-        books=books_in_ranking,
-        total_books=len(books_in_ranking),
-    )
-
+    # 使用原有的方法
+    ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date)
+    if not ranking_detail:
+        raise HTTPException(status_code=404, detail="榜单不存在")
     return DataResponse(
         success=True,
         code=200,
-        data=response_data,
+        data=ranking_detail,
         message="榜单详情获取成功"
     )
 
+
+@router.get("/jiazi", response_model=DataResponse[RankingDetail])
+async def get_jiazi_detail(
+        date: Date | None = Query(None, description="指定日期，默认为最新"),
+        hour: int | None = Query(None, description="指定小时，24小时制，默认为最新"),
+        db: Session = Depends(get_db),
+) -> DataResponse[RankingDetail]:
+    """
+    获取夹子榜单详情，支持获取小时级别的榜单数据
+
+    :param date:
+    :param hour:
+    :param db:
+    :return:
+    """
+    pass
 
 @router.get(
     "/{ranking_id}/history", response_model=DataResponse[RankingHistoryResponse]
