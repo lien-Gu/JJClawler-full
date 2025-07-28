@@ -21,7 +21,7 @@ class RankingService:
     # ==================== 爬虫使用的方法 ====================
 
     def create_or_update_ranking(
-        self, db: Session, ranking_data: dict[str, Any]
+            self, db: Session, ranking_data: dict[str, Any]
     ) -> Ranking:
         """
         根据ranking_data中的信息创建或更新榜单。
@@ -64,7 +64,7 @@ class RankingService:
                 )
 
     def batch_create_ranking_snapshots(
-        self, db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
+            self, db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
     ) -> list[RankingSnapshot]:
         """
         批量创建榜单快照 - 支持batch_id
@@ -75,15 +75,15 @@ class RankingService:
         :return: 创建的快照对象列表
         """
         from ...utils.batch import ensure_batch_id
-        
+
         # 确保有batch_id
         if batch_id is None:
             batch_id = ensure_batch_id()
-        
+
         # 为所有快照数据添加batch_id
         for snapshot in snapshots:
             snapshot['batch_id'] = batch_id
-        
+
         # 过滤数据并创建对象
         valid_fields = get_model_fields(RankingSnapshot)
         filtered_snapshots = [filter_dict(snapshot, valid_fields) for snapshot in snapshots]
@@ -105,7 +105,6 @@ class RankingService:
         :return:
         """
         return db.get(Ranking, ranking_id)
-
 
     def get_ranking_statistics(self, db: Session, ranking_id: int) -> dict[str, Any]:
         """获取榜单统计信息"""
@@ -130,11 +129,11 @@ class RankingService:
         return {}
 
     def get_ranking_detail(
-        self,
-        db: Session,
-        ranking_id: int,
-        target_date: date | None = None,
-        limit: int = 50,
+            self,
+            db: Session,
+            ranking_id: int,
+            target_date: date | None = None,
+            limit: int = 50,
     ) -> dict[str, Any] | None:
         """
         获取榜单详情
@@ -179,11 +178,11 @@ class RankingService:
         }
 
     def get_ranking_history(
-        self,
-        db: Session,
-        ranking_id: int,
-        start_date: date | None = None,
-        end_date: date | None = None,
+            self,
+            db: Session,
+            ranking_id: int,
+            start_date: date | None = None,
+            end_date: date | None = None,
     ) -> dict[str, Any]:
         """获取榜单历史趋势"""
         start_time = None
@@ -207,7 +206,7 @@ class RankingService:
         }
 
     def compare_rankings(
-        self, db: Session, ranking_ids: list[int], target_date: date | None = None
+            self, db: Session, ranking_ids: list[int], target_date: date | None = None
     ) -> dict[str, Any]:
         """对比多个榜单"""
         if len(ranking_ids) < 2:
@@ -279,10 +278,10 @@ class RankingService:
         }
 
     def get_book_ranking_history_with_details(
-        self,
-        db: Session,
-        novel_id: int,
-        days: int = 30,
+            self,
+            db: Session,
+            novel_id: int,
+            days: int = 30,
     ) -> List[book.BookRankingInfo]:
         """
         获取书籍在days天中的每天的榜单排名历史（取每天中最后一次榜单快照）
@@ -293,10 +292,10 @@ class RankingService:
         :return: BookRankingInfo列表，包含榜单信息和排名快照
         """
         from ..sql.ranking_queries import BOOK_DAILY_LAST_RANKING_HISTORY_QUERY
-        
+
         # 计算开始时间
         start_time = datetime.now() - timedelta(days=days)
-        
+
         # 使用高性能Text查询执行窗口函数
         results = db.execute(
             text(BOOK_DAILY_LAST_RANKING_HISTORY_QUERY),
@@ -323,7 +322,7 @@ class RankingService:
         """创建榜单"""
         valid_fields = get_model_fields(Ranking)
         filtered_data = filter_dict(ranking_data, valid_fields)
-        
+
         ranking = Ranking(**filtered_data)
         db.add(ranking)
         db.commit()
@@ -332,11 +331,11 @@ class RankingService:
 
     @staticmethod
     def update_ranking(db: Session, ranking: Ranking, ranking_data: dict[str, Any]
-    ) -> Ranking:
+                       ) -> Ranking:
         """更新榜单"""
         valid_fields = get_model_fields(Ranking)
         filtered_data = filter_dict(ranking_data, valid_fields)
-        
+
         for key, value in filtered_data.items():
             if hasattr(ranking, key):
                 setattr(ranking, key, value)
@@ -347,58 +346,67 @@ class RankingService:
         return ranking
 
     @staticmethod
-    def get_rankings_with_pagination(
-        db: Session,
-        page: int = 1,
-        size: int = 20,
-        page_id: str | None = None,
-        name: str | None = None,
-    ) -> Tuple[List[ranking.RankingBasic], int]:
+    def get_rankings_by_name_with_pagination(
+            db: Session,
+            name: str,
+            page: int = 1,
+            size: int = 20) -> Tuple[List[ranking.RankingBasic], int]:
         """
-        分页获取榜单列表
-        
-        首先根据page_id查找榜单，如果page_id为空或没有查找到就使用name在Ranking
-        表格中的channel_name和sub_channel_name中进行模糊匹配。
-        
-        :param db: 数据库会话对象
-        :param page: 页码，从1开始
-        :param size: 每页数量，1-100之间
-        :param page_id: 榜单页面ID筛选，精确匹配
-        :param name: 榜单名称筛选，模糊匹配
-        :return: (榜单列表, 总页数)
+        通过榜单名称获取榜单列表
+        :param db:
+        :param name:
+        :param page:
+        :param size:
+        :return:
         """
-        skip = (page - 1) * size
 
-        # 构建查询
-        query = select(Ranking)
-        count_query = select(func.count(Ranking.id))
-
-        # 优先使用page_id精确匹配
-        if page_id:
-            query = query.where(Ranking.page_id == page_id)
-            count_query = count_query.where(Ranking.page_id == page_id)
-        elif name:
-            # page_id为空或未提供时，使用name在channel_name和sub_channel_name中模糊匹配
-            name_pattern = f"%{name}%"
-            name_condition = or_(
-                Ranking.channel_name.like(name_pattern),
-                Ranking.sub_channel_name.like(name_pattern)
-            )
-            query = query.where(name_condition)
-            count_query = count_query.where(name_condition)
+        name_pattern = f"%{name}%"
+        name_condition = or_(
+            Ranking.channel_name.like(name_pattern),
+            Ranking.sub_channel_name.like(name_pattern)
+        )
+        query = select(Ranking).where(name_condition)
 
         # 获取数据
         rankings = db.execute(
-                query.order_by(desc(Ranking.created_at)).offset(skip).limit(size)
-            ).scalars()
+            query.order_by(desc(Ranking.created_at)).offset((page - 1) * size).limit(size)
+        ).scalars()
 
-        total = db.scalar(count_query)
+        total = db.scalar(select(func.count(Ranking.id)).where(name_condition))
         total_pages = (total + size - 1) // size if total > 0 else 0
 
-        return rankings, total_pages
+        return [ranking.RankingBasic.model_validate(i) for i in rankings], total_pages
+
+    @staticmethod
+    def get_ranges_by_page_with_pagination(
+            db: Session,
+            page_id: str,
+            page: int = 1,
+            size: int = 20
+
+    ) -> Tuple[List[ranking.RankingBasic], int]:
+        """
+        根据榜单页面获取榜单列表
+        :param db:
+        :param page_id:
+        :param page:
+        :param size:
+        :return:
+        """
+        query = select(Ranking).where(Ranking.page_id == page_id)
+        rankings = db.execute(
+            query.order_by(desc(Ranking.created_at)).offset((page - 1) * size).limit(size)
+        ).scalars()
+
+        total = db.scalar(select(func.count(Ranking.id)).where(Ranking.page_id == page_id))
+        total_pages = (total + size - 1) // size if total > 0 else 0
+
+        return [ranking.RankingBasic.model_validate(i) for i in rankings], total_pages
+
+
 
     def get_latest_snapshots_by_ranking_id(
-        self, db: Session, ranking_id: int, limit: int = 50
+            self, db: Session, ranking_id: int, limit: int = 50
     ) -> list[RankingSnapshot]:
         """
         获取榜单最新快照 - 使用batch_id确保数据一致性
@@ -432,7 +440,7 @@ class RankingService:
 
     @staticmethod
     def get_snapshots_by_date(
-        db: Session, ranking_id: int, target_date: date, limit: int = 50
+            db: Session, ranking_id: int, target_date: date, limit: int = 50
     ) -> list[RankingSnapshot]:
         """
         获取指定日期的榜单快照 - 使用batch_id确保数据一致性
@@ -477,7 +485,7 @@ class RankingService:
 
     @staticmethod
     def get_snapshots_by_batch_id(
-        db: Session, ranking_id: int, batch_id: str, limit: int = 50
+            db: Session, ranking_id: int, batch_id: str, limit: int = 50
     ) -> list[RankingSnapshot]:
         """
         根据batch_id获取榜单快照
@@ -503,7 +511,7 @@ class RankingService:
 
     @staticmethod
     def get_available_batch_ids_by_date(
-        db: Session, ranking_id: int, target_date: date
+            db: Session, ranking_id: int, target_date: date
     ) -> list[str]:
         """
         获取指定日期的所有可用batch_id
@@ -526,13 +534,13 @@ class RankingService:
         return [row for row in result.scalars()]
 
     def get_book_ranking_history(
-        self,
-        db: Session,
-        novel_id: int,
-        ranking_id: int | None = None,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
-        limit: int = 30,
+            self,
+            db: Session,
+            novel_id: int,
+            ranking_id: int | None = None,
+            start_time: datetime | None = None,
+            end_time: datetime | None = None,
+            limit: int = 30,
     ) -> list[RankingSnapshot]:
         """获取书籍排名历史"""
         query = select(RankingSnapshot).where(RankingSnapshot.novel_id == novel_id)
@@ -550,11 +558,11 @@ class RankingService:
         return list(result.scalars())
 
     def get_ranking_trend(
-        self,
-        db: Session,
-        ranking_id: int,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
+            self,
+            db: Session,
+            ranking_id: int,
+            start_time: datetime | None = None,
+            end_time: datetime | None = None,
     ) -> list[tuple[datetime, int]]:
         """获取榜单变化趋势（每个快照时间的书籍数量）"""
         query = select(

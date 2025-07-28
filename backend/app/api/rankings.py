@@ -26,9 +26,9 @@ async def get_rankings(
         page: int = Query(1, ge=1, description="页码"),
         size: int = Query(20, ge=1, le=100, description="每页数量"),
         db: Session = Depends(get_db),
-)->DataResponse:
+) -> DataResponse:
     """
-    获取榜单列表，首先更具page id查找榜单，如果page id 为空或者没有查找到就使用name在Ranking
+    获取榜单列表，首先根据page id查找榜单，如果page id为空或者没有查找到就使用name在Ranking
     表格中的channel name 和 sub channel name中进行模糊匹配。
     
     :param page_id: 榜单页面ID筛选
@@ -38,17 +38,16 @@ async def get_rankings(
     :param db: 数据库会话对象
     :return: 榜单列表
     """
-    # 获取榜单数据 - 传递新参数
-    result = ranking_service.get_rankings_with_pagination(
-        db=db, 
-        page=page, 
-        size=size, 
-        page_id=page_id, 
-        name=name
-    )
-
+    data_list = None
+    total_pages = 0
+    if page_id:
+        data_list, total_pages = ranking_service.get_ranges_by_page_with_pagination(db, page_id, page, size)
+    if not data_list and name is not None:
+        data_list, total_pages = ranking_service.get_rankings_by_name_with_pagination(db, name, page, size)
     return DataResponse(
-        data=result,
+        data=PaginationData(
+            data_list=data_list, page=page, size=size, total_pages=total_pages
+        ),
         message="榜单列表获取成功"
     )
 
@@ -82,7 +81,7 @@ async def get_ranking_detail(
         ranking = ranking_service.get_ranking_by_id(db, ranking_id)
         if not ranking:
             raise HTTPException(status_code=404, detail="榜单不存在")
-        
+
         # 使用batch_id查询到的第一个快照的时间作为快照时间
         snapshot_time = snapshots[0].snapshot_time
         books_data = [
@@ -99,7 +98,7 @@ async def get_ranking_detail(
         ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date, limit)
         if not ranking_detail:
             raise HTTPException(status_code=404, detail="榜单不存在")
-        
+
         ranking = ranking_detail["ranking"]
         books_data = ranking_detail["books"]
         snapshot_time = ranking_detail["snapshot_time"]
@@ -139,7 +138,7 @@ async def get_ranking_detail(
     return DataResponse(
         success=True,
         code=200,
-        data=response_data, 
+        data=response_data,
         message="榜单详情获取成功"
     )
 
@@ -213,10 +212,10 @@ async def get_ranking_batches(
     """
     # 获取可用的batch_id列表
     batch_ids = ranking_service.get_available_batch_ids_by_date(db, ranking_id, date)
-    
+
     if not batch_ids:
         raise HTTPException(status_code=404, detail=f"日期 {date} 没有可用的批次数据")
-    
+
     # 为每个batch_id获取详细信息
     batch_info_list = []
     for batch_id in batch_ids:
@@ -229,13 +228,13 @@ async def get_ranking_batches(
                 total_books=len(snapshots)
             )
             batch_info_list.append(batch_info)
-    
+
     response_data = RankingBatchListResponse(
         ranking_id=ranking_id,
         target_date=date,
         available_batches=batch_info_list
     )
-    
+
     return DataResponse(
         success=True,
         code=200,
