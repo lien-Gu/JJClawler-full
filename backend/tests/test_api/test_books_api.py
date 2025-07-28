@@ -319,7 +319,7 @@ class TestGetBookRankingHistory:
         mock_book_service.get_book_by_novel_id.return_value = mock_book_data_obj
 
         # 模拟ranking service返回详细历史数据
-        mock_ranking_service = mocker.patch("app.api.books.ranking_service")
+        mock_ranking_service = mocker
         mock_ranking_history_with_details = [
             {
                 "ranking_id": 1,
@@ -370,7 +370,7 @@ class TestGetBookRankingHistory:
         mock_book_service.get_book_by_novel_id.return_value = mock_book_data_obj
 
         # 模拟ranking service
-        mock_ranking_service = mocker.patch("app.api.books.ranking_service")
+        mock_ranking_service = mocker
         mock_ranking_service.get_book_ranking_history_with_details.return_value = []
 
         # 发送请求（不指定ranking_id）

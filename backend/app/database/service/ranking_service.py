@@ -2,17 +2,15 @@
 榜单业务逻辑服务 - 集成DAO功能的简化版本
 """
 
-from datetime import date, datetime, timedelta, time
-from typing import Any, Tuple, List, Optional
+from datetime import date, datetime, time, timedelta
+from typing import Any, List, Optional, Tuple
 
-from fastapi import HTTPException
-from sqlalchemy import and_, desc, distinct, func, or_, select, text
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from ..db.book import Book
+from app.models import ranking
 from ..db.ranking import Ranking, RankingSnapshot
 from ...utils import filter_dict, get_model_fields
-from app.models import ranking, book
 
 
 class RankingService:
@@ -145,65 +143,6 @@ class RankingService:
 
         return ranking_detail
 
-    def get_ranking_history(
-            self,
-            db: Session,
-            ranking_id: int,
-            start_date: date | None = None,
-            end_date: date | None = None,
-    ) -> dict[str, Any]:
-        """获取榜单历史趋势"""
-        start_time = None
-        end_time = None
-
-        if start_date:
-            start_time = datetime.combine(start_date, datetime.min.time())
-        if end_date:
-            end_time = datetime.combine(end_date, datetime.max.time())
-
-        trend_data = self.get_ranking_trend(db, ranking_id, start_time, end_time)
-
-        return {
-            "ranking_id": ranking_id,
-            "start_date": start_date,
-            "end_date": end_date,
-            "trend_data": [
-                {"snapshot_time": snapshot_time, "book_count": book_count}
-                for snapshot_time, book_count in trend_data
-            ],
-        }
-
-
-
-    def get_book_ranking_history_with_details(
-            self,
-            db: Session,
-            novel_id: int,
-            days: int = 30,
-    ) -> List[book.BookRankingInfo]:
-        """
-        获取书籍在days天中的每天的榜单排名历史（取每天中最后一次榜单快照）
-
-        :param db: 数据库会话对象
-        :param novel_id: 书籍唯一标识ID
-        :param days: 查询天数，默认30天
-        :return: BookRankingInfo列表，包含榜单信息和排名快照
-        """
-        from ..sql.ranking_queries import BOOK_DAILY_LAST_RANKING_HISTORY_QUERY
-
-        # 计算开始时间
-        start_time = datetime.now() - timedelta(days=days)
-
-        # 使用高性能Text查询执行窗口函数
-        results = db.execute(
-            text(BOOK_DAILY_LAST_RANKING_HISTORY_QUERY),
-            {
-                "novel_id": novel_id,
-                "start_time": start_time
-            }
-        ).all()
-        return [book.BookRankingInfo.model_validate(row._asdict()) for row in results]
-
     # ==================== 内部依赖方法 ====================
     @staticmethod
     def get_rankings_by_rank_id(db: Session, rank_id: str) -> List[Ranking]:
@@ -301,38 +240,6 @@ class RankingService:
 
         return [ranking.RankingBasic.model_validate(i) for i in rankings], total_pages
 
-    def get_latest_snapshots_by_ranking_id(
-            self, db: Session, ranking_id: int
-    ) -> list[RankingSnapshot]:
-        """
-        获取榜单最新快照 - 使用batch_id确保数据一致性
-        
-        优先获取最新batch_id的完整数据，确保所有书籍数据来自同一次爬取
-        """
-        # 获取最新的batch_id
-        latest_batch_id = db.scalar(
-            select(RankingSnapshot.batch_id)
-            .where(RankingSnapshot.ranking_id == ranking_id)
-            .order_by(desc(RankingSnapshot.snapshot_time))
-            .limit(1)
-        )
-
-        if not latest_batch_id:
-            return []
-
-        # 使用最新batch_id获取完整的快照数据
-        result = db.execute(
-            select(RankingSnapshot)
-            .where(
-                and_(
-                    RankingSnapshot.ranking_id == ranking_id,
-                    RankingSnapshot.batch_id == latest_batch_id,
-                )
-            )
-            .order_by(RankingSnapshot.position)
-        )
-        return list(result.scalars())
-
     @staticmethod
     def get_snapshots_by_day(
             db: Session, ranking_id: int, target_date: date, limit: int = 50
@@ -379,84 +286,6 @@ class RankingService:
         return list(result.scalars())
 
     @staticmethod
-    def get_snapshots_by_batch_id(
-            db: Session, ranking_id: int, batch_id: str, limit: int = 50
-    ) -> list[RankingSnapshot]:
-        """
-        根据batch_id获取榜单快照
-        
-        :param db: 数据库会话
-        :param ranking_id: 榜单ID
-        :param batch_id: 批次ID
-        :param limit: 返回数量限制
-        :return: 榜单快照列表
-        """
-        result = db.execute(
-            select(RankingSnapshot)
-            .where(
-                and_(
-                    RankingSnapshot.ranking_id == ranking_id,
-                    RankingSnapshot.batch_id == batch_id,
-                )
-            )
-            .order_by(RankingSnapshot.position)
-            .limit(limit)
-        )
-        return list(result.scalars())
-
-    @staticmethod
-    def get_available_batch_ids_by_date(
-            db: Session, ranking_id: int, target_date: date
-    ) -> list[str]:
-        """
-        获取指定日期的所有可用batch_id
-        
-        :param db: 数据库会话
-        :param ranking_id: 榜单ID
-        :param target_date: 目标日期
-        :return: batch_id列表
-        """
-        result = db.execute(
-            select(distinct(RankingSnapshot.batch_id))
-            .where(
-                and_(
-                    RankingSnapshot.ranking_id == ranking_id,
-                    func.date(RankingSnapshot.snapshot_time) == target_date,
-                )
-            )
-            .order_by(desc(RankingSnapshot.batch_id))
-        )
-        return [row for row in result.scalars()]
-
-    def get_book_ranking_history(
-            self,
-            db: Session,
-            novel_id: int,
-            ranking_id: int | None = None,
-            start_time: datetime | None = None,
-            end_time: datetime | None = None,
-            limit: int = 30,
-    ) -> list[RankingSnapshot]:
-        """获取书籍排名历史"""
-        query = select(RankingSnapshot).where(RankingSnapshot.novel_id == novel_id)
-
-        if ranking_id:
-            query = query.where(RankingSnapshot.ranking_id == ranking_id)
-        if start_time:
-            query = query.where(RankingSnapshot.snapshot_time >= start_time)
-        if end_time:
-            query = query.where(RankingSnapshot.snapshot_time <= end_time)
-
-        result = db.execute(
-            query.order_by(desc(RankingSnapshot.snapshot_time)).limit(limit)
-        )
-        return list(result.scalars())
-
-
-
-
-
-    @staticmethod
     def get_snapshots_by_hour(
             db: Session, ranking_id: int, target_date: date, target_hour: int
     ) -> list[RankingSnapshot]:
@@ -472,7 +301,7 @@ class RankingService:
         # 构造小时时间范围
         start_time = datetime.combine(target_date, time(target_hour, 0, 0))
         end_time = start_time + timedelta(hours=1)
-        
+
         # 首先查找目标小时内最新的batch_id
         latest_batch_id = db.scalar(
             select(RankingSnapshot.batch_id)
@@ -527,7 +356,7 @@ class RankingService:
         )
         if not ranking_basic or not snapshots:
             return None
-        
+
         # 3. 获取书籍详细信息
         books = [ranking.RankingBook.model_validate(s) for s in snapshots]
 
@@ -540,4 +369,112 @@ class RankingService:
             rank_group_type=ranking_basic.rank_group_type,
             books=books,
             snapshot_time=snapshots[0].snapshot_time,
+        )
+
+    # ==================== 历史数据查询方法 ====================
+
+    def get_ranking_history_by_day(
+            self,
+            db: Session,
+            ranking_id: int,
+            start_date: date,
+            end_date: date,
+    ) -> Optional[ranking.RankingHistory]:
+        """
+        获取榜单按天的历史数据，每天选择当天最后一次更新的快照
+
+        :param db: 数据库会话对象
+        :param ranking_id: 榜单ID
+        :param start_date: 开始日期
+        :param end_date: 结束日期
+        :return: 榜单历史数据
+        """
+        # 1. 获取榜单基础信息
+        ranking_basic = self.get_ranking_by_id(db, ranking_id)
+        if not ranking_basic:
+            return None
+
+        # 2. 获取时间范围内每天的最后一次快照
+        snapshots = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            try:
+                daily_snapshots = self.get_snapshots_by_day(db, ranking_id, current_date)
+                if daily_snapshots:
+                    # 构建当天的榜单快照对象
+                    books = [ranking.RankingBook.model_validate(s) for s in daily_snapshots]
+                    snapshots.append(ranking.RankingSnapshot(
+                        books=books,
+                        snapshot_time=daily_snapshots[0].snapshot_time,
+                    ))
+            except ValueError:
+                # 如果某天没有数据，跳过
+                pass
+
+            current_date += timedelta(days=1)
+
+        # 3. 构造历史数据响应
+        return ranking.RankingHistory(
+            id=ranking_basic.id,
+            channel_name=ranking_basic.channel_name,
+            sub_channel_name=ranking_basic.sub_channel_name,
+            page_id=ranking_basic.page_id,
+            rank_group_type=ranking_basic.rank_group_type,
+            snapshots=snapshots,
+        )
+
+    def get_ranking_history_by_hour(
+            self,
+            db: Session,
+            ranking_id: int,
+            start_time: datetime,
+            end_time: datetime,
+    ) -> Optional[ranking.RankingHistory]:
+        """
+        获取榜单按小时的历史数据，每小时选择当小时最后一次更新的快照
+
+        :param db: 数据库会话对象
+        :param ranking_id: 榜单ID
+        :param start_time: 开始时间（分和秒应为0）
+        :param end_time: 结束时间（分和秒应为0）
+        :return: 榜单历史数据
+        """
+        # 1. 获取榜单基础信息
+        ranking_basic = self.get_ranking_by_id(db, ranking_id)
+        if not ranking_basic:
+            return None
+
+        # 2. 获取时间范围内每小时的最后一次快照
+        snapshots = []
+        current_time = start_time
+
+        while current_time <= end_time:
+            try:
+                hourly_snapshots = self.get_snapshots_by_hour(
+                    db, ranking_id, current_time.date(), current_time.hour
+                )
+                if hourly_snapshots:
+                    # 构建当小时的榜单快照对象
+                    books = [ranking.RankingBook.model_validate(s) for s in hourly_snapshots]
+                    snapshots.append(ranking.RankingSnapshot(
+                        books=books,
+                        snapshot_time=hourly_snapshots[0].snapshot_time,
+                        novel_id=0,  # 这个字段在这里不适用
+                        position=0,  # 这个字段在这里不适用
+                    ))
+            except (ValueError, IndexError):
+                # 如果某小时没有数据，跳过
+                pass
+
+            current_time += timedelta(hours=1)
+
+        # 4. 构造历史数据响应
+        return ranking.RankingHistory(
+            id=ranking_basic.id,
+            channel_name=ranking_basic.channel_name,
+            sub_channel_name=ranking_basic.sub_channel_name,
+            page_id=ranking_basic.page_id,
+            rank_group_type=ranking_basic.rank_group_type,
+            snapshots=snapshots,
         )

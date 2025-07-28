@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional, List
+
 from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
 from ..models.base import DataResponse, PaginationData
@@ -94,15 +94,12 @@ async def get_jiazi_detail_by_hour(
     :param db: 数据库会话对象
     :return: 夹子榜单详情
     """
-    # 根据参数组合确定查询逻辑
-    if not target_date and not hour:
-        ranking_detail = ranking_service.get_latest_snapshots_by_ranking_id(db, ranking_id)
-    else:
-        if not target_date:
-            target_date = date.today()
-        if not hour:
-            hour = datetime.now().hour if target_date == date.today() else 24
-        ranking_detail = ranking_service.get_ranking_detail_by_hour(db, ranking_id, target_date, hour)
+
+    if not target_date:
+        target_date = date.today()
+    if not hour:
+        hour = datetime.now().hour if target_date == date.today() else 24
+    ranking_detail = ranking_service.get_ranking_detail_by_hour(db, ranking_id, target_date, hour)
 
     if not ranking_detail:
         raise HTTPException(status_code=404, detail="夹子榜单不存在或指定时间没有数据")
@@ -121,7 +118,7 @@ async def get_ranking_history_by_day(
         start_date: date = Query(..., description="开始日期"),
         end_date: date = Query(date.today(), description="结束日期"),
         db: Session = Depends(get_db),
-)->DataResponse:
+) -> DataResponse:
     """
     获取榜单历史数据，如果start_date必须小于end_date。
     每天的快照选择当天最后一次更新的快照内容。
@@ -129,81 +126,72 @@ async def get_ranking_history_by_day(
     :param ranking_id: 榜单ID
     :param start_date: 开始日期，不能为空
     :param end_date: 结束日期，若为空，则默认为当天
-    :param db:
-    :return:
+    :param db: 数据库会话对象
+    :return: 榜单历史数据
     """
-    pass
+    # 参数验证
+    if start_date > end_date:
+        raise HTTPException(status_code=400, detail="开始日期必须小于或等于结束日期")
+
+    try:
+        history_data = ranking_service.get_ranking_history_by_day(
+            db, ranking_id, start_date, end_date
+        )
+        if not history_data:
+            raise HTTPException(status_code=404, detail="榜单不存在")
+
+        return DataResponse(
+            data=history_data,
+            message=f"成功获取榜单历史数据，时间范围：{start_date} 至 {end_date}"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get(
     "/history/hour/{ranking_id}", response_model=DataResponse[RankingHistory]
 )
-async def get_ranking_history_by_day(
+async def get_ranking_history_by_hour(
         ranking_id: int,
-        start_time: date = Query(..., description="开始日期"),
-        end_time: date = Query(None, description="结束日期"),
+        start_time: datetime = Query(..., description="开始时间，分和秒都为0"),
+        end_time: datetime = Query(None, description="结束时间，分和秒都为0。若为空，则默认为此时此刻"),
         db: Session = Depends(get_db),
 ) -> DataResponse:
     """
     获取小时级别榜单历史数据，如果start_time必须小于end_time
-    每天的快照选择当天最后一次更新的快照内容。
+    每小时的快照选择当小时最后一次更新的快照内容。
 
     :param ranking_id: 榜单ID
     :param start_time: 开始时间，不能为空，这个数据的分和秒都为0
-    :param end_time: 结束日期，这个数据的分和秒都为0。若为空，则默认为此时此刻
-    :param db:
-    :return:
+    :param end_time: 结束时间，这个数据的分和秒都为0。若为空，则默认为此时此刻
+    :param db: 数据库会话对象
+    :return: 榜单小时级历史数据
     """
-    pass
+    # 如果没有提供结束时间，使用当前时间（将分和秒设为0）
+    if not end_time:
+        now = datetime.now()
+        end_time = now.replace(minute=0, second=0, microsecond=0)
 
+    # 参数验证：确保分和秒都为0
+    if start_time.minute != 0 or start_time.second != 0:
+        raise HTTPException(status_code=400, detail="开始时间的分和秒必须为0")
+    if end_time.minute != 0 or end_time.second != 0:
+        raise HTTPException(status_code=400, detail="结束时间的分和秒必须为0")
 
+    # 时间范围验证
+    if start_time > end_time:
+        raise HTTPException(status_code=400, detail="开始时间必须小于或等于结束时间")
 
+    try:
+        history_data = ranking_service.get_ranking_history_by_hour(
+            db, ranking_id, start_time, end_time
+        )
+        if not history_data:
+            raise HTTPException(status_code=404, detail="榜单不存在")
 
-
-@router.get("/{ranking_id}/batches", response_model=DataResponse[RankingBatchListResponse])
-async def get_ranking_batches(
-        ranking_id: int,
-        date: Date = Query(..., description="查询日期"),
-        db: Session = Depends(get_db),
-):
-    """
-    获取指定日期的可用批次列表
-    
-    Args:
-        ranking_id: 榜单ID
-        date: 查询日期
-        
-    Returns:
-        RankingBatchListResponse: 可用批次列表
-    """
-    # 获取可用的batch_id列表
-    batch_ids = ranking_service.get_available_batch_ids_by_date(db, ranking_id, date)
-
-    if not batch_ids:
-        raise HTTPException(status_code=404, detail=f"日期 {date} 没有可用的批次数据")
-
-    # 为每个batch_id获取详细信息
-    batch_info_list = []
-    for batch_id in batch_ids:
-        # 获取该批次的快照数据以统计书籍数量和时间
-        snapshots = ranking_service.get_snapshots_by_batch_id(db, ranking_id, batch_id, limit=1000)
-        if snapshots:
-            batch_info = BatchInfoResponse(
-                batch_id=batch_id,
-                snapshot_time=snapshots[0].snapshot_time,
-                total_books=len(snapshots)
-            )
-            batch_info_list.append(batch_info)
-
-    response_data = RankingBatchListResponse(
-        ranking_id=ranking_id,
-        target_date=date,
-        available_batches=batch_info_list
-    )
-
-    return DataResponse(
-        success=True,
-        code=200,
-        data=response_data,
-        message=f"获取到 {len(batch_info_list)} 个可用批次"
-    )
+        return DataResponse(
+            data=history_data,
+            message=f"成功获取榜单小时级历史数据，时间范围：{start_time} 至 {end_time}"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
