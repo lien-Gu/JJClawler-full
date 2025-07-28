@@ -15,7 +15,7 @@ The project follows a strict API-First development methodology:
 
 **Phase 1: Project Setup (Day 1-2)**
 1. Project structure and environment configuration
-2. Poetry dependency management setup
+2. uv dependency management setup
 3. Basic FastAPI application framework
 
 **Phase 2: API Design Priority (Day 3-4)**
@@ -74,35 +74,37 @@ JJClawer3/
 ### Environment Setup
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
-# Activate virtual environment
-poetry shell
+# Activate virtual environment (optional, can use uv run directly)
+source .venv/bin/activate  # Linux/Mac
+# or .venv\Scripts\activate  # Windows
 ```
 
 ### Running the Application
 ```bash
 # Start the FastAPI development server
-poetry run uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8000
 
-# Or if in poetry shell
+# Or if in activated environment
 uvicorn main:app --reload --port 8000
 ```
 
 ### Development Tools
 ```bash
 # Add new dependencies
-poetry add package_name
+uv add package_name
 
 # Add development dependencies
-poetry add --group dev package_name
+uv add --dev package_name
 
 # Run tests (when implemented)
-poetry run pytest
+uv run pytest
 
 # Format code (when configured)
-poetry run black .
-poetry run isort .
+uv run black .
+uv run isort .
+uv run ruff check . --fix
 ```
 
 ### Testing
@@ -200,7 +202,7 @@ The decision to use a separate `book_snapshots` table was made based on:
 - SQLModel: Type-safe ORM based on SQLAlchemy and Pydantic
 - httpx: Async HTTP client for crawling
 - APScheduler: Task scheduling
-- Poetry: Dependency management
+- uv: Dependency management
 - Uvicorn: ASGI server
 
 ## Detailed Task Breakdown
