@@ -382,6 +382,7 @@ class RankingService:
     ) -> Optional[ranking.RankingHistory]:
         """
         获取榜单按天的历史数据，每天选择当天最后一次更新的快照
+        使用单次查询优化性能，避免循环查询
 
         :param db: 数据库会话对象
         :param ranking_id: 榜单ID
@@ -394,27 +395,78 @@ class RankingService:
         if not ranking_basic:
             return None
 
-        # 2. 获取时间范围内每天的最后一次快照
+        # 2. 使用子查询获取每天最新的batch_id
+        from sqlalchemy import text
+        latest_batches_subquery = select(
+            func.date(RankingSnapshot.snapshot_time).label('snapshot_date'),
+            RankingSnapshot.batch_id,
+            func.max(RankingSnapshot.snapshot_time).label('max_time')
+        ).where(
+            and_(
+                RankingSnapshot.ranking_id == ranking_id,
+                func.date(RankingSnapshot.snapshot_time) >= start_date,
+                func.date(RankingSnapshot.snapshot_time) <= end_date,
+            )
+        ).group_by(
+            func.date(RankingSnapshot.snapshot_time),
+            RankingSnapshot.batch_id
+        ).subquery()
+
+        # 3. 获取每天的最新batch_id
+        latest_batch_ids = db.execute(
+            select(
+                latest_batches_subquery.c.snapshot_date,
+                latest_batches_subquery.c.batch_id
+            ).where(
+                latest_batches_subquery.c.max_time.in_(
+                    select(func.max(latest_batches_subquery.c.max_time))
+                    .group_by(latest_batches_subquery.c.snapshot_date)
+                )
+            )
+        ).fetchall()
+
+        if not latest_batch_ids:
+            return ranking.RankingHistory(
+                id=ranking_basic.id,
+                channel_name=ranking_basic.channel_name,
+                sub_channel_name=ranking_basic.sub_channel_name,
+                page_id=ranking_basic.page_id,
+                rank_group_type=ranking_basic.rank_group_type,
+                snapshots=[],
+            )
+
+        # 4. 一次性获取所有需要的快照数据
+        batch_ids = [row.batch_id for row in latest_batch_ids]
+        all_snapshots = db.execute(
+            select(RankingSnapshot)
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.batch_id.in_(batch_ids)
+                )
+            )
+            .order_by(RankingSnapshot.snapshot_time, RankingSnapshot.position)
+        ).scalars().all()
+
+        # 5. 按批次分组快照数据
+        snapshots_by_batch = {}
+        for snapshot in all_snapshots:
+            if snapshot.batch_id not in snapshots_by_batch:
+                snapshots_by_batch[snapshot.batch_id] = []
+            snapshots_by_batch[snapshot.batch_id].append(snapshot)
+
+        # 6. 构建历史快照数据
         snapshots = []
-        current_date = start_date
+        for batch_row in latest_batch_ids:
+            batch_snapshots = snapshots_by_batch.get(batch_row.batch_id, [])
+            if batch_snapshots:
+                books = [ranking.RankingBook.model_validate(s) for s in batch_snapshots]
+                snapshots.append(ranking.RankingSnapshot(
+                    books=books,
+                    snapshot_time=batch_snapshots[0].snapshot_time,
+                ))
 
-        while current_date <= end_date:
-            try:
-                daily_snapshots = self.get_snapshots_by_day(db, ranking_id, current_date)
-                if daily_snapshots:
-                    # 构建当天的榜单快照对象
-                    books = [ranking.RankingBook.model_validate(s) for s in daily_snapshots]
-                    snapshots.append(ranking.RankingSnapshot(
-                        books=books,
-                        snapshot_time=daily_snapshots[0].snapshot_time,
-                    ))
-            except ValueError:
-                # 如果某天没有数据，跳过
-                pass
-
-            current_date += timedelta(days=1)
-
-        # 3. 构造历史数据响应
+        # 7. 构造历史数据响应
         return ranking.RankingHistory(
             id=ranking_basic.id,
             channel_name=ranking_basic.channel_name,
@@ -433,6 +485,7 @@ class RankingService:
     ) -> Optional[ranking.RankingHistory]:
         """
         获取榜单按小时的历史数据，每小时选择当小时最后一次更新的快照
+        使用单次查询优化性能，避免循环查询
 
         :param db: 数据库会话对象
         :param ranking_id: 榜单ID
@@ -445,31 +498,80 @@ class RankingService:
         if not ranking_basic:
             return None
 
-        # 2. 获取时间范围内每小时的最后一次快照
-        snapshots = []
-        current_time = start_time
+        # 2. 使用子查询获取每小时最新的batch_id
+        # 构造小时级时间截断函数
+        hour_truncate = func.strftime('%Y-%m-%d %H:00:00', RankingSnapshot.snapshot_time)
+        
+        latest_batches_subquery = select(
+            hour_truncate.label('snapshot_hour'),
+            RankingSnapshot.batch_id,
+            func.max(RankingSnapshot.snapshot_time).label('max_time')
+        ).where(
+            and_(
+                RankingSnapshot.ranking_id == ranking_id,
+                RankingSnapshot.snapshot_time >= start_time,
+                RankingSnapshot.snapshot_time <= end_time,
+            )
+        ).group_by(
+            hour_truncate,
+            RankingSnapshot.batch_id
+        ).subquery()
 
-        while current_time <= end_time:
-            try:
-                hourly_snapshots = self.get_snapshots_by_hour(
-                    db, ranking_id, current_time.date(), current_time.hour
+        # 3. 获取每小时的最新batch_id
+        latest_batch_ids = db.execute(
+            select(
+                latest_batches_subquery.c.snapshot_hour,
+                latest_batches_subquery.c.batch_id
+            ).where(
+                latest_batches_subquery.c.max_time.in_(
+                    select(func.max(latest_batches_subquery.c.max_time))
+                    .group_by(latest_batches_subquery.c.snapshot_hour)
                 )
-                if hourly_snapshots:
-                    # 构建当小时的榜单快照对象
-                    books = [ranking.RankingBook.model_validate(s) for s in hourly_snapshots]
-                    snapshots.append(ranking.RankingSnapshot(
-                        books=books,
-                        snapshot_time=hourly_snapshots[0].snapshot_time,
-                        novel_id=0,  # 这个字段在这里不适用
-                        position=0,  # 这个字段在这里不适用
-                    ))
-            except (ValueError, IndexError):
-                # 如果某小时没有数据，跳过
-                pass
+            )
+        ).fetchall()
 
-            current_time += timedelta(hours=1)
+        if not latest_batch_ids:
+            return ranking.RankingHistory(
+                id=ranking_basic.id,
+                channel_name=ranking_basic.channel_name,
+                sub_channel_name=ranking_basic.sub_channel_name,
+                page_id=ranking_basic.page_id,
+                rank_group_type=ranking_basic.rank_group_type,
+                snapshots=[],
+            )
 
-        # 4. 构造历史数据响应
+        # 4. 一次性获取所有需要的快照数据
+        batch_ids = [row.batch_id for row in latest_batch_ids]
+        all_snapshots = db.execute(
+            select(RankingSnapshot)
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.batch_id.in_(batch_ids)
+                )
+            )
+            .order_by(RankingSnapshot.snapshot_time, RankingSnapshot.position)
+        ).scalars().all()
+
+        # 5. 按批次分组快照数据
+        snapshots_by_batch = {}
+        for snapshot in all_snapshots:
+            if snapshot.batch_id not in snapshots_by_batch:
+                snapshots_by_batch[snapshot.batch_id] = []
+            snapshots_by_batch[snapshot.batch_id].append(snapshot)
+
+        # 6. 构建历史快照数据
+        snapshots = []
+        for batch_row in latest_batch_ids:
+            batch_snapshots = snapshots_by_batch.get(batch_row.batch_id, [])
+            if batch_snapshots:
+                books = [ranking.RankingBook.model_validate(s) for s in batch_snapshots]
+                snapshots.append(ranking.RankingSnapshot(
+                    books=books,
+                    snapshot_time=batch_snapshots[0].snapshot_time,
+                ))
+
+        # 7. 构造历史数据响应
         return ranking.RankingHistory(
             id=ranking_basic.id,
             channel_name=ranking_basic.channel_name,
