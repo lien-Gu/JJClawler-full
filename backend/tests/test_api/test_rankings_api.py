@@ -82,7 +82,7 @@ class TestGetRankingDetail:
         mock_service = mocker.patch("app.api.rankings.ranking_service")
         ranking_detail = mock_ranking_data["ranking_detail"]
         ranking_detail["ranking"] = type("MockRanking", (), ranking_detail["ranking"])()
-        mock_service.get_ranking_detail.return_value = ranking_detail
+        mock_service.get_ranking_detail_by_day.return_value = ranking_detail
 
         # 发送请求
         response = client.get("/api/v1/rankings/1?limit=50")
@@ -98,7 +98,7 @@ class TestGetRankingDetail:
         assert len(data["data"]["books"]) == 2
 
         # 验证service调用
-        mock_service.get_ranking_detail.assert_called_once()
+        mock_service.get_ranking_detail_by_day.assert_called_once()
 
     def test_get_ranking_detail_with_date(self, client, mocker, mock_ranking_data):
         """测试指定日期获取榜单详情"""
@@ -106,7 +106,7 @@ class TestGetRankingDetail:
         mock_service = mocker.patch("app.api.rankings.ranking_service")
         ranking_detail = mock_ranking_data["ranking_detail"]
         ranking_detail["ranking"] = type("MockRanking", (), ranking_detail["ranking"])()
-        mock_service.get_ranking_detail.return_value = ranking_detail
+        mock_service.get_ranking_detail_by_day.return_value = ranking_detail
 
         # 发送请求
         response = client.get("/api/v1/rankings/1?date=2024-01-15&limit=50")
@@ -117,13 +117,13 @@ class TestGetRankingDetail:
         assert data["success"] is True
 
         # 验证service调用
-        mock_service.get_ranking_detail.assert_called_once()
+        mock_service.get_ranking_detail_by_day.assert_called_once()
 
     def test_get_ranking_detail_not_found(self, client, mocker):
         """测试榜单不存在"""
         # 模拟service返回None
         mock_service = mocker.patch("app.api.rankings.ranking_service")
-        mock_service.get_ranking_detail.return_value = None
+        mock_service.get_ranking_detail_by_day.return_value = None
 
         # 发送请求
         response = client.get("/api/v1/rankings/999")
@@ -346,7 +346,7 @@ class TestErrorHandling:
         """测试HTTPException直接传递"""
         # 模拟service返回None触发404
         mock_service = mocker.patch("app.api.rankings.ranking_service")
-        mock_service.get_ranking_detail.return_value = None
+        mock_service.get_ranking_detail_by_day.return_value = None
 
         # 发送请求
         response = client.get("/api/v1/rankings/999")

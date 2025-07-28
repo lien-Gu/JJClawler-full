@@ -15,18 +15,22 @@ from base import BaseSchema
 class RankingBasic(BaseSchema):
     """榜单基础信息响应"""
     id: int = Field(..., description="榜单的内部唯一ID")
-    ranking_id: str = Field(..., description="榜单ID")
     channel_name: str = Field(..., description="榜单名称")
     sub_channel_name: str = Field(..., description="子榜单名称")
     page_id: str = Field(..., description="页面ID")
     rank_group_type: str = Field(..., description="榜单分组类型")
 
 
-class RankingSnapshot(BaseSchema, BookRankingInfo):
+class RankingBook(BaseSchema):
+    novel_id: int = Field(..., description="书籍ID")
+    position: int = Field(..., description="排名位置")
+
+
+class RankingSnapshot(BaseSchema, RankingBook):
     """
     榜单快照信息
     """
-    books: List[BookRankingInfo] = Field([], description="榜单书籍列表")
+    books: List[RankingBook] = Field([], description="榜单书籍列表")
     snapshot_time: datetime = Field(..., description="快照时间")
 
 
@@ -34,7 +38,5 @@ class RankingDetail(RankingBasic, RankingSnapshot):
     """榜单详情响应"""
 
 
-
-
-
-
+class RankingHistory(RankingBasic):
+    snapshots: List[RankingSnapshot] = Field([], description="榜单历史快照")

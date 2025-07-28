@@ -2,7 +2,7 @@
 榜单相关API接口
 """
 
-from datetime import date as Date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from typing import Optional, List
 from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
 from ..models.base import DataResponse, PaginationData
-from ..models.ranking import RankingBasic, RankingDetail
+from ..models.ranking import RankingBasic, RankingDetail, RankingHistory
 
 router = APIRouter()
 
@@ -51,97 +51,113 @@ async def get_rankings(
     )
 
 
-@router.get("/{rank_id}", response_model=DataResponse[RankingDetail])
-async def get_ranking_detail(
-        ranking_id: int = Query(0, description="榜单的内部ID"),
-        date: Date | None = Query(None, description="指定日期，默认为最新"),
+@router.get("detail/day/{ranking_id}", response_model=DataResponse[RankingDetail])
+async def get_ranking_detail_by_day(
+        ranking_id: int,
+        target_date: date | None = Query(None, description="指定日期，默认为最新"),
         db: Session = Depends(get_db),
-)->DataResponse:
+) -> DataResponse:
     """
     获取榜单详情
 
     :param ranking_id: 榜单内部ID
-    :param date: 指定日期，精确到天
-    :param db:
+    :param target_date: 指定日期，精确到天
+    :param db: 数据库会话对象
     :return: 榜单详情
     """
-    # 使用原有的方法
-    ranking_detail = ranking_service.get_ranking_detail(db, ranking_id, date)
+    if not target_date:
+        target_date = date.today()
+    ranking_detail = ranking_service.get_ranking_detail_by_day(db, ranking_id, target_date)
     if not ranking_detail:
         raise HTTPException(status_code=404, detail="榜单不存在")
     return DataResponse(
-        success=True,
-        code=200,
         data=ranking_detail,
         message="榜单详情获取成功"
     )
 
 
-@router.get("/jiazi", response_model=DataResponse[RankingDetail])
-async def get_jiazi_detail(
-        date: Date | None = Query(None, description="指定日期，默认为最新"),
-        hour: int | None = Query(None, description="指定小时，24小时制，默认为最新"),
+@router.get("detail/hour/{ranking_id}", response_model=DataResponse[RankingDetail])
+async def get_jiazi_detail_by_hour(
+        ranking_id: int,
+        target_date: date | None = Query(None, description="指定日期，默认为最新"),
+        hour: int | None = Query(None, ge=0, le=23, description="指定小时（0-23），24小时制，默认为最新"),
         db: Session = Depends(get_db),
 ) -> DataResponse[RankingDetail]:
     """
-    获取夹子榜单详情，支持获取小时级别的榜单数据
+    获取榜单小时级别详情，事实上只用于夹子榜单使用
+    如果指定日期，没有指定小时，就获取那天最后一次快照，和函数get_ranking_detail一样
+    如果指定小时，没有指定日期，那就获取当天这个小时的快照数据
 
-    :param date:
-    :param hour:
+    :param ranking_id: 榜单内部ID
+    :param target_date: 指定日期，如果为None则获取最新数据
+    :param hour: 指定小时（0-23），如果为None则获取当天最新数据
+    :param db: 数据库会话对象
+    :return: 夹子榜单详情
+    """
+    # 根据参数组合确定查询逻辑
+    if not target_date and not hour:
+        ranking_detail = ranking_service.get_latest_snapshots_by_ranking_id(db, ranking_id)
+    else:
+        if not target_date:
+            target_date = date.today()
+        if not hour:
+            hour = datetime.now().hour if target_date == date.today() else 24
+        ranking_detail = ranking_service.get_ranking_detail_by_hour(db, ranking_id, target_date, hour)
+
+    if not ranking_detail:
+        raise HTTPException(status_code=404, detail="夹子榜单不存在或指定时间没有数据")
+
+    return DataResponse(
+        data=ranking_detail,
+        message="夹子榜单详情获取成功"
+    )
+
+
+@router.get(
+    "/history/day/{ranking_id}", response_model=DataResponse[RankingHistory]
+)
+async def get_ranking_history_by_day(
+        ranking_id: int,
+        start_date: date = Query(..., description="开始日期"),
+        end_date: date = Query(date.today(), description="结束日期"),
+        db: Session = Depends(get_db),
+)->DataResponse:
+    """
+    获取榜单历史数据，如果start_date必须小于end_date。
+    每天的快照选择当天最后一次更新的快照内容。
+
+    :param ranking_id: 榜单ID
+    :param start_date: 开始日期，不能为空
+    :param end_date: 结束日期，若为空，则默认为当天
     :param db:
     :return:
     """
     pass
 
+
 @router.get(
-    "/{ranking_id}/history", response_model=DataResponse[RankingHistoryResponse]
+    "/history/hour/{ranking_id}", response_model=DataResponse[RankingHistory]
 )
-async def get_ranking_history(
+async def get_ranking_history_by_day(
         ranking_id: int,
-        start_date: Date | None = Query(None, description="开始日期"),
-        end_date: Date | None = Query(None, description="结束日期"),
+        start_time: date = Query(..., description="开始日期"),
+        end_time: date = Query(None, description="结束日期"),
         db: Session = Depends(get_db),
-):
+) -> DataResponse:
     """
-    获取榜单历史数据
+    获取小时级别榜单历史数据，如果start_time必须小于end_time
+    每天的快照选择当天最后一次更新的快照内容。
 
-    Args:
-        ranking_id: 榜单ID
-        start_date: 开始日期
-        end_date: 结束日期
-
-    Returns:
-        RankingHistoryResponse: 榜单历史数据
+    :param ranking_id: 榜单ID
+    :param start_time: 开始时间，不能为空，这个数据的分和秒都为0
+    :param end_time: 结束日期，这个数据的分和秒都为0。若为空，则默认为此时此刻
+    :param db:
+    :return:
     """
-    history_data = ranking_service.get_ranking_history(
-        db, ranking_id, start_date, end_date
-    )
+    pass
 
-    # 转换为响应模型
-    from ..models.ranking import RankingHistoryPoint
 
-    history_points = []
-    for trend_point in history_data["trend_data"]:
-        # 简化的历史点数据，实际应该包含更多信息
-        history_points.append(
-            RankingHistoryPoint(
-                date=trend_point["snapshot_time"].date(),
-                book_id=0,  # 占位符，实际需要更复杂的逻辑
-                title="",
-                position=0,
-                score=None,
-            )
-        )
 
-    response_data = RankingHistoryResponse(
-        ranking_id=ranking_id,
-        ranking_name="榜单名称",  # 需要从数据库获取
-        start_date=start_date or Date.today(),
-        end_date=end_date or Date.today(),
-        history_data=history_points,
-    )
-
-    return DataResponse(data=response_data, message="榜单历史数据获取成功")
 
 
 @router.get("/{ranking_id}/batches", response_model=DataResponse[RankingBatchListResponse])

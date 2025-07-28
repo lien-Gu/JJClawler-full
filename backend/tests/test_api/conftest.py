@@ -339,7 +339,7 @@ def mock_ranking_service(mocker):
 
     # 设置常用方法的返回值
     service.get_all_rankings.return_value = {"rankings": [], "total": 0}
-    service.get_ranking_detail.return_value = None
+    service.get_ranking_detail_by_day.return_value = None
     service.get_ranking_history.return_value = {"trend_data": []}
     service.get_ranking_by_id.return_value = None
     service.get_ranking_statistics.return_value = {}

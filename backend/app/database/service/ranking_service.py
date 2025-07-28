@@ -2,7 +2,7 @@
 榜单业务逻辑服务 - 集成DAO功能的简化版本
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from typing import Any, Tuple, List, Optional
 
 from fastapi import HTTPException
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ..db.book import Book
 from ..db.ranking import Ranking, RankingSnapshot
 from ...utils import filter_dict, get_model_fields
-from app.models import ranking
+from app.models import ranking, book
 
 
 class RankingService:
@@ -25,6 +25,9 @@ class RankingService:
     ) -> Ranking:
         """
         根据ranking_data中的信息创建或更新榜单。
+        :param db:
+        :param ranking_data:
+        :return:
         """
         rank_id = ranking_data.get("rank_id")
         if not rank_id:
@@ -63,8 +66,9 @@ class RankingService:
                     f"数据库中存在重复的(rank_id, channel_id)组合: ('{rank_id}', '{channel_id}')"
                 )
 
+    @staticmethod
     def batch_create_ranking_snapshots(
-            self, db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
+            db: Session, snapshots: list[dict[str, Any]], batch_id: str = None
     ) -> list[RankingSnapshot]:
         """
         批量创建榜单快照 - 支持batch_id
@@ -74,19 +78,13 @@ class RankingService:
         :param batch_id: 批次ID，如果不提供则自动生成
         :return: 创建的快照对象列表
         """
-        from ...utils.batch import ensure_batch_id
-
-        # 确保有batch_id
-        if batch_id is None:
-            batch_id = ensure_batch_id()
 
         # 为所有快照数据添加batch_id
         for snapshot in snapshots:
             snapshot['batch_id'] = batch_id
 
         # 过滤数据并创建对象
-        valid_fields = get_model_fields(RankingSnapshot)
-        filtered_snapshots = [filter_dict(snapshot, valid_fields) for snapshot in snapshots]
+        filtered_snapshots = [filter_dict(snapshot, RankingSnapshot) for snapshot in snapshots]
         snapshot_objs = [RankingSnapshot(**snapshot) for snapshot in filtered_snapshots]
         db.add_all(snapshot_objs)
         db.commit()
@@ -99,53 +97,53 @@ class RankingService:
         """
         根据ID获取榜单
 
-        :param self:
         :param db:
         :param ranking_id:
         :return:
         """
         return db.get(Ranking, ranking_id)
 
-    def get_ranking_statistics(self, db: Session, ranking_id: int) -> dict[str, Any]:
-        """获取榜单统计信息"""
-        result = db.execute(
-            select(
-                func.count(distinct(RankingSnapshot.snapshot_time)).label(
-                    "total_snapshots"
-                ),
-                func.count(distinct(RankingSnapshot.novel_id)).label("unique_books"),
-                func.min(RankingSnapshot.snapshot_time).label("first_snapshot_time"),
-                func.max(RankingSnapshot.snapshot_time).label("last_snapshot_time"),
-            ).where(RankingSnapshot.ranking_id == ranking_id)
-        ).first()
-
-        if result:
-            return {
-                "total_snapshots": result.total_snapshots or 0,
-                "unique_books": result.unique_books or 0,
-                "first_snapshot_time": result.first_snapshot_time,
-                "last_snapshot_time": result.last_snapshot_time,
-            }
-        return {}
-
-    def get_ranking_detail(
+    def get_ranking_detail_by_day(
             self,
             db: Session,
             ranking_id: int,
-            target_date: date | None = None,
-            limit: int = 50,
+            target_date: date,
     ) -> Optional[ranking.RankingDetail]:
         """
         获取某一天的榜单详情
         根据ranking_id在RankingSnapshot查询到此表格当天最后一批次的快照，然后再与Ranking中的榜单信息join
 
-        :param db:
-        :param ranking_id:
-        :param target_date:
-        :param limit:
-        :return:
+        :param db: 数据库会话对象
+        :param ranking_id: 榜单内部ID
+        :param target_date: 指定日期，如果为None则获取最新数据
+        :return: 榜单详情对象或None
         """
+        # 1. 获取榜单基础信息
+        ranking_basic = db.get(Ranking, ranking_id)
+        if not ranking_basic:
+            return None
 
+        # 2. 获取指定日期的快照
+        snapshots = self.get_snapshots_by_day(db, ranking_id, target_date)
+
+        if not snapshots or not ranking_basic:
+            return None
+
+        # 3. 获取书籍详细信息
+        books = [ranking.RankingBook.model_validate(s) for s in snapshots]
+
+        # 4. 构造榜单详情响应
+        ranking_detail = ranking.RankingDetail(
+            id=ranking_basic.id,
+            channel_name=ranking_basic.channel_name,
+            sub_channel_name=ranking_basic.sub_channel_name,
+            page_id=ranking_basic.page_id,
+            rank_group_type=ranking_basic.rank_group_type,
+            books=books,
+            snapshot_time=snapshots[0].snapshot_time,
+        )
+
+        return ranking_detail
 
     def get_ranking_history(
             self,
@@ -175,77 +173,7 @@ class RankingService:
             ],
         }
 
-    def compare_rankings(
-            self, db: Session, ranking_ids: list[int], target_date: date | None = None
-    ) -> dict[str, Any]:
-        """对比多个榜单"""
-        if len(ranking_ids) < 2:
-            raise ValueError("至少需要2个榜单进行对比")
 
-        # 获取榜单基本信息
-        rankings = [self.get_ranking_by_id(db, rid) for rid in ranking_ids]
-        rankings = [r for r in rankings if r is not None]
-
-        if len(rankings) != len(ranking_ids):
-            raise ValueError("部分榜单不存在")
-
-        # 获取对比数据
-        comparison_data = {}
-        for ranking_id in ranking_ids:
-            if target_date:
-                snapshots = self.get_snapshots_by_date(
-                    db, ranking_id, target_date
-                )
-            else:
-                snapshots = self.get_latest_snapshots_by_ranking_id(db, ranking_id)
-            comparison_data[ranking_id] = snapshots
-
-        # 分析共同书籍
-        all_books = {}  # novel_id -> book_info
-        ranking_books = {}  # ranking_id -> set of novel_ids
-
-        for ranking_id, snapshots in comparison_data.items():
-            novel_ids = set()
-            for snapshot in snapshots:
-                novel_ids.add(snapshot.novel_id)
-                # 获取书籍信息
-                book = db.get(Book, snapshot.novel_id)
-                all_books[snapshot.novel_id] = {
-                    "id": book.id if book else None,
-                    "novel_id": snapshot.novel_id,
-                    "title": book.title if book else "未知书籍",
-                }
-            ranking_books[ranking_id] = novel_ids
-
-        # 找出共同书籍
-        common_novel_ids = (
-            set.intersection(*ranking_books.values()) if ranking_books else set()
-        )
-
-        return {
-            "rankings": [
-                {"ranking_id": r.id, "name": r.name, "page_id": r.page_id}
-                for r in rankings
-            ],
-            "comparison_date": target_date or date.today(),
-            "ranking_data": {
-                ranking_id: [
-                    {
-                        "novel_id": s.novel_id,
-                        "title": all_books.get(s.novel_id, {}).get("title", "未知书籍"),
-                        "position": s.position,
-                        "score": s.score,
-                    }
-                    for s in snapshots
-                ]
-                for ranking_id, snapshots in comparison_data.items()
-            },
-            "common_books": [all_books[novel_id] for novel_id in common_novel_ids],
-            "stats": {
-                "total_unique_books": len(all_books),
-                "common_books_count": len(common_novel_ids),
-            },
-        }
 
     def get_book_ranking_history_with_details(
             self,
@@ -373,10 +301,8 @@ class RankingService:
 
         return [ranking.RankingBasic.model_validate(i) for i in rankings], total_pages
 
-
-
     def get_latest_snapshots_by_ranking_id(
-            self, db: Session, ranking_id: int, limit: int = 50
+            self, db: Session, ranking_id: int
     ) -> list[RankingSnapshot]:
         """
         获取榜单最新快照 - 使用batch_id确保数据一致性
@@ -404,12 +330,11 @@ class RankingService:
                 )
             )
             .order_by(RankingSnapshot.position)
-            .limit(limit)
         )
         return list(result.scalars())
 
     @staticmethod
-    def get_snapshots_by_date(
+    def get_snapshots_by_day(
             db: Session, ranking_id: int, target_date: date, limit: int = 50
     ) -> list[RankingSnapshot]:
         """
@@ -527,28 +452,92 @@ class RankingService:
         )
         return list(result.scalars())
 
-    def get_ranking_trend(
+
+
+
+
+    @staticmethod
+    def get_snapshots_by_hour(
+            db: Session, ranking_id: int, target_date: date, target_hour: int
+    ) -> list[RankingSnapshot]:
+        """
+        获取指定日期和小时的榜单快照
+        
+        :param db: 数据库会话
+        :param ranking_id: 榜单ID
+        :param target_date: 目标日期
+        :param target_hour: 目标小时（0-23）
+        :return: 榜单快照列表
+        """
+        # 构造小时时间范围
+        start_time = datetime.combine(target_date, time(target_hour, 0, 0))
+        end_time = start_time + timedelta(hours=1)
+        
+        # 首先查找目标小时内最新的batch_id
+        latest_batch_id = db.scalar(
+            select(RankingSnapshot.batch_id)
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.snapshot_time >= start_time,
+                    RankingSnapshot.snapshot_time < end_time,
+                )
+            )
+            .order_by(desc(RankingSnapshot.snapshot_time))
+            .limit(1)
+        )
+
+        if not latest_batch_id:
+            return []
+
+        # 使用batch_id获取同一批次的所有数据，确保时间一致性
+        result = db.execute(
+            select(RankingSnapshot)
+            .where(
+                and_(
+                    RankingSnapshot.ranking_id == ranking_id,
+                    RankingSnapshot.batch_id == latest_batch_id,
+                )
+            )
+            .order_by(RankingSnapshot.position)
+        )
+        return list(result.scalars())
+
+    def get_ranking_detail_by_hour(
             self,
             db: Session,
             ranking_id: int,
-            start_time: datetime | None = None,
-            end_time: datetime | None = None,
-    ) -> list[tuple[datetime, int]]:
-        """获取榜单变化趋势（每个快照时间的书籍数量）"""
-        query = select(
-            RankingSnapshot.snapshot_time,
-            func.count(RankingSnapshot.novel_id).label("book_count"),
-        ).where(RankingSnapshot.ranking_id == ranking_id)
+            target_date: date,
+            target_hour: int,
+    ) -> Optional[ranking.RankingDetail]:
+        """
+        获取榜单详情，支持精确到小时的查询
 
-        if start_time:
-            query = query.where(RankingSnapshot.snapshot_time >= start_time)
-        if end_time:
-            query = query.where(RankingSnapshot.snapshot_time <= end_time)
+        :param db: 数据库会话对象
+        :param ranking_id:
+        :param target_date: 指定日期
+        :param target_hour:
+        :return:
+        """
+        # 1. 获取榜单基础信息
+        ranking_basic = db.get(Ranking, ranking_id)
+        # 2. 获取快照数据
+        snapshots = self.get_snapshots_by_hour(
+            db, ranking_id, target_date, target_hour
+        )
+        if not ranking_basic or not snapshots:
+            return None
+        
+        # 3. 获取书籍详细信息
+        books = [ranking.RankingBook.model_validate(s) for s in snapshots]
 
-        result = db.execute(
-            query.group_by(RankingSnapshot.snapshot_time).order_by(
-                RankingSnapshot.snapshot_time
-            )
-        ).all()
-
-        return [(row.snapshot_time, row.book_count) for row in result]
+        # 4. 构造榜单详情响应
+        return ranking.RankingDetail(
+            id=ranking_basic.id,
+            channel_name=ranking_basic.channel_name,
+            sub_channel_name=ranking_basic.sub_channel_name,
+            page_id=ranking_basic.page_id,
+            rank_group_type=ranking_basic.rank_group_type,
+            books=books,
+            snapshot_time=snapshots[0].snapshot_time,
+        )
