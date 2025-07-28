@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..db.book import Book
 from ..db.ranking import Ranking, RankingSnapshot
 from ...utils import filter_dict, get_model_fields
+from app.models import book
 
 
 class RankingService:
@@ -113,7 +114,7 @@ class RankingService:
                 func.count(distinct(RankingSnapshot.snapshot_time)).label(
                     "total_snapshots"
                 ),
-                func.count(distinct(RankingSnapshot.book_id)).label("unique_books"),
+                func.count(distinct(RankingSnapshot.novel_id)).label("unique_books"),
                 func.min(RankingSnapshot.snapshot_time).label("first_snapshot_time"),
                 func.max(RankingSnapshot.snapshot_time).label("last_snapshot_time"),
             ).where(RankingSnapshot.ranking_id == ranking_id)
@@ -159,9 +160,9 @@ class RankingService:
         books_data = []
         for snapshot in snapshots:
             # 获取书籍信息
-            book = db.get(Book, snapshot.book_id)
+            book = db.get(Book, snapshot.novel_id)
             book_data = {
-                "book_id": snapshot.book_id,
+                "novel_id": snapshot.novel_id,
                 "title": book.title if book else "未知书籍",
                 "position": snapshot.position,
                 "score": snapshot.score,
@@ -231,24 +232,24 @@ class RankingService:
             comparison_data[ranking_id] = snapshots
 
         # 分析共同书籍
-        all_books = {}  # book_id -> book_info
-        ranking_books = {}  # ranking_id -> set of book_ids
+        all_books = {}  # novel_id -> book_info
+        ranking_books = {}  # ranking_id -> set of novel_ids
 
         for ranking_id, snapshots in comparison_data.items():
-            book_ids = set()
+            novel_ids = set()
             for snapshot in snapshots:
-                book_ids.add(snapshot.book_id)
+                novel_ids.add(snapshot.novel_id)
                 # 获取书籍信息
-                book = db.get(Book, snapshot.book_id)
-                all_books[snapshot.book_id] = {
+                book = db.get(Book, snapshot.novel_id)
+                all_books[snapshot.novel_id] = {
                     "id": book.id if book else None,
-                    "book_id": snapshot.book_id,
+                    "novel_id": snapshot.novel_id,
                     "title": book.title if book else "未知书籍",
                 }
-            ranking_books[ranking_id] = book_ids
+            ranking_books[ranking_id] = novel_ids
 
         # 找出共同书籍
-        common_book_ids = (
+        common_novel_ids = (
             set.intersection(*ranking_books.values()) if ranking_books else set()
         )
 
@@ -261,8 +262,8 @@ class RankingService:
             "ranking_data": {
                 ranking_id: [
                     {
-                        "book_id": s.book_id,
-                        "title": all_books.get(s.book_id, {}).get("title", "未知书籍"),
+                        "novel_id": s.novel_id,
+                        "title": all_books.get(s.novel_id, {}).get("title", "未知书籍"),
                         "position": s.position,
                         "score": s.score,
                     }
@@ -270,31 +271,31 @@ class RankingService:
                 ]
                 for ranking_id, snapshots in comparison_data.items()
             },
-            "common_books": [all_books[book_id] for book_id in common_book_ids],
+            "common_books": [all_books[novel_id] for novel_id in common_novel_ids],
             "stats": {
                 "total_unique_books": len(all_books),
-                "common_books_count": len(common_book_ids),
+                "common_books_count": len(common_novel_ids),
             },
         }
 
     def get_book_ranking_history_with_details(
         self,
         db: Session,
-        book_id: int,
+        novel_id: int,
         ranking_id: int | None = None,
         days: int = 30,
-    ) -> list[Tuple[Ranking, RankingSnapshot]]:
+    ) -> List[book.BookRankingInfo]:
         """
         获取书籍在榜单中的排名历史
 
         :param db:
-        :param book_id:
+        :param novel_id:
         :param ranking_id:
         :param days:
         :return:
         """
         start_time = datetime.now() - timedelta(days=days)
-        snapshots = self.get_book_ranking_history(db, book_id, ranking_id, start_time)
+        snapshots = self.get_book_ranking_history(db, novel_id, ranking_id, start_time)
         results = []
         for snapshot in snapshots:
             ranking = self.get_ranking_by_id(db, snapshot.ranking_id)
@@ -506,14 +507,14 @@ class RankingService:
     def get_book_ranking_history(
         self,
         db: Session,
-        book_id: int,
+        novel_id: int,
         ranking_id: int | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 30,
     ) -> list[RankingSnapshot]:
         """获取书籍排名历史"""
-        query = select(RankingSnapshot).where(RankingSnapshot.book_id == book_id)
+        query = select(RankingSnapshot).where(RankingSnapshot.novel_id == novel_id)
 
         if ranking_id:
             query = query.where(RankingSnapshot.ranking_id == ranking_id)
@@ -537,7 +538,7 @@ class RankingService:
         """获取榜单变化趋势（每个快照时间的书籍数量）"""
         query = select(
             RankingSnapshot.snapshot_time,
-            func.count(RankingSnapshot.book_id).label("book_count"),
+            func.count(RankingSnapshot.novel_id).label("book_count"),
         ).where(RankingSnapshot.ranking_id == ranking_id)
 
         if start_time:

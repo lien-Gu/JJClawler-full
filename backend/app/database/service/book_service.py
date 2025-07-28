@@ -165,7 +165,6 @@ class BookService:
         :return: BookSnapshot对象列表，按snapshot_time倒序排列
         """
         query = select(BookSnapshot).where(BookSnapshot.novel_id == novel_id)
-
         if start_time:
             query = query.where(BookSnapshot.snapshot_time >= start_time)
         if end_time:

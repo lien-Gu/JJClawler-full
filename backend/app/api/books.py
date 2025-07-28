@@ -134,12 +134,12 @@ async def get_book_ranking_history(
     book = book_service.get_book_by_novel_id(db, novel_id)
 
     ranking_history_data = ranking_service.get_book_ranking_history_with_details(
-        db, book.book_id, ranking_id, days
+        db, book.novel_id, ranking_id, days
     )
 
     # 转换为响应模型
     ranking_responses = [
-        BookRankingInfo.from_snapshot(book.book_id, ranking, snapshot)
+        BookRankingInfo.from_snapshot(book.novel_id, ranking, snapshot)
         for ranking, snapshot in ranking_history_data
     ]
 
