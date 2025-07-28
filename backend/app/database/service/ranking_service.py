@@ -6,13 +6,13 @@ from datetime import date, datetime, timedelta
 from typing import Any, Tuple, List
 
 from fastapi import HTTPException
-from sqlalchemy import and_, desc, distinct, func, select, text
+from sqlalchemy import and_, desc, distinct, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from ..db.book import Book
 from ..db.ranking import Ranking, RankingSnapshot
 from ...utils import filter_dict, get_model_fields
-from app.models import book
+from app.models import ranking
 
 
 class RankingService:
@@ -351,28 +351,46 @@ class RankingService:
         db: Session,
         page: int = 1,
         size: int = 20,
-        filters: dict[str, Any] | None = None,
-    ) -> Tuple[List[Ranking], int]:
-        """分页获取榜单列表"""
+        page_id: str | None = None,
+        name: str | None = None,
+    ) -> Tuple[List[ranking.RankingBasic], int]:
+        """
+        分页获取榜单列表
+        
+        首先根据page_id查找榜单，如果page_id为空或没有查找到就使用name在Ranking
+        表格中的channel_name和sub_channel_name中进行模糊匹配。
+        
+        :param db: 数据库会话对象
+        :param page: 页码，从1开始
+        :param size: 每页数量，1-100之间
+        :param page_id: 榜单页面ID筛选，精确匹配
+        :param name: 榜单名称筛选，模糊匹配
+        :return: (榜单列表, 总页数)
+        """
         skip = (page - 1) * size
 
         # 构建查询
         query = select(Ranking)
         count_query = select(func.count(Ranking.id))
 
-        # 应用过滤条件
-        if filters:
-            for key, value in filters.items():
-                if hasattr(Ranking, key):
-                    query = query.where(getattr(Ranking, key) == value)
-                    count_query = count_query.where(getattr(Ranking, key) == value)
+        # 优先使用page_id精确匹配
+        if page_id:
+            query = query.where(Ranking.page_id == page_id)
+            count_query = count_query.where(Ranking.page_id == page_id)
+        elif name:
+            # page_id为空或未提供时，使用name在channel_name和sub_channel_name中模糊匹配
+            name_pattern = f"%{name}%"
+            name_condition = or_(
+                Ranking.channel_name.like(name_pattern),
+                Ranking.sub_channel_name.like(name_pattern)
+            )
+            query = query.where(name_condition)
+            count_query = count_query.where(name_condition)
 
         # 获取数据
-        rankings = list(
-            db.execute(
+        rankings = db.execute(
                 query.order_by(desc(Ranking.created_at)).offset(skip).limit(size)
             ).scalars()
-        )
 
         total = db.scalar(count_query)
         total_pages = (total + size - 1) // size if total > 0 else 0

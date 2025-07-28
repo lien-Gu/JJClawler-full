@@ -6,18 +6,12 @@ from datetime import date as Date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-
+from typing import Optional, List
 from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
+from ..models import PaginationData
 from ..models.base import DataResponse
-from ..models.ranking import (
-    BatchInfoResponse,
-    BookInRanking,
-    RankingBatchListResponse,
-    RankingDetailResponse,
-    RankingHistoryResponse,
-    RankingResponse,
-)
+from ..models.ranking import RankingBasic
 
 router = APIRouter()
 
@@ -25,39 +19,36 @@ router = APIRouter()
 ranking_service = RankingService()
 
 
-@router.get("/", response_model=ListResponse[RankingResponse])
+@router.get("/", response_model=DataResponse[PaginationData[RankingBasic]])
 async def get_rankings(
         page_id: str | None = Query(None, description="榜单页面ID筛选"),
         name: str | None = Query(None, description="榜单名称筛选"),
         page: int = Query(1, ge=1, description="页码"),
         size: int = Query(20, ge=1, le=100, description="每页数量"),
         db: Session = Depends(get_db),
-):
+)->DataResponse:
     """
-    获取榜单列表
+    获取榜单列表，首先更具page id查找榜单，如果page id 为空或者没有查找到就使用name在Ranking
+    表格中的channel name 和 sub channel name中进行模糊匹配。
     
     :param page_id: 榜单页面ID筛选
-    :param sub_page_id: 子榜单名称筛选
     :param name: 榜单名称筛选
     :param page: 页码
     :param size: 每页数量
     :param db: 数据库会话对象
     :return: 榜单列表
     """
-    # 构建筛选条件
-    filters = {}
-    if page_id:
-        filters["page_id"] = page_id
-    if name:
-        filters["channel_name"] = name
+    # 获取榜单数据 - 传递新参数
+    result = ranking_service.get_rankings_with_pagination(
+        db=db, 
+        page=page, 
+        size=size, 
+        page_id=page_id, 
+        name=name
+    )
 
-    # 获取榜单数据
-    result, _ = ranking_service.get_rankings_with_pagination(db, page, size, filters)
-
-    return ListResponse(
-        success=True,
-        code=200,
-        data=[RankingResponse.from_ranking(ranking) for ranking in result],
+    return DataResponse(
+        data=result,
         message="榜单列表获取成功"
     )
 
