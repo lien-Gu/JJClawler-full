@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Tuple, List
 
 from fastapi import HTTPException
-from sqlalchemy import and_, desc, distinct, func, select
+from sqlalchemy import and_, desc, distinct, func, select, text
 from sqlalchemy.orm import Session
 
 from ..db.book import Book
@@ -282,27 +282,30 @@ class RankingService:
         self,
         db: Session,
         novel_id: int,
-        ranking_id: int | None = None,
         days: int = 30,
     ) -> List[book.BookRankingInfo]:
         """
-        获取书籍在榜单中的排名历史
+        获取书籍在days天中的每天的榜单排名历史（取每天中最后一次榜单快照）
 
-        :param db:
-        :param novel_id:
-        :param ranking_id:
-        :param days:
-        :return:
+        :param db: 数据库会话对象
+        :param novel_id: 书籍唯一标识ID
+        :param days: 查询天数，默认30天
+        :return: BookRankingInfo列表，包含榜单信息和排名快照
         """
+        from ..sql.ranking_queries import BOOK_DAILY_LAST_RANKING_HISTORY_QUERY
+        
+        # 计算开始时间
         start_time = datetime.now() - timedelta(days=days)
-        snapshots = self.get_book_ranking_history(db, novel_id, ranking_id, start_time)
-        results = []
-        for snapshot in snapshots:
-            ranking = self.get_ranking_by_id(db, snapshot.ranking_id)
-            if not ranking:
-                raise ValueError("can not get ranking!")
-            results.append((ranking, snapshot))
-        return results
+        
+        # 使用高性能Text查询执行窗口函数
+        results = db.execute(
+            text(BOOK_DAILY_LAST_RANKING_HISTORY_QUERY),
+            {
+                "novel_id": novel_id,
+                "start_time": start_time
+            }
+        ).all()
+        return [book.BookRankingInfo.model_validate(row._asdict()) for row in results]
 
     # ==================== 内部依赖方法 ====================
     @staticmethod

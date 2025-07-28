@@ -99,3 +99,30 @@ WHERE b.id IN (
         AND DATE(snapshot_time) = :target_date
 )
 """
+
+# 获取书籍每天最后一次榜单排名历史（高性能窗口函数查询）
+BOOK_DAILY_LAST_RANKING_HISTORY_QUERY = """
+SELECT 
+    rs.novel_id,
+    rs.position,
+    rs.snapshot_time,
+    r.page_id,
+    r.channel_name,
+    r.sub_channel_name
+FROM (
+    SELECT novel_id,
+           ranking_id,
+           position,
+           snapshot_time,
+           ROW_NUMBER() OVER (
+               PARTITION BY DATE(snapshot_time), ranking_id 
+               ORDER BY snapshot_time DESC
+           ) as rn
+    FROM ranking_snapshots 
+    WHERE novel_id = :novel_id 
+        AND snapshot_time >= :start_time
+) rs
+JOIN rankings r ON rs.ranking_id = r.id
+WHERE rs.rn = 1
+ORDER BY rs.snapshot_time DESC
+"""

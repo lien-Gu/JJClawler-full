@@ -37,7 +37,7 @@ class BookDetail(BookBasic, BookSnapshot):
 class BookRankingInfo(BaseSchema):
     """书籍排名信息"""
 
-    book_id: int = Field(..., description="书籍ID")
+    novel_id: int = Field(..., description="书籍ID")
     position: int = Field(..., description="排名位置")
     snapshot_time: datetime = Field(..., description="快照时间")
     page_id: str = Field(..., description="榜单页面ID")
