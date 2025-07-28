@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database.connection import get_db
 from ..database.service.ranking_service import RankingService
-from ..models.base import DataResponse, ListResponse
+from ..models.base import DataResponse
 from ..models.ranking import (
     BatchInfoResponse,
     BookInRanking,
@@ -28,7 +28,6 @@ ranking_service = RankingService()
 @router.get("/", response_model=ListResponse[RankingResponse])
 async def get_rankings(
         page_id: str | None = Query(None, description="榜单页面ID筛选"),
-        sub_ranking_name: str | None = Query(None, description="子榜单名称筛选"),
         name: str | None = Query(None, description="榜单名称筛选"),
         page: int = Query(1, ge=1, description="页码"),
         size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -38,7 +37,7 @@ async def get_rankings(
     获取榜单列表
     
     :param page_id: 榜单页面ID筛选
-    :param sub_ranking_name: 子榜单名称筛选  
+    :param sub_page_id: 子榜单名称筛选
     :param name: 榜单名称筛选
     :param page: 页码
     :param size: 每页数量
@@ -49,10 +48,8 @@ async def get_rankings(
     filters = {}
     if page_id:
         filters["page_id"] = page_id
-    if sub_ranking_name:
-        filters["sub_ranking_name"] = sub_ranking_name
     if name:
-        filters["name"] = name
+        filters["channel_name"] = name
 
     # 获取榜单数据
     result, _ = ranking_service.get_rankings_with_pagination(db, page, size, filters)
