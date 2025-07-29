@@ -5,10 +5,10 @@
 
 import pytest
 import json
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, mock_open
 import httpx
 
-from app.crawl.base import CrawlConfig
+from app.crawl_config import CrawlConfig
 from app.crawl.http import HttpClient
 from app.crawl.parser import RankingParser, PageParser, NovelPageParser
 

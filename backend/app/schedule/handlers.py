@@ -7,10 +7,10 @@ import time
 from abc import ABC, abstractmethod
 
 from app.config import get_settings
-from app.crawl.base import CrawlConfig
+from app.crawl_config import CrawlConfig
 from app.crawl.crawl_flow import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import JobContextModel, JobResultModel
+from app.models.schedule import , JobResultModel
 
 
 class BaseJobHandler(ABC):
@@ -23,12 +23,11 @@ class BaseJobHandler(ABC):
         self.max_retries = self.settings.crawler.retry_times
 
     async def execute_with_retry(
-        self, context: JobContextModel, page_ids: list = None
+        self, job_id: str, page_ids: list = None
     ) -> JobResultModel:
         """带重试机制的任务执行"""
         start_time = time.time()
         last_exception = None
-        job_id = context.job_id
 
         # max_retries=3 表示最多重试3次: 1次初始执行 + 3次重试 = 总共4次尝试
         for attempt in range(self.max_retries + 1):

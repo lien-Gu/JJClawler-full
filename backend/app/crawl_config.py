@@ -2,11 +2,8 @@
 爬虫基础组件 - 简化版本
 """
 
-import asyncio
 import json
 from pathlib import Path
-
-import httpx
 
 
 class CrawlConfig:

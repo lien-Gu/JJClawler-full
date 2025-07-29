@@ -4,8 +4,7 @@
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-import asyncio
+from unittest.mock import patch
 
 from app.crawl.crawl_flow import CrawlFlow
 
@@ -260,7 +259,7 @@ class TestRealCrawlFlow:
     async def test_real_novel_detail_crawl(self):
         """测试真实的书籍详情爬取"""
         from app.crawl.http import HttpClient
-        from app.crawl.base import CrawlConfig
+        from app.crawl_config import CrawlConfig
         from app.crawl.parser import NovelPageParser
         
         try:

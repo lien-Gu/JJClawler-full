@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.books import router as books_router
-from app.api.crawl import router as crawl_router
+from app.api.schedule import router as crawl_router
 from app.api.rankings import router as rankings_router
 
 # ==================== 基础Fixtures ====================

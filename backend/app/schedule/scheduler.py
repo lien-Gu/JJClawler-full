@@ -3,7 +3,8 @@
 """
 
 from datetime import datetime
-from typing import Any
+from tkinter import Listbox
+from typing import Any, List
 
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.job import Job
@@ -13,14 +14,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import get_settings
 from app.logger import get_logger
 from app.models.schedule import (
-    PREDEFINED_JOB_CONFIGS,
-    JobConfigModel,
-    JobContextModel,
+    PREDEFINED_JOB_INFO,
     JobHandlerType,
     TriggerType,
 )
 
 from .handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
+from ..models import JobInfo
 
 
 class TaskScheduler:
@@ -104,228 +104,45 @@ class TaskScheduler:
 
     async def _load_predefined_jobs(self) -> None:
         """加载预定义任务（支持多子任务）"""
-        for job_id, job_config in PREDEFINED_JOB_CONFIGS.items():
+        for job_id, job_info in PREDEFINED_JOB_INFO.items():
             try:
-                # 检查是否需要分解为多个子任务
-                if job_config.is_single_page_task:
-                    # 单页面任务，直接添加
-                    await self.add_job(job_config)
-                    self.logger.info(f"已加载预定义任务: {job_id}")
-                else:
-                    # 多页面任务，使用批量任务功能分解
-                    result = await self.add_batch_jobs(
-                        page_ids=job_config.page_ids,
-                        force=job_config.force,
-                        batch_id=f"predefined_{job_id}",
-                    )
-
-                    if result["success"]:
-                        self.logger.info(
-                            f"已加载预定义批量任务: {job_id}, 包含 {result['successful_tasks']} 个子任务"
-                        )
-                    else:
-                        self.logger.error(
-                            f"加载预定义批量任务失败 {job_id}: {result['message']}"
-                        )
-
+                if job_info.handler == JobHandlerType.REPORT:
+                    return
+                await self.add_job(job_info)
             except Exception as e:
                 self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
 
-    async def add_job(self, job_config: JobConfigModel) -> bool:
-        """统一的任务添加方法"""
-        if self.scheduler is None:
-            raise RuntimeError("调度器未启动")
+    async def add_job(self, job_info: JobInfo) -> JobInfo:
+        """
+        根据调度任务信息来添加一个调度任务
+        如果是爬虫类任务，并且page id不是单个，就需要调用add_batch_jobs来处理
+        需要监视器跟踪任务的情况然后补充job_info,完成任务后需要将结果记录到job_info的result中
 
-        try:
-            # 创建触发器
-            trigger = job_config.build_trigger()
-
-            # 添加任务到调度器（统一使用_execute_job函数）
-            self.scheduler.add_job(
-                func=self._execute_job,
-                trigger=trigger,
-                id=job_config.job_id,
-                name=job_config.job_id,
-                kwargs={"job_config": job_config},
-            )
-
-            # 如果任务被禁用，则暂停
-            if not job_config.enabled:
-                self.scheduler.pause_job(job_config.job_id)
-
-            self.logger.info(f"成功添加任务: {job_config.job_id}")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"添加任务失败 {job_config.job_id}: {e}")
-            return False
+        :param job_info:
+        :return: 返回创建后的调度任务信息
+        """
+        page_ids = self.get_full_page_ids(job_info.page_ids)
+        job_info.page_ids = page_ids
+        if len(job_info.page_ids) > 1:
+            return await self.add_batch_jobs(job_info)
+        pass
 
     async def add_batch_jobs(
-        self, page_ids: list[str], force: bool = False, batch_id: str | None = None
-    ) -> dict[str, Any]:
+        self, job_info: JobInfo) -> JobInfo:
         """
-        添加批量任务，为每个页面创建独立的任务
+        添加多个调度任务，将job_info中的page_ids中的每个页面都生成一个爬虫调度任务，然后添加到调度器中
+        需要监视器跟踪任务的情况然后补充job_info,JobInfo.status中需要记录完成了多少个任务，任务执行情况
+        完成任务后需要将结果记录到job_info的result中
 
-        Args:
-            page_ids: 页面ID列表
-            force: 是否强制执行
-            batch_id: 批量任务ID，如果不提供则自动生成
-
-        Returns:
-            Dict[str, Any]: 包含批量任务信息的字典
+        :param job_info:
+        :return:
         """
-        from app.crawl.base import CrawlConfig
 
-        if not batch_id:
-            batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-
-        # 使用CrawlConfig来处理特殊字符
-        config = CrawlConfig()
-        resolved_page_ids = config.determine_page_ids(page_ids)
-
-        if not resolved_page_ids:
-            return {
-                "success": False,
-                "message": "没有找到有效的页面ID",
-                "batch_id": batch_id,
-                "task_ids": [],
-            }
-
-        # 为每个页面创建独立的任务
-        task_ids = []
-        successful_tasks = 0
-
-        for page_id in resolved_page_ids:
-            job_config = JobConfigModel(
-                job_id=f"crawl_{page_id}_{batch_id}",
-                trigger_type=TriggerType.DATE,
-                handler_class=JobHandlerType.CRAWL,
-                page_ids=[page_id],
-                batch_id=batch_id,
-                force=force,
-                description=f"批量任务 {batch_id} 中的页面: {page_id}",
-            )
-
-            success = await self.add_job(job_config)
-            task_ids.append(job_config.job_id)
-
-            if success:
-                successful_tasks += 1
-            else:
-                self.logger.error(f"添加任务失败: {job_config.job_id}")
-
-        return {
-            "success": successful_tasks > 0,
-            "message": f"批量任务 {batch_id}: 成功添加 {successful_tasks}/{len(resolved_page_ids)} 个任务",
-            "batch_id": batch_id,
-            "task_ids": task_ids,
-            "total_pages": len(resolved_page_ids),
-            "successful_tasks": successful_tasks,
-            "failed_tasks": len(resolved_page_ids) - successful_tasks,
-        }
-
-    async def _execute_job(self, job_config: JobConfigModel) -> None:
-        """统一的任务执行函数"""
-        # 获取处理器类
-        handler_class = self.job_handlers.get(job_config.handler_class)
-        if not handler_class:
-            raise ValueError(f"未找到处理器: {job_config.handler_class}")
-
-        # 创建处理器实例
-        handler = handler_class(scheduler=self)
-
-        # 创建任务上下文
-        context = JobContextModel(
-            job_id=job_config.job_id,
-            job_name=job_config.job_id,
-            trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-        )
-
-        # 获取任务数据
-        page_ids = job_config.page_ids or []
-
-        # 执行任务
-        result = await handler.execute_with_retry(page_ids=page_ids, context=context)
-
-        # 记录结果
-        self.logger.info(f"任务 {job_config.job_id} 执行完成: {result.message}")
-
-    def get_jobs(self) -> list[Job]:
-        """获取所有任务"""
-        return self.scheduler.get_jobs() if self.scheduler else []
-
-    def get_job(self, job_id: str) -> Job | None:
-        """获取指定任务"""
-        return self.scheduler.get_job(job_id) if self.scheduler else None
-
-    def is_running(self) -> bool:
-        """检查调度器是否运行中"""
-        return self.scheduler is not None and self.scheduler.running
-
-    def get_status(self) -> dict[str, Any]:
-        """获取调度器状态"""
-        if self.scheduler is None:
-            return {
-                "status": "stopped",
-                "job_count": 0,
-                "running_jobs": 0,
-                "paused_jobs": 0,
-                "uptime": 0.0,
-            }
-
-        jobs = self.get_jobs()
-        running_jobs = sum(1 for job in jobs if job.next_run_time is not None)
-        paused_jobs = len(jobs) - running_jobs
-        uptime = (
-            (datetime.now() - self.start_time).total_seconds()
-            if self.start_time
-            else 0.0
-        )
-
-        return {
-            "status": "running" if self.scheduler.running else "paused",
-            "job_count": len(jobs),
-            "running_jobs": running_jobs,
-            "paused_jobs": paused_jobs,
-            "uptime": uptime,
-        }
-
-    def get_batch_jobs(self, batch_id: str) -> list[Job]:
-        """获取批量任务中的所有任务"""
-        return [job for job in self.get_jobs() if batch_id in job.id]
-
-    def get_batch_status(self, batch_id: str) -> dict[str, Any]:
-        """获取批量任务的整体状态"""
-        batch_jobs = self.get_batch_jobs(batch_id)
-
-        if not batch_jobs:
-            return {
-                "batch_id": batch_id,
-                "status": "not_found",
-                "total_jobs": 0,
-                "running_jobs": 0,
-                "completed_jobs": 0,
-            }
-
-        running_jobs = sum(1 for job in batch_jobs if job.next_run_time is not None)
-        completed_jobs = len(batch_jobs) - running_jobs
-
-        # 简化状态判断
-        if running_jobs > 0:
-            batch_status = "running"
-        elif completed_jobs == len(batch_jobs):
-            batch_status = "completed"
-        else:
-            batch_status = "partial"
-
-        return {
-            "batch_id": batch_id,
-            "status": batch_status,
-            "total_jobs": len(batch_jobs),
-            "running_jobs": running_jobs,
-            "completed_jobs": completed_jobs,
-        }
+    @staticmethod
+    def get_full_page_ids(page_ids) -> List[str]:
+        from app.crawl_config import CrawlConfig
+        crawl_config = CrawlConfig()
+        return crawl_config.determine_page_ids(page_ids)
 
 
 # 全局调度器实例

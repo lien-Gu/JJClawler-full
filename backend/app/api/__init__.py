@@ -5,7 +5,7 @@ API模块 - 定义HTTP接口端点
 from fastapi import APIRouter
 
 from .books import router as books_router
-from .crawl import router as crawl_router
+from .schedule import router as crawl_router
 from .rankings import router as rankings_router
 
 # 创建主API路由器

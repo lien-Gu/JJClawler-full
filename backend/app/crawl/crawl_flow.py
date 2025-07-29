@@ -12,7 +12,7 @@ from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
 from app.logger import get_logger
-from .base import CrawlConfig
+from app.crawl_config import CrawlConfig
 from .http import HttpClient
 from .parser import NovelPageParser, PageParser, RankingParser
 from ..utils import generate_batch_id
