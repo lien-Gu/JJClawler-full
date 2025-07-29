@@ -4,7 +4,7 @@
 
 from datetime import date as Date
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,9 +16,9 @@ class RankingBasic(BaseSchema):
     """榜单基础信息响应"""
     id: int = Field(..., description="榜单的内部唯一ID")
     channel_name: str = Field(..., description="榜单名称")
-    sub_channel_name: str = Field(..., description="子榜单名称")
+    sub_channel_name: Optional[str] = Field(None, description="子榜单名称")
     page_id: str = Field(..., description="页面ID")
-    rank_group_type: str = Field(..., description="榜单分组类型")
+    rank_group_type: Optional[str] = Field(None, description="榜单分组类型")
 
 
 class RankingBook(BaseSchema):

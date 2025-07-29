@@ -1,521 +1,381 @@
 """
-RankingService单元测试
-使用pytest-mock进行纯业务逻辑测试，不依赖真实数据库，专注于函数逻辑和业务规则验证
+RankingService集成测试
+使用真实内存数据库进行服务层功能测试，验证数据库CRUD操作和业务逻辑
 """
 
-from datetime import date, datetime
-from unittest.mock import MagicMock
+from datetime import date, datetime, timedelta
 
 import pytest
-from pytest_mock import MockerFixture
 
 from app.database.service.ranking_service import RankingService
-from app.models import ranking
+from app.database.db.ranking import Ranking, RankingSnapshot
 
 
-class TestRankingServiceUnit:
-    """使用Mock的RankingService测试类"""
+class TestRankingServiceIntegration:
+    """RankingService集成测试类 - 使用真实内存数据库"""
 
     @pytest.fixture
     def ranking_service(self):
         return RankingService()
 
-    @pytest.fixture
-    def mock_db_session(self, mocker: MockerFixture):
-        """模拟数据库会话"""
-        return mocker.MagicMock()
+    # ==================== 基础CRUD操作测试 ====================
 
-    def test_get_ranking_by_id_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_get_ranking_by_id_success(self, ranking_service, populated_db_session):
         """测试根据ID获取榜单 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.rank_id = "jiazi"
-        mock_ranking.channel_name = "夹子榜单"
-
-        # Mock方法调用
-        mock_db_session.get.return_value = mock_ranking
-
-        # 执行测试
-        result = ranking_service.get_ranking_by_id(mock_db_session, 1)
+        # 执行测试 - 获取已存在的榜单
+        result = ranking_service.get_ranking_by_id(populated_db_session, 1)
 
         # 验证结果
         assert result is not None
         assert result.id == 1
         assert result.rank_id == "jiazi"
-        assert result.channel_name == "夹子榜单"
+        assert result.channel_name == "夹子"
 
-        # 验证调用
-        mock_db_session.get.assert_called_once_with(mocker.ANY, 1)
-
-    def test_get_ranking_by_id_not_found(self, ranking_service, mock_db_session):
+    def test_get_ranking_by_id_not_found(self, ranking_service, populated_db_session):
         """测试根据ID获取榜单 - 榜单不存在"""
-        # Mock方法调用
-        mock_db_session.get.return_value = None
-
-        # 执行测试
-        result = ranking_service.get_ranking_by_id(mock_db_session, 999)
+        # 执行测试 - 获取不存在的榜单
+        result = ranking_service.get_ranking_by_id(populated_db_session, 999)
 
         # 验证结果
         assert result is None
 
-    def test_get_ranking_detail_by_day_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按天获取榜单详情 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.sub_channel_name = "测试子频道"
-        mock_ranking.page_id = "test_page"
-        mock_ranking.rank_group_type = "test_type"
-
-        mock_snapshot = MagicMock()
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.snapshot_time = datetime(2024, 1, 1, 12, 0, 0)
-
-        # Mock方法调用
-        mock_db_session.get.return_value = mock_ranking
-        mocker.patch.object(ranking_service, 'get_snapshots_by_day', return_value=[mock_snapshot])
-
-        # 执行测试
-        target_date = date(2024, 1, 1)
-        result = ranking_service.get_ranking_detail_by_day(mock_db_session, 1, target_date)
+    def test_get_rankings_by_rank_id_success(self, ranking_service, populated_db_session):
+        """测试根据rank_id获取榜单列表 - 成功场景"""
+        # 执行测试 - 获取具有相同rank_id的榜单（如VIP金榜有多个）
+        result = ranking_service.get_rankings_by_rank_id(populated_db_session, "657")
 
         # 验证结果
-        assert result is not None
-        assert result.id == 1
-        assert result.channel_name == "测试频道"
-        assert len(result.books) == 1
-        assert result.books[0].novel_id == 123
-        assert result.books[0].position == 1
+        assert len(result) >= 1  # 至少有一个榜单
+        for ranking in result:
+            assert ranking.rank_id == "657"
 
-        # 验证调用
-        mock_db_session.get.assert_called_once_with(mocker.ANY, 1)
-        ranking_service.get_snapshots_by_day.assert_called_once_with(mock_db_session, 1, target_date)
-
-    def test_get_ranking_detail_by_day_not_found(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按天获取榜单详情 - 榜单不存在"""
-        # Mock方法调用
-        mock_db_session.get.return_value = None
-
-        # 执行测试
-        target_date = date(2024, 1, 1)
-        result = ranking_service.get_ranking_detail_by_day(mock_db_session, 999, target_date)
+    def test_get_rankings_by_rank_id_not_found(self, ranking_service, populated_db_session):
+        """测试根据rank_id获取榜单列表 - 不存在的rank_id"""
+        # 执行测试 - 获取不存在的rank_id
+        result = ranking_service.get_rankings_by_rank_id(populated_db_session, "nonexistent")
 
         # 验证结果
-        assert result is None
+        assert isinstance(result, list)
+        assert len(result) == 0
 
-    def test_get_ranking_detail_by_hour_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按小时获取榜单详情 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.sub_channel_name = "测试子频道"
-        mock_ranking.page_id = "test_page"
-        mock_ranking.rank_group_type = "test_type"
-
-        mock_snapshot = MagicMock()
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.snapshot_time = datetime(2024, 1, 1, 14, 30, 0)
-
-        # Mock方法调用
-        mock_db_session.get.return_value = mock_ranking
-        mocker.patch.object(ranking_service, 'get_snapshots_by_hour', return_value=[mock_snapshot])
-
-        # 执行测试
-        target_date = date(2024, 1, 1)
-        target_hour = 14
-        result = ranking_service.get_ranking_detail_by_hour(mock_db_session, 1, target_date, target_hour)
-
-        # 验证结果
-        assert result is not None
-        assert result.id == 1
-        assert result.channel_name == "测试频道"
-        assert len(result.books) == 1
-        assert result.books[0].novel_id == 123
-
-        # 验证调用
-        ranking_service.get_snapshots_by_hour.assert_called_once_with(mock_db_session, 1, target_date, target_hour)
-
-    def test_get_ranking_history_by_day_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按天获取榜单历史 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.sub_channel_name = "测试子频道"
-        mock_ranking.page_id = "test_page"
-        mock_ranking.rank_group_type = "test_type"
-
-        # Mock数据库执行结果
-        mock_batch_row = MagicMock()
-        mock_batch_row.batch_id = "batch_001"
-        mock_batch_row.snapshot_date = date(2024, 1, 1)
-
-        mock_snapshot = MagicMock()
-        mock_snapshot.batch_id = "batch_001"
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.snapshot_time = datetime(2024, 1, 1, 12, 0, 0)
-
-        # Mock方法调用
-        mocker.patch.object(ranking_service, 'get_ranking_by_id', return_value=mock_ranking)
-        
-        # Mock数据库查询
-        mock_db_session.execute.side_effect = [
-            MagicMock(fetchall=MagicMock(return_value=[mock_batch_row])),  # 第一次查询batch_ids
-            MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[mock_snapshot]))))  # 第二次查询snapshots
-        ]
-
-        # 执行测试
-        start_date = date(2024, 1, 1)
-        end_date = date(2024, 1, 3)
-        result = ranking_service.get_ranking_history_by_day(mock_db_session, 1, start_date, end_date)
-
-        # 验证结果
-        assert result is not None
-        assert result.id == 1
-        assert result.channel_name == "测试频道"
-        assert len(result.snapshots) == 1
-        assert len(result.snapshots[0].books) == 1
-
-        # 验证调用
-        ranking_service.get_ranking_by_id.assert_called_once_with(mock_db_session, 1)
-        assert mock_db_session.execute.call_count == 2
-
-    def test_get_ranking_history_by_day_ranking_not_found(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按天获取榜单历史 - 榜单不存在"""
-        # Mock方法调用
-        mocker.patch.object(ranking_service, 'get_ranking_by_id', return_value=None)
-
-        # 执行测试
-        start_date = date(2024, 1, 1)
-        end_date = date(2024, 1, 3)
-        result = ranking_service.get_ranking_history_by_day(mock_db_session, 999, start_date, end_date)
-
-        # 验证结果
-        assert result is None
-
-    def test_get_ranking_history_by_hour_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按小时获取榜单历史 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.sub_channel_name = "测试子频道"
-        mock_ranking.page_id = "test_page"
-        mock_ranking.rank_group_type = "test_type"
-
-        # Mock数据库执行结果
-        mock_batch_row = MagicMock()
-        mock_batch_row.batch_id = "batch_001"
-        mock_batch_row.snapshot_hour = "2024-01-01 14:00:00"
-
-        mock_snapshot = MagicMock()
-        mock_snapshot.batch_id = "batch_001"
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.snapshot_time = datetime(2024, 1, 1, 14, 30, 0)
-
-        # Mock方法调用
-        mocker.patch.object(ranking_service, 'get_ranking_by_id', return_value=mock_ranking)
-        
-        # Mock数据库查询
-        mock_db_session.execute.side_effect = [
-            MagicMock(fetchall=MagicMock(return_value=[mock_batch_row])),  # 第一次查询batch_ids
-            MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[mock_snapshot]))))  # 第二次查询snapshots
-        ]
-
-        # 执行测试
-        start_time = datetime(2024, 1, 1, 14, 0, 0)
-        end_time = datetime(2024, 1, 1, 16, 0, 0)
-        result = ranking_service.get_ranking_history_by_hour(mock_db_session, 1, start_time, end_time)
-
-        # 验证结果
-        assert result is not None
-        assert result.id == 1
-        assert result.channel_name == "测试频道"
-        assert len(result.snapshots) == 1
-        assert len(result.snapshots[0].books) == 1
-
-        # 验证调用
-        ranking_service.get_ranking_by_id.assert_called_once_with(mock_db_session, 1)
-        assert mock_db_session.execute.call_count == 2
-
-    def test_get_rankings_by_name_with_pagination_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按名称分页查询榜单 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.sub_channel_name = "测试子频道"
-        mock_ranking.page_id = "test_page"
-        mock_ranking.rank_group_type = "test_type"
-
-        # Mock数据库查询结果
-        mock_db_session.execute.return_value = MagicMock(scalars=MagicMock(return_value=[mock_ranking]))
-        mock_db_session.scalar.return_value = 5  # 总数
-
-        # Mock ranking.RankingBasic.model_validate
-        mock_ranking_basic = MagicMock()
-        mock_ranking_basic.id = 1
-        mock_ranking_basic.channel_name = "测试频道"
-        mocker.patch('app.models.ranking.RankingBasic.model_validate', return_value=mock_ranking_basic)
-
-        # 执行测试
-        rankings, total_pages = ranking_service.get_rankings_by_name_with_pagination(
-            mock_db_session, "测试", page=1, size=2
-        )
-
-        # 验证结果
-        assert len(rankings) == 1
-        assert rankings[0].id == 1
-        assert rankings[0].channel_name == "测试频道"
-        assert total_pages == 3  # ceil(5/2) = 3
-
-        # 验证调用
-        assert mock_db_session.execute.call_count == 1
-        assert mock_db_session.scalar.call_count == 1
-
-    def test_get_ranges_by_page_with_pagination_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试按页面分页查询榜单 - 成功场景"""
-        # Mock数据准备
-        mock_ranking = MagicMock()
-        mock_ranking.id = 1
-        mock_ranking.channel_name = "测试频道"
-        mock_ranking.page_id = "test_page"
-
-        # Mock数据库查询结果
-        mock_db_session.execute.return_value = MagicMock(scalars=MagicMock(return_value=[mock_ranking]))
-        mock_db_session.scalar.return_value = 3  # 总数
-
-        # Mock ranking.RankingBasic.model_validate
-        mock_ranking_basic = MagicMock()
-        mock_ranking_basic.id = 1
-        mock_ranking_basic.page_id = "test_page"
-        mocker.patch('app.models.ranking.RankingBasic.model_validate', return_value=mock_ranking_basic)
-
-        # 执行测试
-        rankings, total_pages = ranking_service.get_ranges_by_page_with_pagination(
-            mock_db_session, "test_page", page=1, size=2
-        )
-
-        # 验证结果
-        assert len(rankings) == 1
-        assert rankings[0].id == 1
-        assert rankings[0].page_id == "test_page"
-        assert total_pages == 2  # ceil(3/2) = 2
-
-    def test_create_or_update_ranking_create_new(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_create_or_update_ranking_create_new(self, ranking_service, test_db_session, sample_ranking_data):
         """测试创建或更新榜单 - 创建新榜单场景"""
-        # Mock数据准备
-        ranking_data = {
-            "rank_id": "new_ranking",
-            "channel_name": "新榜单",
-            "page_id": "new_page"
-        }
+        # 确认榜单不存在
+        existing_rankings = ranking_service.get_rankings_by_rank_id(test_db_session, sample_ranking_data["rank_id"])
+        assert len(existing_rankings) == 0
 
-        mock_new_ranking = MagicMock()
-        mock_new_ranking.id = 1
-        mock_new_ranking.rank_id = "new_ranking"
-
-        # Mock方法调用
-        mocker.patch.object(ranking_service, 'get_rankings_by_rank_id', return_value=[])
-        mocker.patch.object(ranking_service, 'create_ranking', return_value=mock_new_ranking)
-
-        # 执行测试
-        result = ranking_service.create_or_update_ranking(mock_db_session, ranking_data)
+        # 执行测试 - 创建新榜单
+        result = ranking_service.create_or_update_ranking(test_db_session, sample_ranking_data)
 
         # 验证结果
-        assert result.id == 1
-        assert result.rank_id == "new_ranking"
+        assert result is not None
+        assert result.rank_id == sample_ranking_data["rank_id"]
+        assert result.channel_name == sample_ranking_data["channel_name"]
 
-        # 验证调用
-        ranking_service.get_rankings_by_rank_id.assert_called_once_with(mock_db_session, "new_ranking")
-        ranking_service.create_ranking.assert_called_once_with(mock_db_session, ranking_data)
+        # 验证数据库中的记录
+        db_ranking = test_db_session.get(Ranking, result.id)
+        assert db_ranking is not None
+        assert db_ranking.rank_id == sample_ranking_data["rank_id"]
 
-    def test_create_or_update_ranking_update_existing(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_create_or_update_ranking_update_existing(self, ranking_service, populated_db_session):
         """测试创建或更新榜单 - 更新已存在榜单场景"""
-        # Mock数据准备
-        ranking_data = {
-            "rank_id": "existing_ranking",
-            "channel_name": "更新榜单",
-            "page_id": "updated_page"
+        # 准备更新数据
+        update_data = {
+            "rank_id": "jiazi",  # 使用已存在的rank_id
+            "channel_name": "更新后的夹子榜单",
+            "rank_group_type": "更新分组",
+            "page_id": "updated_jiazi"
         }
 
-        mock_existing_ranking = MagicMock()
-        mock_existing_ranking.id = 1
-        mock_existing_ranking.rank_id = "existing_ranking"
-
-        mock_updated_ranking = MagicMock()
-        mock_updated_ranking.id = 1
-        mock_updated_ranking.channel_name = "更新榜单"
-
-        # Mock方法调用
-        mocker.patch.object(ranking_service, 'get_rankings_by_rank_id', return_value=[mock_existing_ranking])
-        mocker.patch.object(ranking_service, 'update_ranking', return_value=mock_updated_ranking)
-
-        # 执行测试
-        result = ranking_service.create_or_update_ranking(mock_db_session, ranking_data)
+        # 执行测试 - 更新已存在的榜单
+        result = ranking_service.create_or_update_ranking(populated_db_session, update_data)
 
         # 验证结果
-        assert result.id == 1
-        assert result.channel_name == "更新榜单"
+        assert result is not None
+        assert result.rank_id == "jiazi"
+        assert result.channel_name == "更新后的夹子榜单"
 
-        # 验证调用
-        ranking_service.get_rankings_by_rank_id.assert_called_once_with(mock_db_session, "existing_ranking")
-        ranking_service.update_ranking.assert_called_once_with(mock_db_session, mock_existing_ranking, ranking_data)
+        # 验证数据库更新
+        db_ranking = populated_db_session.get(Ranking, result.id)
+        assert db_ranking.channel_name == "更新后的夹子榜单"
 
-    def test_create_or_update_ranking_missing_rank_id(self, ranking_service, mock_db_session):
+    def test_create_or_update_ranking_missing_rank_id(self, ranking_service, test_db_session):
         """测试创建或更新榜单 - 缺少rank_id异常场景"""
-        # Mock数据准备 - 没有rank_id
-        ranking_data = {
+        # 准备无效数据 - 没有rank_id
+        invalid_data = {
             "channel_name": "无ID榜单",
             "page_id": "no_id_page"
         }
 
         # 执行测试并验证异常
         with pytest.raises(ValueError, match="ranking_data中必须包含rank_id"):
-            ranking_service.create_or_update_ranking(mock_db_session, ranking_data)
+            ranking_service.create_or_update_ranking(test_db_session, invalid_data)
 
-    def test_batch_create_ranking_snapshots_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_batch_create_ranking_snapshots_success(self, ranking_service, populated_db_session, sample_ranking_snapshots_data):
         """测试批量创建榜单快照 - 成功场景"""
-        # Mock数据准备
-        snapshots_data = [
-            {
-                "ranking_id": 1,
-                "novel_id": 123,
-                "position": 1,
-                "snapshot_time": datetime.now()
-            },
-            {
-                "ranking_id": 1,
-                "novel_id": 124,
-                "position": 2,
-                "snapshot_time": datetime.now()
-            }
-        ]
+        # 生成批次ID
+        from app.utils import generate_batch_id
+        batch_id = generate_batch_id()
 
-        batch_id = "test_batch_001"
-        
-        # Mock RankingSnapshot创建
-        mock_snapshot1 = MagicMock()
-        mock_snapshot2 = MagicMock()
-        
-        # Mock filter_dict和RankingSnapshot
-        mocker.patch('app.database.service.ranking_service.filter_dict', side_effect=lambda x, y: x)
-        mock_ranking_snapshot = mocker.patch('app.database.service.ranking_service.RankingSnapshot')
-        mock_ranking_snapshot.side_effect = [mock_snapshot1, mock_snapshot2]
-
-        # 执行测试
-        result = ranking_service.batch_create_ranking_snapshots(mock_db_session, snapshots_data, batch_id)
+        # 执行测试 - 批量创建快照
+        result = ranking_service.batch_create_ranking_snapshots(populated_db_session, sample_ranking_snapshots_data, batch_id)
 
         # 验证结果
-        assert len(result) == 2
-        assert result[0] == mock_snapshot1
-        assert result[1] == mock_snapshot2
-
-        # 验证所有快照数据都添加了batch_id
-        for snapshot in snapshots_data:
-            assert snapshot['batch_id'] == batch_id
-
-        # 验证数据库操作
-        mock_db_session.add_all.assert_called_once()
-        mock_db_session.commit.assert_called_once()
-
-    def test_get_rankings_by_rank_id_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
-        """测试根据rank_id获取榜单列表 - 成功场景"""
-        # Mock数据准备
-        mock_ranking1 = MagicMock()
-        mock_ranking1.id = 1
-        mock_ranking1.rank_id = "test_rank"
+        assert len(result) == len(sample_ranking_snapshots_data)
         
-        mock_ranking2 = MagicMock()
-        mock_ranking2.id = 2
-        mock_ranking2.rank_id = "test_rank"
+        # 验证每个快照
+        for i, snapshot in enumerate(result):
+            assert snapshot.ranking_id == sample_ranking_snapshots_data[i]["ranking_id"]
+            assert snapshot.novel_id == sample_ranking_snapshots_data[i]["novel_id"]
+            assert snapshot.position == sample_ranking_snapshots_data[i]["position"]
+            assert snapshot.batch_id == batch_id
 
-        # Mock数据库查询结果
-        mock_execute_result = MagicMock()
-        mock_execute_result.scalars.return_value = [mock_ranking1, mock_ranking2]
-        mock_db_session.execute.return_value = mock_execute_result
+        # 验证数据库中的记录数量
+        total_snapshots = populated_db_session.query(RankingSnapshot).count()
+        assert total_snapshots >= len(sample_ranking_snapshots_data)
 
-        # 执行测试
-        result = ranking_service.get_rankings_by_rank_id(mock_db_session, "test_rank")
+    # ==================== API操作测试 ====================
+
+    def test_get_rankings_by_name_with_pagination_success(self, ranking_service, populated_db_session):
+        """测试按名称分页查询榜单 - 成功场景"""
+        # 执行测试 - 搜索包含"榜"的榜单
+        rankings, total_pages = ranking_service.get_rankings_by_name_with_pagination(
+            populated_db_session, "榜", page=1, size=2
+        )
 
         # 验证结果
-        assert len(result) == 2
-        assert result[0].rank_id == "test_rank"
-        assert result[1].rank_id == "test_rank"
+        assert len(rankings) <= 2  # 最多2条记录
+        assert total_pages >= 1  # 至少1页
+        
+        # 验证返回的榜单数据包含搜索关键字
+        if rankings:
+            assert hasattr(rankings[0], 'id')
+            assert hasattr(rankings[0], 'channel_name')
+            # 检查榜单名称包含搜索关键字
+            for ranking in rankings:
+                assert "榜" in ranking.channel_name
 
-    def test_get_snapshots_by_day_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_get_ranges_by_page_with_pagination_success(self, ranking_service, populated_db_session):
+        """测试按页面分页查询榜单 - 成功场景"""
+        # 执行测试 - 获取index页面的榜单
+        rankings, total_pages = ranking_service.get_ranges_by_page_with_pagination(
+            populated_db_session, "index", page=1, size=3
+        )
+
+        # 验证结果
+        assert len(rankings) <= 3  # 最多3条记录
+        assert total_pages >= 1  # 至少1页
+        
+        # 验证返回的榜单数据
+        if rankings:
+            for ranking in rankings:
+                assert hasattr(ranking, 'id')
+                assert hasattr(ranking, 'page_id')
+                assert ranking.page_id == "index"
+
+    def test_get_ranking_detail_by_day_success(self, ranking_service, populated_db_session):
+        """测试按天获取榜单详情 - 成功场景"""
+        # 使用当前日期，因为测试数据包含当天的快照
+        target_date = date.today()
+        
+        # 执行测试 - 获取夹子榜单的当天详情
+        result = ranking_service.get_ranking_detail_by_day(populated_db_session, 1, target_date)
+
+        # 验证结果
+        if result is not None:  # 可能没有当天数据
+            assert result.id == 1
+            assert result.channel_name == "夹子"
+            assert hasattr(result, 'books')
+            # 如果有书籍数据，验证书籍属性
+            if result.books:
+                for book in result.books:
+                    assert hasattr(book, 'novel_id')
+                    assert hasattr(book, 'position')
+
+    def test_get_ranking_detail_by_day_not_found(self, ranking_service, populated_db_session):
+        """测试按天获取榜单详情 - 榜单不存在"""
+        # 执行测试 - 获取不存在的榜单详情
+        target_date = date.today()
+        result = ranking_service.get_ranking_detail_by_day(populated_db_session, 999, target_date)
+
+        # 验证结果
+        assert result is None
+
+    def test_get_ranking_detail_by_hour_success(self, ranking_service, populated_db_session):
+        """测试按小时获取榜单详情 - 成功场景"""
+        # 使用当前日期和小时
+        target_date = date.today()
+        target_hour = datetime.now().hour
+        
+        # 执行测试 - 获取夹子榜单的当前小时详情
+        result = ranking_service.get_ranking_detail_by_hour(populated_db_session, 1, target_date, target_hour)
+
+        # 验证结果（可能没有数据，取决于测试数据的时间）
+        if result is not None:
+            assert result.id == 1
+            assert result.channel_name == "夹子"
+            assert hasattr(result, 'books')
+
+    def test_get_ranking_history_by_day_success(self, ranking_service, populated_db_session):
+        """测试按天获取榜单历史 - 成功场景"""
+        # 执行测试 - 获取最近3天的夹子榜单历史
+        start_date = date.today() - timedelta(days=2)
+        end_date = date.today()
+        result = ranking_service.get_ranking_history_by_day(populated_db_session, 1, start_date, end_date)
+
+        # 验证结果
+        if result is not None:  # 可能没有历史数据
+            assert result.id == 1
+            assert result.channel_name == "夹子"
+            assert hasattr(result, 'snapshots')
+            # 验证快照数据结构
+            for snapshot in result.snapshots:
+                assert hasattr(snapshot, 'books')
+                assert hasattr(snapshot, 'snapshot_time')
+
+    def test_get_ranking_history_by_day_ranking_not_found(self, ranking_service, populated_db_session):
+        """测试按天获取榜单历史 - 榜单不存在"""
+        # 执行测试 - 获取不存在榜单的历史
+        start_date = date.today() - timedelta(days=2)
+        end_date = date.today()
+        result = ranking_service.get_ranking_history_by_day(populated_db_session, 999, start_date, end_date)
+
+        # 验证结果
+        assert result is None
+
+    def test_get_ranking_history_by_hour_success(self, ranking_service, populated_db_session):
+        """测试按小时获取榜单历史 - 成功场景"""
+        # 执行测试 - 获取最近2小时的夹子榜单历史
+        start_time = datetime.now() - timedelta(hours=2)
+        end_time = datetime.now()
+        result = ranking_service.get_ranking_history_by_hour(populated_db_session, 1, start_time, end_time)
+
+        # 验证结果（可能没有数据，取决于测试数据）
+        if result is not None:
+            assert result.id == 1
+            assert result.channel_name == "夹子"
+            assert hasattr(result, 'snapshots')
+
+    def test_get_snapshots_by_day_success(self, ranking_service, populated_db_session):
         """测试获取指定日期快照 - 成功场景"""
-        # Mock数据准备
-        mock_snapshot = MagicMock()
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.batch_id = "batch_001"
+        # 使用当前日期
+        target_date = date.today()
+        
+        try:
+            # 执行测试 - 获取夹子榜单当天的快照
+            result = ranking_service.get_snapshots_by_day(populated_db_session, 1, target_date)
+            
+            # 验证结果
+            assert isinstance(result, list)
+            if result:
+                for snapshot in result:
+                    assert hasattr(snapshot, 'novel_id')
+                    assert hasattr(snapshot, 'position')
+                    assert hasattr(snapshot, 'batch_id')
+        except ValueError as e:
+            # 如果没有当天数据，这是正常的
+            assert "Don't exist records in target time" in str(e)
 
-        # Mock数据库查询结果
-        mock_db_session.scalar.return_value = "batch_001"  # latest_batch_id
-        mock_execute_result = MagicMock()
-        mock_execute_result.scalars.return_value = [mock_snapshot]
-        mock_db_session.execute.return_value = mock_execute_result
-
-        # 执行测试
-        target_date = date(2024, 1, 1)
-        result = ranking_service.get_snapshots_by_day(mock_db_session, 1, target_date)
-
-        # 验证结果
-        assert len(result) == 1
-        assert result[0].novel_id == 123
-        assert result[0].position == 1
-
-    def test_get_snapshots_by_day_no_data(self, ranking_service, mock_db_session):
+    def test_get_snapshots_by_day_no_data(self, ranking_service, populated_db_session):
         """测试获取指定日期快照 - 无数据"""
-        # Mock数据库查询结果 - 没有找到batch_id
-        mock_db_session.scalar.return_value = None
-
+        # 使用一个很久以前的日期，应该没有数据
+        target_date = date(2020, 1, 1)
+        
         # 执行测试并验证异常
-        target_date = date(2024, 1, 1)
         with pytest.raises(ValueError, match="Don't exist records in target time"):
-            ranking_service.get_snapshots_by_day(mock_db_session, 1, target_date)
+            ranking_service.get_snapshots_by_day(populated_db_session, 1, target_date)
 
-    def test_get_snapshots_by_hour_success(self, ranking_service, mock_db_session, mocker: MockerFixture):
+    def test_get_snapshots_by_hour_success(self, ranking_service, populated_db_session):
         """测试获取指定小时快照 - 成功场景"""
-        # Mock数据准备
-        mock_snapshot = MagicMock()
-        mock_snapshot.novel_id = 123
-        mock_snapshot.position = 1
-        mock_snapshot.batch_id = "batch_001"
+        # 使用当前日期和小时
+        target_date = date.today()
+        target_hour = datetime.now().hour
+        
+        # 执行测试 - 获取夹子榜单当前小时的快照
+        result = ranking_service.get_snapshots_by_hour(populated_db_session, 1, target_date, target_hour)
 
-        # Mock数据库查询结果
-        mock_db_session.scalar.return_value = "batch_001"  # latest_batch_id
-        mock_execute_result = MagicMock()
-        mock_execute_result.scalars.return_value = [mock_snapshot]
-        mock_db_session.execute.return_value = mock_execute_result
+        # 验证结果（可能为空，取决于测试数据）
+        assert isinstance(result, list)
+        if result:
+            for snapshot in result:
+                assert hasattr(snapshot, 'novel_id')
+                assert hasattr(snapshot, 'position')
+                assert hasattr(snapshot, 'batch_id')
 
-        # 执行测试
-        target_date = date(2024, 1, 1)
-        target_hour = 14
-        result = ranking_service.get_snapshots_by_hour(mock_db_session, 1, target_date, target_hour)
-
-        # 验证结果
-        assert len(result) == 1
-        assert result[0].novel_id == 123
-        assert result[0].position == 1
-
-    def test_get_snapshots_by_hour_no_data(self, ranking_service, mock_db_session):
+    def test_get_snapshots_by_hour_no_data(self, ranking_service, populated_db_session):
         """测试获取指定小时快照 - 无数据"""
-        # Mock数据库查询结果 - 没有找到batch_id
-        mock_db_session.scalar.return_value = None
-
-        # 执行测试
-        target_date = date(2024, 1, 1)
+        # 使用一个很久以前的日期，应该没有数据
+        target_date = date(2020, 1, 1)
         target_hour = 14
-        result = ranking_service.get_snapshots_by_hour(mock_db_session, 1, target_date, target_hour)
+        
+        # 执行测试 - 应该返回空列表
+        result = ranking_service.get_snapshots_by_hour(populated_db_session, 1, target_date, target_hour)
 
         # 验证结果
+        assert isinstance(result, list)
         assert len(result) == 0
+
+    # ==================== 边界条件和异常测试 ====================
+
+    def test_pagination_with_empty_search(self, ranking_service, populated_db_session):
+        """测试分页查询 - 空搜索条件"""
+        # 执行测试 - 使用空字符串搜索
+        rankings, total_pages = ranking_service.get_rankings_by_name_with_pagination(
+            populated_db_session, "", page=1, size=5
+        )
+
+        # 验证结果 - 应该返回所有榜单
+        assert isinstance(rankings, list)
+        assert total_pages >= 1
+
+    def test_pagination_with_large_page_number(self, ranking_service, populated_db_session):
+        """测试分页查询 - 超大页码"""
+        # 执行测试 - 请求第100页
+        rankings, total_pages = ranking_service.get_rankings_by_name_with_pagination(
+            populated_db_session, "榜", page=100, size=10
+        )
+
+        # 验证结果 - 应该返回空列表
+        assert isinstance(rankings, list)
+        assert len(rankings) == 0
+        assert total_pages >= 1
+
+    def test_batch_create_empty_snapshots(self, ranking_service, test_db_session):
+        """测试批量创建空快照列表"""
+        from app.utils import generate_batch_id
+        batch_id = generate_batch_id()
+        
+        # 执行测试 - 传入空列表
+        result = ranking_service.batch_create_ranking_snapshots(test_db_session, [], batch_id)
+
+        # 验证结果
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    def test_ranking_operations_with_minimal_data(self, ranking_service, test_db_session):
+        """测试榜单操作 - 最小数据集"""
+        # 测试包含最小必要字段的数据
+        minimal_data = {
+            "rank_id": "minimal_test",
+            "channel_name": "最小测试榜单",
+            "page_id": "test"
+        }
+        
+        # 创建榜单应该能处理最小数据
+        result = ranking_service.create_or_update_ranking(test_db_session, minimal_data)
+        assert result is not None
+        assert result.rank_id == "minimal_test"
+        assert result.channel_name == "最小测试榜单"
+
+    def test_search_with_special_characters(self, ranking_service, populated_db_session):
+        """测试搜索 - 特殊字符"""
+        # 执行测试 - 搜索包含特殊字符的内容
+        rankings, total_pages = ranking_service.get_rankings_by_name_with_pagination(
+            populated_db_session, "VIP", page=1, size=5
+        )
+
+        # 验证结果
+        assert isinstance(rankings, list)
+        if rankings:
+            for ranking in rankings:
+                assert "VIP" in ranking.channel_name

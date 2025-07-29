@@ -23,13 +23,13 @@ class TestBookServiceIntegration:
     def test_get_book_by_novel_id_success(self, book_service, populated_db_session):
         """测试根据novel_id获取书籍 - 成功场景"""
         # 执行测试 - 获取已存在的书籍
-        result = book_service.get_book_by_novel_id(populated_db_session, 123456)
+        result = book_service.get_book_by_novel_id(populated_db_session, 3682327)
 
         # 验证结果
         assert result is not None
-        assert result.novel_id == 123456
-        assert result.title == "测试小说1"
-        assert result.author_id == 1001
+        assert result.novel_id == 3682327
+        assert result.title == "扫描你的心"
+        assert result.author_id == 348407
 
     def test_get_book_by_novel_id_not_found(self, book_service, populated_db_session):
         """测试根据novel_id获取书籍 - 书籍不存在"""
@@ -42,12 +42,12 @@ class TestBookServiceIntegration:
     def test_get_book_by_novel_id_type_conversion(self, book_service, populated_db_session):
         """测试根据novel_id获取书籍 - 字符串ID自动转换"""
         # 执行测试 - 传入字符串形式的ID
-        result = book_service.get_book_by_novel_id(populated_db_session, "123456")
+        result = book_service.get_book_by_novel_id(populated_db_session, "3682327")
 
         # 验证结果
         assert result is not None
-        assert result.novel_id == 123456
-        assert result.title == "测试小说1"
+        assert result.novel_id == 3682327
+        assert result.title == "扫描你的心"
 
     def test_create_book_success(self, book_service, test_db_session, sample_book_data):
         """测试创建书籍 - 成功场景"""
@@ -68,7 +68,7 @@ class TestBookServiceIntegration:
     def test_update_book_success(self, book_service, populated_db_session):
         """测试更新书籍 - 成功场景"""
         # 准备测试数据
-        book = populated_db_session.get(Book, 123456)
+        book = populated_db_session.get(Book, 3682327)
         original_title = book.title
         
         update_data = {
@@ -83,11 +83,11 @@ class TestBookServiceIntegration:
         assert result is not None
         assert result.title == "更新后的标题"
         assert result.author_id == 2001
-        assert result.novel_id == 123456  # ID不应该改变
+        assert result.novel_id == 3682327  # ID不应该改变
         assert result.updated_at is not None
 
         # 验证数据库中的更新
-        db_book = populated_db_session.get(Book, 123456)
+        db_book = populated_db_session.get(Book, 3682327)
         assert db_book.title == "更新后的标题"
         assert db_book.title != original_title
 
@@ -113,7 +113,7 @@ class TestBookServiceIntegration:
         """测试创建或更新书籍 - 更新已存在书籍场景"""
         # 准备更新数据
         update_data = {
-            "novel_id": 123456,
+            "novel_id": 3682327,
             "title": "更新的书籍标题",
             "author_id": 3001
         }
@@ -123,12 +123,12 @@ class TestBookServiceIntegration:
 
         # 验证结果
         assert result is not None
-        assert result.novel_id == 123456
+        assert result.novel_id == 3682327
         assert result.title == "更新的书籍标题"
         assert result.author_id == 3001
 
         # 验证数据库更新
-        db_book = populated_db_session.get(Book, 123456)
+        db_book = populated_db_session.get(Book, 3682327)
         assert db_book.title == "更新的书籍标题"
 
     def test_create_or_update_book_missing_novel_id(self, book_service, test_db_session):
@@ -193,12 +193,12 @@ class TestBookServiceIntegration:
     def test_get_book_detail_by_novel_id_success(self, book_service, populated_db_session):
         """测试获取书籍详情 - 成功场景"""
         # 执行测试 - 获取有快照数据的书籍详情
-        result = book_service.get_book_detail_by_novel_id(populated_db_session, 123456)
+        result = book_service.get_book_detail_by_novel_id(populated_db_session, 3682327)
 
         # 验证结果
         assert result is not None
-        assert result.novel_id == 123456
-        assert result.title == "测试小说1"
+        assert result.novel_id == 3682327
+        assert result.title == "扫描你的心"
         # 验证包含快照数据
         assert hasattr(result, 'favorites')
         assert hasattr(result, 'clicks')
@@ -230,7 +230,7 @@ class TestBookServiceIntegration:
         """测试获取书籍历史快照 - 成功场景"""
         # 执行测试 - 获取7天内的历史快照
         result = book_service.get_historical_snapshots_by_novel_id(
-            populated_db_session, 123456, "day", 7
+            populated_db_session, 3682327, "day", 7
         )
 
         # 验证结果
@@ -250,7 +250,7 @@ class TestBookServiceIntegration:
         # 执行测试并验证异常
         with pytest.raises(ValueError, match="不支持的时间间隔"):
             book_service.get_historical_snapshots_by_novel_id(
-                populated_db_session, 123456, "invalid_interval", 7
+                populated_db_session, 3682327, "invalid_interval", 7
             )
 
     def test_get_historical_snapshots_by_novel_id_no_data(self, book_service, populated_db_session):
@@ -271,7 +271,7 @@ class TestBookServiceIntegration:
         
         for interval in intervals:
             result = book_service.get_historical_snapshots_by_novel_id(
-                populated_db_session, 123456, interval, 1
+                populated_db_session, 3682327, interval, 1
             )
             # 每个间隔都应该返回列表（可能为空）
             assert isinstance(result, list)
