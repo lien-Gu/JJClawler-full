@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.crawl_config import CrawlConfig
 from app.crawl.crawl_flow import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import , JobResultModel
+from app.models.schedule import JobResultModel
 
 
 class BaseJobHandler(ABC):
@@ -29,6 +29,13 @@ class BaseJobHandler(ABC):
         start_time = time.time()
         last_exception = None
 
+        # 更新调度器中的任务状态为运行中
+        if self.scheduler and hasattr(self.scheduler, '_job_store'):
+            job_info = self.scheduler._job_store.get(job_id)
+            if job_info:
+                from app.models.schedule import JobStatus
+                job_info.status = (JobStatus.RUNNING, "任务执行中")
+
         # max_retries=3 表示最多重试3次: 1次初始执行 + 3次重试 = 总共4次尝试
         for attempt in range(self.max_retries + 1):
             try:
@@ -44,8 +51,9 @@ class BaseJobHandler(ABC):
                 result.execution_time = time.time() - start_time
 
                 if result.success:
-                    # 执行成功
+                    # 执行成功 - 更新任务状态
                     self.logger.info(f"任务 {job_id} 执行成功: {result.message}")
+                    self._update_job_status(job_id, JobStatus.SUCCESS, result.message)
                     return result
                 else:
                     # 执行失败，但没有异常
@@ -57,6 +65,7 @@ class BaseJobHandler(ABC):
                         continue
                     else:
                         self.logger.error(f"任务 {job_id} 执行失败: {last_exception}")
+                        self._update_job_status(job_id, JobStatus.FAILED, f"执行失败: {result.message}")
                         return result
 
             except Exception as e:
@@ -82,8 +91,24 @@ class BaseJobHandler(ABC):
         )
         result.execution_time = time.time() - start_time
 
+        # 更新任务状态为失败
+        self._update_job_status(job_id, JobStatus.FAILED, f"重试{self.max_retries}次后仍失败: {str(last_exception)}")
+
         self.logger.error(f"任务 {job_id} 执行失败: {last_exception}")
         return result
+
+    def _update_job_status(self, job_id: str, status, message: str):
+        """更新任务状态"""
+        from app.models.schedule import JobStatus
+        
+        if self.scheduler and hasattr(self.scheduler, '_job_store'):
+            job_info = self.scheduler._job_store.get(job_id)
+            if job_info:
+                job_info.status = (status, message)
+                if status == JobStatus.FAILED:
+                    # 在描述中添加失败信息
+                    failure_info = f"失败原因: {message}"
+                    job_info.desc = f"{job_info.desc or ''} - {failure_info}" if job_info.desc else failure_info
 
     @abstractmethod
     async def execute(self, page_ids: list[str] = None) -> JobResultModel:
@@ -108,10 +133,10 @@ class CrawlJobHandler(BaseJobHandler):
 
     async def execute(self, page_ids: list[str] = None) -> JobResultModel:
         """
-        执行单页面爬虫任务（重构后只处理单个页面）
+        执行爬虫任务（支持单页面和多页面）
 
         Args:
-            page_ids: 页面列表，应该只包含一个页面ID
+            page_ids: 页面列表
 
         Returns:
             JobResultModel: 任务执行结果
@@ -119,13 +144,15 @@ class CrawlJobHandler(BaseJobHandler):
         if not page_ids:
             return JobResultModel.error_result("任务数据为空")
 
-        if len(page_ids) != 1:
-            return JobResultModel.error_result(
-                f"单页面任务应该只包含一个页面ID，但收到了 {len(page_ids)} 个"
-            )
+        # 处理单页面任务
+        if len(page_ids) == 1:
+            return await self._execute_single_page(page_ids[0])
+        
+        # 处理多页面任务
+        return await self._execute_multiple_pages(page_ids)
 
-        page_id = page_ids[0]
-
+    async def _execute_single_page(self, page_id: str) -> JobResultModel:
+        """执行单个页面的爬取任务"""
         try:
             # 验证页面ID是否有效
             if not self.config.validate_page_id(page_id):
@@ -139,8 +166,10 @@ class CrawlJobHandler(BaseJobHandler):
 
                 if crawl_result.get("success", False):
                     books_crawled = crawl_result.get("books_crawled", 0)
+                    rankings_crawled = crawl_result.get("rankings_crawled", 0)
+                    
                     self.logger.info(
-                        f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍"
+                        f"页面 {page_id} 爬取成功，共爬取 {books_crawled} 本书籍，{rankings_crawled} 个榜单"
                     )
 
                     return JobResultModel.success_result(
@@ -148,6 +177,7 @@ class CrawlJobHandler(BaseJobHandler):
                         {
                             "page_id": page_id,
                             "books_crawled": books_crawled,
+                            "rankings_crawled": rankings_crawled,
                             "crawl_result": crawl_result,
                         },
                     )
@@ -163,6 +193,59 @@ class CrawlJobHandler(BaseJobHandler):
         except Exception as e:
             self.logger.error(f"页面 {page_id} 爬取异常: {str(e)}")
             return JobResultModel.error_result(f"页面 {page_id} 爬取异常: {str(e)}", e)
+
+    async def _execute_multiple_pages(self, page_ids: list[str]) -> JobResultModel:
+        """执行多个页面的爬取任务"""
+        total_books = 0
+        total_rankings = 0
+        success_pages = []
+        failed_pages = []
+        
+        for page_id in page_ids:
+            try:
+                result = await self._execute_single_page(page_id)
+                if result.success:
+                    success_pages.append(page_id)
+                    if result.data:
+                        total_books += result.data.get("books_crawled", 0)
+                        total_rankings += result.data.get("rankings_crawled", 0)
+                else:
+                    failed_pages.append(page_id)
+            except Exception as e:
+                self.logger.error(f"页面 {page_id} 处理异常: {e}")
+                failed_pages.append(page_id)
+        
+        # 汇总结果
+        success_count = len(success_pages)
+        total_count = len(page_ids)
+        
+        if success_count == total_count:
+            return JobResultModel.success_result(
+                f"多页面爬取完全成功: {success_count}/{total_count} 页面，共 {total_books} 本书籍，{total_rankings} 个榜单",
+                {
+                    "total_pages": total_count,
+                    "success_pages": success_pages,
+                    "failed_pages": failed_pages,
+                    "total_books": total_books,
+                    "total_rankings": total_rankings
+                }
+            )
+        elif success_count > 0:
+            return JobResultModel.success_result(
+                f"多页面爬取部分成功: {success_count}/{total_count} 页面，共 {total_books} 本书籍，{total_rankings} 个榜单",
+                {
+                    "total_pages": total_count,
+                    "success_pages": success_pages,
+                    "failed_pages": failed_pages,
+                    "total_books": total_books,
+                    "total_rankings": total_rankings
+                }
+            )
+        else:
+            return JobResultModel.error_result(
+                f"多页面爬取全部失败: 0/{total_count} 页面成功",
+                None
+            )
 
 
 class ReportJobHandler(BaseJobHandler):
