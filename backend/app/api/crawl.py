@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.post("/all", response_model=DataResponse[BatchJobResponse])
 async def crawl_all_pages(
-    force: bool = Query(False, description="是否强制爬取（忽略间隔限制）")
+    force: bool = Query(True, description="是否强制爬取（忽略间隔限制）")
 ):
     """
     触发爬取所有配置的页面（简化版）

@@ -55,6 +55,9 @@ def filter_dict(raw_dict: dict, valid_field: set | list | Any):
     :return:
     """
     if isinstance(valid_field, set) or isinstance(valid_field, list):
+        valid_field = set(valid_field)
+    else:
+        # 如果是SQLAlchemy模型类，获取字段集合
         valid_field = get_model_fields(valid_field)
     return {k: v for k, v in raw_dict.items() if k in valid_field}
 

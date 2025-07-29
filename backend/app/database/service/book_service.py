@@ -180,11 +180,23 @@ class BookService:
             .where(BookSnapshot.novel_id == novel_id)
             .order_by(desc(BookSnapshot.snapshot_time))
             .limit(1)
-        ).first()
+        ).scalars().first()
         if not book_record or not latest_snapshot:
             return None
         book_dict = {
             "novel_id": book_record.novel_id,
             "title": book_record.title
         }
-        return book.BookDetail.model_validate({**book_dict, **latest_snapshot._asdict()})
+        # 将SQLAlchemy对象转换为字典
+        snapshot_dict = {
+            "snapshot_time": latest_snapshot.snapshot_time,
+            "favorites": latest_snapshot.favorites,
+            "clicks": latest_snapshot.clicks,
+            "comments": latest_snapshot.comments,
+            "nutrition": latest_snapshot.nutrition,
+            "word_counts": latest_snapshot.word_counts,
+            "chapter_counts": latest_snapshot.chapter_counts,
+            "status": latest_snapshot.status,
+            "vip_chapter_id": getattr(latest_snapshot, 'vip_chapter_id', None) or 0
+        }
+        return book.BookDetail.model_validate({**book_dict, **snapshot_dict})

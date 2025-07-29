@@ -9,7 +9,7 @@ from typing import List
 from pydantic import BaseModel, Field
 
 from app.models import BookRankingInfo
-from base import BaseSchema
+from .base import BaseSchema
 
 
 class RankingBasic(BaseSchema):
@@ -26,7 +26,7 @@ class RankingBook(BaseSchema):
     position: int = Field(..., description="排名位置")
 
 
-class RankingSnapshot(BaseSchema, RankingBook):
+class RankingSnapshot(BaseSchema):
     """
     榜单快照信息
     """

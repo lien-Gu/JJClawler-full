@@ -35,7 +35,6 @@ class Ranking(Base):
     # 榜单基本信息
     rank_id: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         index=True,
         comment="榜单唯一标识ID，来源于晋江文学城的榜单ID",
     )

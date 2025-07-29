@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from base import BaseSchema
+from .base import BaseSchema
 
 
 class BookBasic(BaseSchema):
