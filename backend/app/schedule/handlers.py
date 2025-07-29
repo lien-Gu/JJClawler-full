@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.crawl_config import CrawlConfig
 from app.crawl.crawl_flow import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import JobResultModel
+from app.models.schedule import JobResultModel, JobStatus
 
 
 class BaseJobHandler(ABC):
@@ -33,7 +33,6 @@ class BaseJobHandler(ABC):
         if self.scheduler and hasattr(self.scheduler, '_job_store'):
             job_info = self.scheduler._job_store.get(job_id)
             if job_info:
-                from app.models.schedule import JobStatus
                 job_info.status = (JobStatus.RUNNING, "任务执行中")
 
         # max_retries=3 表示最多重试3次: 1次初始执行 + 3次重试 = 总共4次尝试
@@ -99,8 +98,6 @@ class BaseJobHandler(ABC):
 
     def _update_job_status(self, job_id: str, status, message: str):
         """更新任务状态"""
-        from app.models.schedule import JobStatus
-        
         if self.scheduler and hasattr(self.scheduler, '_job_store'):
             job_info = self.scheduler._job_store.get(job_id)
             if job_info:

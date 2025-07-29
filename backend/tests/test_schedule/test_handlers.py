@@ -1,13 +1,16 @@
 """
-任务处理器测试文件
-测试schedule.handlers模块的关键功能
+任务处理器测试
+
+测试各种任务处理器的功能，使用mock避免实际的爬虫执行
 """
 
+import asyncio
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.models.schedule import JobContextModel, JobResultModel
+from app.models.schedule import JobResultModel, JobStatus
 from app.schedule.handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
 
 
@@ -18,6 +21,9 @@ class TestBaseJobHandler:
         """测试用的具体处理器类"""
 
         async def execute(self, page_ids=None):
+            # 模拟一些执行时间
+            import asyncio
+            await asyncio.sleep(0.001)  # 1ms
             return JobResultModel.success_result("测试任务执行成功")
 
     @pytest.fixture
@@ -26,20 +32,23 @@ class TestBaseJobHandler:
         return self.TestJobHandler()
 
     @pytest.fixture
-    def job_context(self):
-        """创建任务上下文"""
-        return JobContextModel(
-            job_id="test_job",
-            job_name="test_job",
-            trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-        )
+    def mock_scheduler(self):
+        """Mock调度器，用于状态更新"""
+        from unittest.mock import MagicMock
+        scheduler = MagicMock()
+        scheduler._update_job_status = AsyncMock()
+        return scheduler
 
     @pytest.mark.asyncio
-    async def test_execute_with_retry_success_first_try(self, handler, job_context):
+    async def test_execute_with_retry_success_first_try(self, handler, mock_scheduler):
         """测试第一次执行成功"""
+        handler.scheduler = mock_scheduler
+        # Mock 调度器的 _job_store
+        mock_scheduler._job_store = {}
+        job_id = "test_job"
+        
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         assert result.success is True
@@ -47,8 +56,12 @@ class TestBaseJobHandler:
         assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_retry_success_after_retry(self, handler, job_context):
+    async def test_execute_with_retry_success_after_retry(self, handler, mock_scheduler):
         """测试重试后成功"""
+        handler.scheduler = mock_scheduler
+        mock_scheduler._job_store = {}
+        job_id = "test_job"
+        
         # 模拟第一次失败，第二次成功
         call_count = 0
 
@@ -63,7 +76,7 @@ class TestBaseJobHandler:
         handler.execute = mock_execute
 
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         assert result.success is True
@@ -71,9 +84,12 @@ class TestBaseJobHandler:
         assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_retry_max_retries_exceeded(self, handler, job_context):
+    async def test_execute_with_retry_max_retries_exceeded(self, handler, mock_scheduler):
         """测试超过最大重试次数"""
-
+        handler.scheduler = mock_scheduler
+        mock_scheduler._job_store = {}
+        job_id = "test_job"
+        
         # 模拟总是失败，返回错误结果（不抛出异常）
         async def mock_execute(page_ids=None):
             return JobResultModel.error_result("执行失败")
@@ -82,7 +98,7 @@ class TestBaseJobHandler:
         handler.max_retries = 2  # 设置最大重试次数为2
 
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         assert result.success is False
@@ -91,9 +107,12 @@ class TestBaseJobHandler:
         assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_retry_exception_handling(self, handler, job_context):
+    async def test_execute_with_retry_exception_handling(self, handler, mock_scheduler):
         """测试异常处理"""
-
+        handler.scheduler = mock_scheduler
+        mock_scheduler._job_store = {}
+        job_id = "test_job"
+        
         # 模拟抛出异常
         async def mock_execute(page_ids=None):
             raise Exception("执行异常")
@@ -102,7 +121,7 @@ class TestBaseJobHandler:
         handler.max_retries = 1
 
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         assert result.success is False
@@ -110,8 +129,12 @@ class TestBaseJobHandler:
         assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_execute_with_retry_delay(self, handler, job_context, mocker):
+    async def test_execute_with_retry_delay(self, handler, mock_scheduler, mocker):
         """测试重试延迟"""
+        handler.scheduler = mock_scheduler
+        mock_scheduler._job_store = {}
+        job_id = "test_job"
+        
         # 模拟第一次异常，第二次成功
         call_count = 0
 
@@ -130,7 +153,7 @@ class TestBaseJobHandler:
         mock_sleep = mocker.patch("asyncio.sleep")
 
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         assert result.success is True
@@ -147,9 +170,23 @@ class TestCrawlJobHandler:
     """测试CrawlJobHandler类"""
 
     @pytest.fixture
-    def handler(self):
+    def handler(self, mocker):
         """创建CrawlJobHandler实例"""
-        return CrawlJobHandler()
+        # Mock CrawlConfig 避免文件依赖
+        mock_config = mocker.MagicMock()
+        mock_config.validate_page_id.return_value = True
+        
+        with mocker.patch('app.schedule.handlers.CrawlConfig', return_value=mock_config):
+            handler = CrawlJobHandler()
+            return handler
+
+    @pytest.fixture
+    def mock_crawl_result(self):
+        """模拟爬取结果"""
+        return {
+            "success": {"success": True, "books_crawled": 25, "page_id": "test_page"},
+            "failure": {"success": False, "error_message": "爬取失败"}
+        }
 
     @pytest.mark.asyncio
     async def test_execute_success_single_page(
@@ -189,12 +226,22 @@ class TestCrawlJobHandler:
         assert "任务数据为空" in result.message
 
     @pytest.mark.asyncio
-    async def test_execute_multiple_page_ids(self, handler):
-        """测试多页面ID（应该失败）"""
+    async def test_execute_multiple_page_ids(self, handler, mocker):
+        """测试多页面ID处理"""
+        # Mock 配置和爬虫
+        mock_config = mocker.patch.object(handler, "config")
+        mock_config.validate_page_id.return_value = True
+
+        mock_crawler = mocker.patch("app.schedule.handlers.CrawlFlow")
+        mock_crawler.return_value.execute_crawl_task = mocker.AsyncMock(
+            return_value={"success": False, "error_message": "页面不存在"}
+        )
+        mock_crawler.return_value.close = mocker.AsyncMock()
+
         result = await handler.execute(page_ids=["page1", "page2"])
 
         assert result.success is False
-        assert "应该只包含一个页面ID" in result.message
+        assert "多页面爬取全部失败" in result.message
 
     @pytest.mark.asyncio
     async def test_execute_invalid_page_id(self, handler, mocker):
@@ -312,7 +359,7 @@ class TestJobResultModel:
         assert result.message == "操作成功"
         assert result.data == {"count": 5}
         assert result.exception is None
-        assert isinstance(result.timestamp, datetime)
+        assert result.execution_time is None  # 默认时间为None
 
     def test_error_result_creation(self):
         """测试创建错误结果"""
@@ -323,7 +370,7 @@ class TestJobResultModel:
         assert result.message == "操作失败"
         assert result.data is None
         assert result.exception == "测试异常"
-        assert isinstance(result.timestamp, datetime)
+        assert result.execution_time is None  # 默认时间为None
 
     def test_error_result_without_exception(self):
         """测试创建无异常的错误结果"""
@@ -338,35 +385,42 @@ class TestIntegration:
     """集成测试"""
 
     @pytest.fixture
-    def job_context(self):
-        """创建任务上下文"""
-        return JobContextModel(
-            job_id="integration_test_job",
-            job_name="integration_test_job",
-            trigger_time=datetime.now(),
-            scheduled_time=datetime.now(),
-        )
+    def mock_scheduler_integration(self):
+        """集成测试用的Mock调度器"""
+        from unittest.mock import MagicMock
+        scheduler = MagicMock()
+        scheduler._update_job_status = AsyncMock()
+        return scheduler
 
     @pytest.mark.asyncio
-    async def test_crawl_handler_full_workflow(self, job_context, mocker):
+    async def test_crawl_handler_full_workflow(self, mock_scheduler_integration, mocker):
         """测试爬虫处理器完整工作流程"""
-        handler = CrawlJobHandler()
-
-        # 模拟配置
-        mock_config = mocker.patch.object(handler, "config")
+        # Mock CrawlConfig 避免文件依赖
+        mock_config = mocker.MagicMock()
         mock_config.validate_page_id.return_value = True
+        
+        with mocker.patch('app.schedule.handlers.CrawlConfig', return_value=mock_config):
+            handler = CrawlJobHandler()
+            handler.scheduler = mock_scheduler_integration
+            job_id = "integration_test_job"
 
         # 模拟爬虫
         mock_crawler = mocker.patch("app.schedule.handlers.CrawlFlow")
-        # execute_crawl_task 是async方法，需要使用AsyncMock
+        
+        # 添加执行延迟的Mock
+        async def mock_crawl_task(page_id):
+            import asyncio
+            await asyncio.sleep(0.001)  # 1ms延迟
+            return {"success": True, "books_crawled": 15, "page_id": "jiazi"}
+        
         mock_crawler.return_value.execute_crawl_task = mocker.AsyncMock(
-            return_value={"success": True, "books_crawled": 15, "page_id": "jiazi"}
+            side_effect=mock_crawl_task
         )
         mock_crawler.return_value.close = mocker.AsyncMock()
 
         # 执行带重试的任务
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["jiazi"]
+            job_id=job_id, page_ids=["jiazi"]
         )
 
         # 验证结果
@@ -382,14 +436,17 @@ class TestIntegration:
         mock_crawler.return_value.close.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_handler_retry_workflow(self, job_context, mocker):
+    async def test_handler_retry_workflow(self, mock_scheduler_integration, mocker):
         """测试处理器重试工作流程"""
-        handler = CrawlJobHandler()
-        handler.max_retries = 2
-
-        # 模拟配置
-        mock_config = mocker.patch.object(handler, "config")
+        # Mock CrawlConfig 避免文件依赖
+        mock_config = mocker.MagicMock()
         mock_config.validate_page_id.return_value = True
+        
+        with mocker.patch('app.schedule.handlers.CrawlConfig', return_value=mock_config):
+            handler = CrawlJobHandler()
+            handler.scheduler = mock_scheduler_integration
+            handler.max_retries = 2
+            job_id = "retry_test_job"
 
         # 模拟爬虫（第一次失败，第二次成功）
         mock_crawler = mocker.patch("app.schedule.handlers.CrawlFlow")
@@ -411,7 +468,7 @@ class TestIntegration:
         )
 
         result = await handler.execute_with_retry(
-            context=job_context, page_ids=["test_page"]
+            job_id=job_id, page_ids=["test_page"]
         )
 
         # 验证结果
