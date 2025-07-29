@@ -8,7 +8,7 @@
 """
 
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -37,13 +37,38 @@ class JobHandlerType(str, Enum):
     REPORT = "ReportJobHandler"  # 报告任务
 
 
+class JobResultModel(BaseModel):
+    """
+    任务执行结果模型
+    """
+    success: bool = Field(..., description="任务是否执行成功")
+    message: str = Field(..., description="执行结果消息")
+    data: Optional[Dict[str, Any]] = Field(None, description="执行结果数据")
+    exception: Optional[str] = Field(None, description="异常信息")
+    execution_time: Optional[float] = Field(None, description="执行时间（秒）")
+
+    @classmethod
+    def success_result(cls, message: str, data: Optional[Dict[str, Any]] = None) -> "JobResultModel":
+        """创建成功结果"""
+        return cls(success=True, message=message, data=data)
+
+    @classmethod
+    def error_result(cls, message: str, exception: Optional[Exception] = None) -> "JobResultModel":
+        """创建错误结果"""
+        return cls(
+            success=False,
+            message=message,
+            exception=str(exception) if exception else None
+        )
+
+
 class CrawTaskInfo(BaseModel):
     """
     爬虫任务信息
     """
-    page_id: str = Field(...)
-    rankings: List = Field(..., description="该页面中的榜单列表")
-    summary: Dict[str, str] = Field(..., description="该爬取任务爬取了多少个榜单，多少本书籍")
+    page_id: str = Field(..., description="页面ID")
+    rankings: List[Dict[str, Any]] = Field(default_factory=list, description="该页面中的榜单列表")
+    summary: Dict[str, Any] = Field(default_factory=dict, description="该爬取任务爬取了多少个榜单，多少本书籍")
 
 
 class JobInfo(BaseModel):
@@ -52,12 +77,12 @@ class JobInfo(BaseModel):
     """
     job_id: str = Field(..., description="调度任务ID")
     trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
-    trigger_time: Dict[str, str] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
-    status: Tuple[JobStatus, str] = Field(..., description="调度任务运行的状态，完成了多少个任务了")
+    trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
     handler: JobHandlerType = Field(..., description="处理器类")
-    page_ids: List[str] | None = Field(..., description="爬虫任务需要爬取的页面")
-    result: List[CrawTaskInfo] | None = Field(..., description="任务运行结果")
-    desc: str = Field(..., description="调度状态描述")
+    status: Optional[Tuple[JobStatus, str]] = Field(None, description="调度任务运行的状态，完成了多少个任务了")
+    page_ids: Optional[List[str]] = Field(None, description="爬虫任务需要爬取的页面")
+    result: Optional[List[CrawTaskInfo]] = Field(None, description="任务运行结果")
+    desc: Optional[str] = Field(None, description="调度状态描述")
 
 
 class SchedulerInfo(BaseModel):
@@ -65,8 +90,8 @@ class SchedulerInfo(BaseModel):
     调度器信息
     """
     status: str = Field(..., description="调度器当前的状态")
-    job_wait: List = Field(..., description="等待运行的任务列表")
-    job_running: List = Field(..., description="正在运行的任务列表")
+    job_wait: List[Dict[str, Any]] = Field(default_factory=list, description="等待运行的任务列表")
+    job_running: List[Dict[str, Any]] = Field(default_factory=list, description="正在运行的任务列表")
     run_time: str = Field(..., description="调度器运行的时间，格式为：%d天%h小时%m分钟%s秒")
 
 
@@ -74,19 +99,21 @@ PREDEFINED_JOB_INFO = {
     "jiazi_crawl": JobInfo(
         job_id="jiazi_crawl",
         trigger_type=TriggerType.CRON,
-        trigger_time={},
-        status=(JobStatus.PENDING, "尚未初始化"),
+        trigger_time={"hour": "*/1"},  # 每小时执行一次
         handler=JobHandlerType.CRAWL,
-        page_ids=["jiazi_crawl"],
-        result=None
+        status=(JobStatus.PENDING, "尚未初始化"),
+        page_ids=["jiazi"],
+        result=None,
+        desc="夹子榜单定时爬取任务"
     ),
     "category_crawl": JobInfo(
         job_id="category_crawl",
         trigger_type=TriggerType.CRON,
-        trigger_time={},
-        status=(JobStatus.PENDING, "尚未初始化"),
+        trigger_time={"hour": "6-18", "minute": "0"},  # 6-18点每小时执行
         handler=JobHandlerType.CRAWL,
+        status=(JobStatus.PENDING, "尚未初始化"),
         page_ids=["category"],
-        result=None
+        result=None,
+        desc="分类页面定时爬取任务"
     )
 }
