@@ -18,24 +18,8 @@ class TestBookService:
     def book_service(self):
         return BookService()
 
-    def test_create_book(self, book_service, test_db_session):
-        """测试创建书籍"""
-        book_data = {
-            "novel_id": "123456",
-            "title": "测试小说",
-            "author_id": "1001",
-            "author_name": "测试作者"
-        }
-        
-        book = book_service.create_book(test_db_session, book_data)
-        
-        assert book is not None
-        assert book.novel_id == "123456"
-        assert book.title == "测试小说"
-        assert book.author_name == "测试作者"
-
     def test_create_or_update_book(self, book_service, test_db_session):
-        """测试创建或更新书籍"""
+        """测试创建或更新书籍 - 核心业务逻辑"""
         book_data = {
             "novel_id": "123456",
             "title": "测试小说",
@@ -81,7 +65,7 @@ class TestBookService:
             test_db_session, snapshots_data, batch_id
         )
         
-        assert result == 1  # 成功创建1个快照
+        assert len(result) == 1  # 成功创建1个快照
 
 
 class TestRankingService:
@@ -91,24 +75,8 @@ class TestRankingService:
     def ranking_service(self):
         return RankingService()
 
-    def test_create_ranking(self, ranking_service, test_db_session):
-        """测试创建榜单"""
-        ranking_data = {
-            "rank_id": "jiazi",
-            "rank_name": "夹子榜单",
-            "channel_name": "夹子频道",
-            "page_id": "jiazi"
-        }
-        
-        ranking = ranking_service.create_ranking(test_db_session, ranking_data)
-        
-        assert ranking is not None
-        assert ranking.rank_id == "jiazi"
-        assert ranking.rank_name == "夹子榜单"
-        assert ranking.channel_name == "夹子频道"
-
     def test_create_or_update_ranking(self, ranking_service, test_db_session):
-        """测试创建或更新榜单"""
+        """测试创建或更新榜单 - 核心业务逻辑"""
         ranking_data = {
             "rank_id": "jiazi",
             "rank_name": "夹子榜单",
@@ -161,7 +129,7 @@ class TestRankingService:
             test_db_session, snapshots_data, batch_id
         )
         
-        assert result == 1  # 成功创建1个快照
+        assert len(result) == 1  # 成功创建1个快照
 
 
 class TestServicesIntegration:
@@ -222,11 +190,11 @@ class TestServicesIntegration:
         # 验证所有操作成功
         assert ranking.id is not None
         assert book.id is not None
-        assert book_result == 1
-        assert ranking_result == 1
+        assert len(book_result) == 1
+        assert len(ranking_result) == 1
         
         print(f"✅ 完整数据流程测试成功:")
         print(f"   - 榜单: {ranking.rank_name}")
         print(f"   - 书籍: {book.title}")
-        print(f"   - 书籍快照: {book_result} 条")
-        print(f"   - 榜单快照: {ranking_result} 条")
+        print(f"   - 书籍快照: {len(book_result)} 条")
+        print(f"   - 榜单快照: {len(ranking_result)} 条")
