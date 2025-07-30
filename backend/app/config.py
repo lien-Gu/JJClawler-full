@@ -80,25 +80,48 @@ class CrawlerSettings(BaseSettings):
 
 
 class SchedulerSettings(BaseSettings):
-    """任务调度器配置"""
+    """任务调度器配置
+    
+    重构后的配置支持APScheduler 4.0的并发特性，
+    包括更细粒度的任务并发控制。
+    """
 
     # 调度器基本配置
     timezone: str = Field(default="Asia/Shanghai", description="时区设置")
-    max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数")
+    max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数，控制同时执行的任务数量")
 
-    # 任务默认配置
+    # 任务默认配置 - 优化了并发参数
     job_defaults: dict[str, Any] = Field(
-        default={"coalesce": False, "max_instances": 1, "misfire_grace_time": 60},
-        description="任务默认配置",
+        default={
+            "coalesce": False,           # 不合并延迟的任务，保证每个任务都执行
+            "max_instances": 3,          # 每个任务最多3个实例并发执行
+            "misfire_grace_time": 60,     # 错过执行的宽限时间（60秒）
+            "replace_existing": True,     # 替换已存在的相同ID任务
+        },
+        description="任务默认配置，优化了并发性能",
     )
 
     # 任务存储配置
     job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
     job_store_url: str | None = Field(default=None, description="任务存储连接URL，默认使用数据库URL")
+    
+    # 事件系统配置
+    enable_event_logging: bool = Field(default=True, description="是否启用事件日志记录")
+    event_retry_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="事件处理失败重试延迟（秒）")
 
     class Config:
         env_prefix = "SCHEDULER_"
         env_file_encoding = "utf-8"
+    
+    @field_validator("max_workers")
+    @classmethod
+    def validate_max_workers(cls, v: int):
+        """验证最大工作线程数"""
+        if v < 1:
+            raise ValueError("最大工作线程数必须大于0")
+        if v > 20:
+            raise ValueError("最大工作线程数不应超过20，以免资源消耗过大")
+        return v
 
 
 class LoggingSettings(BaseSettings):

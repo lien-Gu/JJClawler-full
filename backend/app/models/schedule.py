@@ -9,6 +9,7 @@
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+from base import BaseSchema
 
 from pydantic import BaseModel, Field
 
@@ -37,31 +38,6 @@ class JobHandlerType(str, Enum):
     REPORT = "ReportJobHandler"  # 报告任务
 
 
-class JobResultModel(BaseModel):
-    """
-    任务执行结果模型
-    """
-    success: bool = Field(..., description="任务是否执行成功")
-    message: str = Field(..., description="执行结果消息")
-    data: Optional[Dict[str, Any]] = Field(None, description="执行结果数据")
-    exception: Optional[str] = Field(None, description="异常信息")
-    execution_time: Optional[float] = Field(None, description="执行时间（秒）")
-
-    @classmethod
-    def success_result(cls, message: str, data: Optional[Dict[str, Any]] = None) -> "JobResultModel":
-        """创建成功结果"""
-        return cls(success=True, message=message, data=data)
-
-    @classmethod
-    def error_result(cls, message: str, exception: Optional[Exception] = None) -> "JobResultModel":
-        """创建错误结果"""
-        return cls(
-            success=False,
-            message=message,
-            exception=str(exception) if exception else None
-        )
-
-
 class CrawTaskInfo(BaseModel):
     """
     爬虫任务信息
@@ -69,6 +45,17 @@ class CrawTaskInfo(BaseModel):
     page_id: str = Field(..., description="页面ID")
     rankings: List[Dict[str, Any]] = Field(default_factory=list, description="该页面中的榜单列表")
     summary: Dict[str, Any] = Field(default_factory=dict, description="该爬取任务爬取了多少个榜单，多少本书籍")
+
+class JobResultModel(BaseModel):
+    """
+    任务执行结果模型
+    """
+    success: bool = Field(default=True, description="任务是否执行成功")
+    message: str = Field(default="成功完成任务", description="执行结果消息")
+    data: Optional[CrawTaskInfo|Dict[str, Any]] = Field(None, description="执行结果数据")
+    exception: Optional[str] = Field(None, description="异常信息")
+    execution_time: Optional[float] = Field(None, description="执行时间（秒）")
+
 
 
 class JobInfo(BaseModel):
@@ -81,17 +68,16 @@ class JobInfo(BaseModel):
     handler: JobHandlerType = Field(..., description="处理器类")
     status: Optional[Tuple[JobStatus, str]] = Field(None, description="调度任务运行的状态，完成了多少个任务了")
     page_ids: Optional[List[str]] = Field(None, description="爬虫任务需要爬取的页面")
-    result: Optional[List[CrawTaskInfo]] = Field(None, description="任务运行结果")
+    result: Optional[List[JobResultModel]] = Field(None, description="任务运行结果")
     desc: Optional[str] = Field(None, description="调度状态描述")
 
 
-class SchedulerInfo(BaseModel):
+class SchedulerInfo(BaseSchema):
     """
     调度器信息
     """
     status: str = Field(..., description="调度器当前的状态")
-    job_wait: List[Dict[str, Any]] = Field(default_factory=list, description="等待运行的任务列表")
-    job_running: List[Dict[str, Any]] = Field(default_factory=list, description="正在运行的任务列表")
+    jobs: List[Dict[str, Any]] = Field(default_factory=list, description="调度器中的任务列表")
     run_time: str = Field(..., description="调度器运行的时间，格式为：%d天%h小时%m分钟%s秒")
 
 

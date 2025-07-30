@@ -100,26 +100,7 @@ async def get_scheduler_status():
         DataResponse: 调度器状态和任务统计信息
     """
     try:
-        # 从调度器获取状态信息
-        scheduler_info_dict = await scheduler.get_scheduler_info()
-        
-        # 转换为Pydantic模型
-        scheduler_info = SchedulerInfo(
-            status=scheduler_info_dict["status"],
-            job_wait=scheduler_info_dict["job_wait"],
-            job_running=scheduler_info_dict["job_running"],
-            run_time=scheduler_info_dict["run_time"]
-        )
-        
-        return DataResponse(
-            success=True,
-            message="获取调度器状态成功",
-            data=scheduler_info
-        )
-        
+        scheduler_info = await scheduler.get_scheduler_info()
+        return DataResponse(message="获取调度器状态成功",data=scheduler_info)
     except Exception as e:
-        return DataResponse(
-            success=False,
-            message=f"获取调度器状态失败: {str(e)}",
-            data=None
-        )
+        return DataResponse(success=False,message=f"获取调度器状态失败: {str(e)}",data=None)

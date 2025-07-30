@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import strftime
 from typing import Dict, List, Any
 import re
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import inspect
+
 
 def generate_batch_id() -> str:
     """
@@ -71,3 +72,21 @@ def get_model_fields(model_class) -> set[str]:
     """
     mapper = inspect(model_class)
     return set(mapper.columns.keys())
+
+
+def delta_to_str(delta: timedelta | int = None) -> str:
+    """
+    将时间间隔变为字符串
+    :param delta:时间间隔、或者秒
+    :return:时间字符串
+    """
+    str_format = "{days}天{hours}小时{minutes}分钟{seconds}秒"
+    if not delta:
+        return str_format.format(days=0, hours=0, minutes=0, seconds=0)
+    if isinstance(delta, int):
+        delta = timedelta(seconds=delta)
+
+    days = delta.days
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return str_format.format(days=days, hours=hours, minutes=minutes, seconds=seconds)
