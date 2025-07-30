@@ -56,10 +56,10 @@ async def create_crawl_job(
         )
 
 
-@router.get("/task/{job_id}", response_model=DataResponse[JobInfo])
+@router.get("/task/{job_id}", response_model=DataResponse[List[JobInfo]])
 async def get_task_status(
         job_id: str,
-) -> DataResponse[JobInfo]:
+) -> DataResponse[List[JobInfo]]:
     """
     获取指定调度任务的详细信息
     

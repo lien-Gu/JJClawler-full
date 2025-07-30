@@ -9,7 +9,6 @@
 
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
-from base import BaseSchema
 
 from pydantic import BaseModel, Field
 
@@ -55,6 +54,20 @@ class JobResultModel(BaseModel):
     data: Optional[CrawTaskInfo|Dict[str, Any]] = Field(None, description="执行结果数据")
     exception: Optional[str] = Field(None, description="异常信息")
     execution_time: Optional[float] = Field(None, description="执行时间（秒）")
+    
+    @classmethod
+    def success_result(cls, message: str, data: Optional[Dict[str, Any]] = None) -> "JobResultModel":
+        """创建成功结果"""
+        return cls(success=True, message=message, data=data)
+
+    @classmethod
+    def error_result(cls, message: str, exception: Optional[Exception] = None) -> "JobResultModel":
+        """创建错误结果"""
+        return cls(
+            success=False,
+            message=message,
+            exception=str(exception) if exception else None
+        )
 
 
 
@@ -72,7 +85,7 @@ class JobInfo(BaseModel):
     desc: Optional[str] = Field(None, description="调度状态描述")
 
 
-class SchedulerInfo(BaseSchema):
+class SchedulerInfo(BaseModel):
     """
     调度器信息
     """

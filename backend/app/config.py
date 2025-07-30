@@ -89,18 +89,6 @@ class SchedulerSettings(BaseSettings):
     # 调度器基本配置
     timezone: str = Field(default="Asia/Shanghai", description="时区设置")
     max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数，控制同时执行的任务数量")
-
-    # 任务默认配置 - 优化了并发参数
-    job_defaults: dict[str, Any] = Field(
-        default={
-            "coalesce": False,           # 不合并延迟的任务，保证每个任务都执行
-            "max_instances": 3,          # 每个任务最多3个实例并发执行
-            "misfire_grace_time": 60,     # 错过执行的宽限时间（60秒）
-            "replace_existing": True,     # 替换已存在的相同ID任务
-        },
-        description="任务默认配置，优化了并发性能",
-    )
-
     # 任务存储配置
     job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
     job_store_url: str | None = Field(default=None, description="任务存储连接URL，默认使用数据库URL")
