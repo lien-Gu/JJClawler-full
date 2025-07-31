@@ -12,7 +12,8 @@ from typing import Any, Dict, List, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
+from apscheduler.triggers.base import BaseTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -27,10 +28,8 @@ from app.models.schedule import (
     TriggerType,
 )
 
-from .handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
 
-
-class TaskScheduler:
+class JobScheduler:
     """任务调度器主类 - 基于APScheduler 3.x稳定版本
     
     重构后的调度器完全依赖APScheduler的存储机制，
@@ -39,28 +38,30 @@ class TaskScheduler:
 
     def __init__(self):
         """初始化调度器"""
-        self.settings: SchedulerSettings = get_settings().scheduler
+        self.settings: SchedulerSettings = None
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_handlers: Dict[str, type[BaseJobHandler]] = {}
-        self.logger = get_logger(__name__)
+        self.job_handlers: Dict = {}
+        self.logger = None
         self.start_time: Optional[datetime] = None
 
-        # 注册默认任务处理器
-        self._register_default_handlers()
+        # 初始化参数
+        self._initial_variety()
 
-    def _register_default_handlers(self) -> None:
+    def _initial_variety(self):
         """注册默认任务处理器"""
+        self.settings = get_settings().scheduler
         self.job_handlers = {
-            JobHandlerType.CRAWL: CrawlJobHandler,
-            JobHandlerType.REPORT: ReportJobHandler,
+            JobHandlerType.CRAWL: self._add_report_job,
+            JobHandlerType.REPORT: self._add_report_job,
         }
+        self.logger = get_logger(__name__)
 
     def _create_scheduler_with_config(self) -> AsyncIOScheduler:
         """创建APScheduler 3.x实例并应用配置"""
         db_url = self.settings.job_store_url
         # 创建调度器
         scheduler = AsyncIOScheduler(
-            jobstores=SQLAlchemyJobStore(url=db_url, tablename='apscheduler_jobs'),
+            jobstores=SQLAlchemyJobStore(url=db_url, tablename=self.settings.job_store_table_name),
             executors=ThreadPoolExecutor(self.settings.max_workers),
             timezone=self.settings.timezone
         )
@@ -74,116 +75,76 @@ class TaskScheduler:
         """注册事件监听器 - 3.x版本API"""
         if self.scheduler is None:
             return
-
         # 注册事件监听器
-        self.scheduler.add_listener(self._on_job_executed,EVENT_JOB_EXECUTED)
-        self.scheduler.add_listener(self._on_job_error,EVENT_JOB_ERROR)
-        self.scheduler.add_listener(self._on_job_missed,EVENT_JOB_MISSED)
+        self.scheduler.add_listener(self._job_listener,
+                                    EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
 
         self.logger.info("事件监听器注册完成")
 
-    def _on_job_executed(self, event) -> None:
-        """任务执行成功监听器"""
+    def _job_listener(self, event):
         job_id = event.job_id
-
-        # 获取job并更新metadata
         job = self.scheduler.get_job(job_id)
-        if job and job.metadata:
-            job.metadata['status'] = JobStatus.SUCCESS
-            job.metadata['status_message'] = '任务执行完成'
-            job.metadata['last_run_time'] = datetime.now().isoformat()
+        if not job or not job.metadata:
+            raise ValueError("Job ID {} not found".format(job_id))
+        update_dict = job.metadata.copy()
+        update_dict['timestamp'] = datetime.now()
+        if event.code == EVENT_JOB_SUBMITTED:
+            update_dict["status"] = JobStatus.RUNNING
+            update_dict["description"] = "任务正在执行或者排队"
+            self.logger.info(f"任务 {job_id} 正在执行或者排队")
 
-            # 如果有执行结果，可以存储到metadata中
-            if hasattr(event, 'retval') and event.retval:
-                job.metadata['last_result'] = event.retval
-
+        elif event.code == EVENT_JOB_EXECUTED:
+            update_dict["status"] = JobStatus.SUCCESS
+            update_dict["description"] = "任务执行完成"
             self.logger.info(f"任务 {job_id} 执行成功")
 
-    def _on_job_error(self, event) -> None:
-        """任务执行失败监听器"""
-        job_id = event.job_id
-        exception = event.exception
+        elif event.code == EVENT_JOB_ERROR:
+            update_dict["status"] = JobStatus.FAILED
+            exception = event.exception
+            update_dict["description"] = "任务失败，失败原因：{}".format(str(exception))
+            self.logger.error("任务失败，失败原因：{}".format(str(exception)))
 
-        job = self.scheduler.get_job(job_id)
-        if job and job.metadata:
-            retry_count = job.metadata.get('retry_count', 0)
-            max_retries = self.settings.crawler.retry_times
-
-            if retry_count < max_retries:
-                # 安排重试
-                retry_count += 1
-                job.metadata['retry_count'] = retry_count
-                job.metadata['status'] = JobStatus.PENDING
-                job.metadata['status_message'] = f'准备第{retry_count}次重试'
-
-                # 重新调度任务
-                self._reschedule_job_for_retry(job, retry_count)
-
-                self.logger.warning(
-                    f"任务 {job_id} 将进行第{retry_count}次重试: {str(exception)}"
-                )
-            else:
-                # 重试次数已达上限
-                job.metadata['status'] = JobStatus.FAILED
-                job.metadata['status_message'] = f'重试{max_retries}次后仍失败: {str(exception)}'
-                job.metadata['failure_reason'] = str(exception)
-
-                self.logger.error(f"任务 {job_id} 最终失败: {str(exception)}")
-
-    def _on_job_missed(self, event) -> None:
-        """任务错过执行时间监听器"""
-        job_id = event.job_id
-
-        job = self.scheduler.get_job(job_id)
-        if job and job.metadata:
-            job.metadata['status'] = JobStatus.FAILED
-            job.metadata['status_message'] = '任务错过执行时间'
-
+        elif event.code == EVENT_JOB_MISSED:
+            update_dict["status"] = JobStatus.FAILED
+            update_dict["description"] = "任务错过执行时间"
             self.logger.warning(f"任务 {job_id} 错过执行时间")
 
-    def _reschedule_job_for_retry(self, job, retry_count: int) -> None:
-        """重新调度失败的任务进行重试"""
-        try:
-            # 计算重试时间
-            retry_delay = self.settings.crawler.retry_delay
-            retry_time = datetime.now() + timedelta(seconds=retry_delay)
+        job.modify(metadata=update_dict)
 
-            # 获取原始的page_ids
-            page_ids = job.metadata.get('page_ids', [])
-            handler_type = job.metadata.get('handler_type', JobHandlerType.CRAWL)
+    async def add_crawl_job(self, job_info: JobInfo) -> JobInfo:
+        """
+        添加爬虫调度任务
+        :param job_info:
+        :return:
+        """
+        res_job = None
+        trigger = self._create_trigger(job_info.trigger_type, job_info.trigger_time)
+        # 准备metadata - 存储所有业务信息
+        metadata =job_info.to_metadata()
 
-            # 获取处理器
-            handler_class = self.job_handlers.get(handler_type)
-            if not handler_class:
-                self.logger.error(f"未找到处理器: {handler_type}")
-                return
+        # 添加任务到调度器
+        self.scheduler.add_job(
+            func=handler.execute,
+            trigger=trigger,
+            id=job_info.job_id,
+            args=[job_info.page_ids or []],
+            metadata=metadata
+        )
 
-            handler = handler_class()
+        self.logger.info(f"单个任务添加成功: {job_info.job_id}")
 
-            # 创建新的重试任务ID
-            retry_job_id = f"{job.id}_retry_{retry_count}"
+        return job_info
 
-            # 复制原任务的metadata
-            retry_metadata = job.metadata.copy()
-            retry_metadata['original_job_id'] = job.id
-            retry_metadata['is_retry'] = True
+    async def _add_report_job(self, job_info: JobInfo) -> JobInfo:
 
-            # 添加重试任务
-            self.scheduler.add_job(
-                func=handler.execute,
-                trigger=DateTrigger(run_date=retry_time),
-                id=retry_job_id,
-                args=[page_ids],
-                metadata=retry_metadata
-            )
+        """
+        添加报告调度任务，暂时不实现
 
-            self.logger.info(f"任务 {job.id} 重试已调度，重试ID: {retry_job_id}")
-
-        except Exception as e:
-            self.logger.error(f"重新调度任务失败 {job.id}: {e}")
-            if job.metadata:
-                job.metadata['status'] = JobStatus.FAILED
-                job.metadata['status_message'] = f'重试调度失败: {str(e)}'
+        :param trigger_type:
+        :param trigger_time:
+        :return:
+        """
+        pass
 
     async def start(self) -> None:
         """启动调度器"""
@@ -218,18 +179,19 @@ class TaskScheduler:
         self.start_time = None
         self.logger.info("任务调度器已关闭")
 
-    def _generate_job_id(self, job_type: str, page_id: Optional[str] = None) -> str:
-        """生成任务ID"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        if page_id:
-            return f"{job_type}_{page_id}_{timestamp}"
-        else:
-            return f"{job_type}_{timestamp}_{str(uuid.uuid4())[:8]}"
+    @staticmethod
+    def _create_trigger(trigger_type: TriggerType, trigger_time: Dict[str, Any]):
+        """
+        根据触发器类型创建触发器
 
-    def _create_trigger(self, trigger_type: TriggerType, trigger_time: Dict[str, Any]):
-        """根据触发器类型创建触发器"""
+        :param trigger_type:
+        :param trigger_time:
+        :return:
+        """
         if trigger_type == TriggerType.DATE:
-            run_time = trigger_time.get("run_time")
+            run_time = trigger_time.get("run_time", None)
+            if not run_time:
+                run_time = datetime.now()
             return DateTrigger(run_date=run_time)
         elif trigger_type == TriggerType.CRON:
             return CronTrigger(**trigger_time)
@@ -244,27 +206,9 @@ class TaskScheduler:
             try:
                 if job_info.handler == JobHandlerType.REPORT:
                     continue  # 跳过报告任务
-                await self.add_job(job_info)
+                await self.add_crawl_job(job_info)
             except Exception as e:
                 self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
-
-    async def add_job(self, job_info: JobInfo) -> JobInfo:
-        """根据JobInfo添加调度任务"""
-        # 如果没有job_id，生成一个
-        if not job_info.job_id:
-            job_info.job_id = self._generate_job_id(job_info.handler)
-
-        # 获取完整的page_ids
-        if job_info.page_ids:
-            page_ids = self.get_full_page_ids(job_info.page_ids)
-            job_info.page_ids = page_ids
-
-        # 如果是多个页面的批次任务
-        if job_info.page_ids and len(job_info.page_ids) > 1:
-            return await self.add_batch_jobs(job_info)
-        else:
-            # 单个任务
-            return await self._add_single_job(job_info)
 
     async def _add_single_job(self, job_info: JobInfo) -> JobInfo:
         """添加单个任务到调度器"""
@@ -451,30 +395,16 @@ class TaskScheduler:
                 "run_time": "未知"
             }
 
-    @staticmethod
-    def get_full_page_ids(page_ids) -> List[str]:
-        """获取完整的页面ID列表"""
-        if not page_ids:
-            return []
-
-        try:
-            from app.crawl_config import CrawlConfig
-            crawl_config = CrawlConfig()
-            return crawl_config.determine_page_ids(page_ids)
-        except Exception:
-            # 如果获取失败，返回原始列表
-            return page_ids if isinstance(page_ids, list) else [page_ids]
-
 
 # 全局调度器实例
-_scheduler: TaskScheduler | None = None
+_scheduler: JobScheduler | None = None
 
 
-def get_scheduler() -> TaskScheduler:
+def get_scheduler() -> JobScheduler:
     """获取调度器实例（单例模式）"""
     global _scheduler
     if _scheduler is None:
-        _scheduler = TaskScheduler()
+        _scheduler = JobScheduler()
     return _scheduler
 
 

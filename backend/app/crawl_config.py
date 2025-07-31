@@ -37,28 +37,27 @@ class CrawlConfig:
         """获取所有任务配置"""
         return self._config.get("crawl_tasks", [])
 
-    def determine_page_ids(self, page_ids: list[str]) -> list[str]:
+    def get_page_ids(self, page_ids: list[str]) -> list[str]:
         """
         根据任务数据确定需要爬取的页面ID列表
 
-        Args:
-            page_ids: 任务数据
-
-        Returns:
-            List[str]: 页面ID列表
+        :param page_ids: 任务页面
+        :return: 页面ID列表
         """
-        # 特殊字符任务类型
-        if len(page_ids) == 1 and page_ids[0] in ["all", "jiazi", "category"]:
-            special_word = page_ids[0]
-            if special_word == "jiazi":
-                # 夹子榜任务
-                return ["jiazi"]
-            elif special_word == "category":
-                # 所有分类任务
-                return self.get_category_page_ids()
+        res = []
+        special_words = {"all": self.get_all_page_ids(), "category": self.get_category_page_ids}  # 特殊字符任务类型
+        for page_id in page_ids:
+            if page_id in special_words:
+                func = special_words.get(page_id, None)
+                if not func:
+                    raise ValueError(f"page id {page_id} does not exist")
+                res.extend(func())
+                continue
+            if page_id in self.validate_page_id(page_id):
+                res.append(page_id)
             else:
-                return self.get_all_page_ids()
-        return [pid for pid in page_ids if self.validate_page_id(pid)]
+                raise ValueError(f"page id {page_id} does not exist")
+        return res
 
     def get_category_page_ids(self) -> list[str]:
         """获取所有分类页面ID列表（排除夹子榜）"""

@@ -90,3 +90,13 @@ def delta_to_str(delta: timedelta | int = None) -> str:
     hours, remainder = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return str_format.format(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+
+def generate_job_id(job_type: str, run_time: datetime) -> str:
+    """
+    根据任务类型和运行时间生成job_id
+    :param job_type:
+    :param run_time:
+    :return:
+    """
+    return f"{job_type}_{run_time.strftime('%Y%m%d%H%M%S')}"

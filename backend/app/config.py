@@ -92,6 +92,7 @@ class SchedulerSettings(BaseSettings):
     # 任务存储配置
     job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
     job_store_url: str | None = Field(default=None, description="任务存储连接URL，默认使用数据库URL")
+    job_store_table_name: str = Field(default="scheduler_jobs", description="调度任务存储表格")
     
     # 事件系统配置
     enable_event_logging: bool = Field(default=True, description="是否启用事件日志记录")

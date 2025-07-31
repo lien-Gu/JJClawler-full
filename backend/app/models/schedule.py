@@ -6,7 +6,7 @@
 - 调度器管理模型
 - API请求/响应模型
 """
-
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -45,16 +45,17 @@ class CrawTaskInfo(BaseModel):
     rankings: List[Dict[str, Any]] = Field(default_factory=list, description="该页面中的榜单列表")
     summary: Dict[str, Any] = Field(default_factory=dict, description="该爬取任务爬取了多少个榜单，多少本书籍")
 
+
 class JobResultModel(BaseModel):
     """
     任务执行结果模型
     """
     success: bool = Field(default=True, description="任务是否执行成功")
     message: str = Field(default="成功完成任务", description="执行结果消息")
-    data: Optional[CrawTaskInfo|Dict[str, Any]] = Field(None, description="执行结果数据")
+    data: Optional[CrawTaskInfo | Dict[str, Any]] = Field(None, description="执行结果数据")
     exception: Optional[str] = Field(None, description="异常信息")
     execution_time: Optional[float] = Field(None, description="执行时间（秒）")
-    
+
     @classmethod
     def success_result(cls, message: str, data: Optional[Dict[str, Any]] = None) -> "JobResultModel":
         """创建成功结果"""
@@ -70,7 +71,6 @@ class JobResultModel(BaseModel):
         )
 
 
-
 class JobInfo(BaseModel):
     """
     调度任务信息
@@ -79,10 +79,28 @@ class JobInfo(BaseModel):
     trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
     trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
     handler: JobHandlerType = Field(..., description="处理器类")
-    status: Optional[Tuple[JobStatus, str]] = Field(None, description="调度任务运行的状态，完成了多少个任务了")
+    result: Optional[List[JobResultModel]] = Field(default=None, description="任务运行结果")
+    status: Optional[Tuple[JobStatus, str]] = Field(default=None, description="调度任务运行的状态")
+    description: Optional[str] = Field(None, description="调度状态描述")
+    # 爬虫任务需要的参数
     page_ids: Optional[List[str]] = Field(None, description="爬虫任务需要爬取的页面")
-    result: Optional[List[JobResultModel]] = Field(None, description="任务运行结果")
-    desc: Optional[str] = Field(None, description="调度状态描述")
+
+    def get_page_ids(self):
+        from app.crawl_config import CrawlConfig
+        self.page_ids = CrawlConfig().get_page_ids(self.page_ids)
+
+    def to_metadata(self) -> dict:
+        return {
+            "status": self.status,
+            "description": self.message,
+            "handler_class": self.handler,
+            "page_ids": ",".join(self.page_ids),
+        }
+    def from_metadata(self, metadata: dict):
+        self.status = metadata["status"]
+        self.description = metadata["description"]
+        self.page_ids = metadata["page_ids"]
+
 
 
 class SchedulerInfo(BaseModel):

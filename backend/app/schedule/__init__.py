@@ -29,10 +29,10 @@ APScheduler 调度器设计说明:
 """
 
 from .handlers import BaseJobHandler, CrawlJobHandler, ReportJobHandler
-from .scheduler import TaskScheduler, get_scheduler, start_scheduler, stop_scheduler
+from .scheduler import JobScheduler, get_scheduler, start_scheduler, stop_scheduler
 
 __all__ = [
-    "TaskScheduler",
+    "JobScheduler",
     "BaseJobHandler",
     "CrawlJobHandler",
     "ReportJobHandler",

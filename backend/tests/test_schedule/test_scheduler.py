@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.models.schedule import JobHandlerType, JobInfo, JobStatus, TriggerType
-from app.schedule.scheduler import TaskScheduler
+from app.schedule.scheduler import JobScheduler
 
 
 class TestTaskScheduler:
@@ -19,7 +19,7 @@ class TestTaskScheduler:
     @pytest.fixture
     def scheduler(self):
         """创建调度器实例"""
-        return TaskScheduler()
+        return JobScheduler()
 
     @pytest.fixture
     def mock_apscheduler(self):
@@ -223,12 +223,12 @@ class TestTaskScheduler:
         """测试获取完整页面ID列表 - 成功场景"""
         with patch('app.crawl_config.CrawlConfig') as mock_config:
             mock_instance = mock_config.return_value
-            mock_instance.determine_page_ids.return_value = ["jiazi", "category"]
+            mock_instance.get_page_ids.return_value = ["jiazi", "category"]
             
             result = scheduler.get_full_page_ids(["jiazi"])
             
             assert result == ["jiazi", "category"]
-            mock_instance.determine_page_ids.assert_called_once_with(["jiazi"])
+            mock_instance.get_page_ids.assert_called_once_with(["jiazi"])
 
     def test_get_full_page_ids_fallback(self, scheduler):
         """测试获取完整页面ID列表 - 异常回退"""

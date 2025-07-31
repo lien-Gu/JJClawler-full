@@ -77,16 +77,16 @@ class TestCrawlConfig:
         config = CrawlConfig()
         
         # 测试单个页面ID
-        assert config.determine_page_ids(["jiazi"]) == ["jiazi"]
+        assert config.get_page_ids(["jiazi"]) == ["jiazi"]
         
         # 测试特殊关键字
-        category_ids = config.determine_page_ids(["category"])
+        category_ids = config.get_page_ids(["category"])
         assert "index" in category_ids
         assert "yq" in category_ids
         assert "jiazi" not in category_ids  # 分类页面应排除jiazi
         
         # 测试all关键字
-        all_ids = config.determine_page_ids(["all"])
+        all_ids = config.get_page_ids(["all"])
         assert len(all_ids) == 3
         assert "jiazi" in all_ids
 
