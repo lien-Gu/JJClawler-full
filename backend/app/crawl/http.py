@@ -43,14 +43,12 @@ class HttpClient:
     async def run(self, urls: Union[str, List[str]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         执行HTTP请求 - 唯一的对外接口
-        
-        Args:
-            urls: 单个URL字符串或URL列表
-            
-        Returns:
-            单个URL返回Dict，多个URL返回List[Dict]
-            错误格式: {"status": "error", "url": url, "error": error_msg}
+
+        :param urls:  单个URL字符串或URL列表
+        :return: 单个URL返回Dict，多个URL返回List[Dict].
+        错误格式: {"status": "error", "url": url, "error": error_msg}
         """
+
         if isinstance(urls, str):
             return await self._request_single(urls)
 
@@ -93,12 +91,8 @@ class HttpClient:
     async def _request_single(self, url: str) -> Dict[str, Any]:
         """
         执行单个HTTP请求
-        
-        Args:
-            url: 目标URL
-            
-        Returns:
-            响应数据字典或错误信息
+        :param url: 目标URL
+        :return: 响应数据字典或错误信息
         """
         try:
             response = await self._client.get(url)
@@ -111,12 +105,8 @@ class HttpClient:
     async def _request_sequential(self, urls: List[str]) -> List[Dict[str, Any]]:
         """
         顺序执行多个HTTP请求
-        
-        Args:
-            urls: URL列表
-            
-        Returns:
-            响应数据列表
+        :param urls: URL列表
+        :return: 响应数据列表
         """
         results = []
         for i, url in enumerate(urls):
@@ -126,4 +116,3 @@ class HttpClient:
             results.append(result)
         return results
 
-    # 移除并发相关方法，由上层CrawlFlow统一控制并发
