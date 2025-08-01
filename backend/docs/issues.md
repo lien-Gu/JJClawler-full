@@ -192,3 +192,96 @@ scheduler_info = scheduler.get_scheduler_info()  # 正确
 2. **解耦重要性**: 模块间的松耦合设计大大提升了代码的可维护性
 3. **测试驱动**: 完善的测试用例帮助确保重构过程中功能的正确性
 4. **配置优化**: 合理的并发配置对调度器性能有显著影响
+
+---
+
+## 2025-08-01: 并发爬取功能实现完成
+
+### 实施背景
+用户要求实现并发爬取功能，支持多页面同时爬取以最大化计算机资源利用率。要求使用现有的Service层避免重复实现功能。
+
+### 技术方案
+实现了基于AsyncIO的并发爬取架构：
+
+#### 1. 配置优化 (@app/config.py)
+- **页面级并发控制**: max_concurrent_pages=3, page_retry_times=2, page_retry_delay=2.0
+- **保留原有并发参数**: concurrent_requests, request_delay等HTTP层面配置
+- 删除了过度复杂的配置，专注核心功能
+
+#### 2. CrawlFlow重构 (@app/crawl/crawl_flow.py)
+- **并发架构**: 使用asyncio.Semaphore控制最大同时处理页面数
+- **重试机制**: 页面级重试，支持指数退避延迟
+- **现有Service集成**: 直接使用BookService和RankingService，避免重复代码
+- **统计与监控**: 完整的执行统计和错误处理
+- **向后兼容**: 支持单页面字符串和多页面列表输入
+
+```python
+async def execute_crawl_task(self, page_ids: Union[str, List[str]]) -> Tuple[bool, Dict]:
+    """执行并发爬取任务 - 支持单页面和多页面"""
+    # 并发爬取所有页面
+    tasks = [self._crawl_single_page_with_retry(page_id) for page_id in page_ids]
+    page_results = await asyncio.gather(*tasks, return_exceptions=True)
+    return self._aggregate_results(page_results, page_ids)
+```
+
+#### 3. HttpClient优化 (@app/crawl/http.py)
+- **连接池优化**: 20个keep-alive连接，30个最大连接
+- **统一异步**: 移除同步客户端，全部使用异步操作
+- **重试机制**: 带指数退避的请求重试
+- **代理问题解决**: 处理环境变量代理配置冲突
+
+#### 4. 路径修复
+- **配置文件路径**: 修复crawl_config.py中urls.json路径错误
+- **项目结构适配**: 确保配置文件正确加载
+
+### 实施结果
+
+#### 成功完成项目
+1. ✅ **配置简化**: 删除过度复杂配置，保留核心并发参数
+2. ✅ **CrawlFlow重构**: 完整的并发架构，使用现有Service层
+3. ✅ **HttpClient优化**: 异步连接池，统一重试机制
+4. ✅ **基础功能验证**: 并发控制、URL构建、资源管理等核心功能正常
+
+#### 技术特点
+- **高并发**: 支持最多8个页面同时爬取（默认3个）
+- **容错性**: 页面级重试，单个页面失败不影响其他页面
+- **资源控制**: Semaphore控制并发数，防止资源过载
+- **现有架构集成**: 充分利用BookService和RankingService避免重复开发
+- **统计完整**: 详细的执行时间、成功/失败页面、爬取数量统计
+
+#### 性能优势
+- **并行处理**: 多页面同时爬取，大幅提升整体速度
+- **连接复用**: HTTP连接池减少连接建立开销
+- **智能重试**: 指数退避重试避免无效请求
+- **内存高效**: 使用异步IO，内存占用优化
+
+### 环境注意事项
+- **代理配置**: 系统代理环境变量(all_proxy, http_proxy, https_proxy)可能导致初始化失败
+- **解决方案**: 测试前需要`unset`相关代理环境变量，或在生产环境中配置正确的代理支持
+
+### 测试验证
+```bash
+# 清除代理环境变量
+unset all_proxy && unset http_proxy && unset https_proxy
+
+# 运行测试
+uv run python -c "
+from app.crawl.crawl_flow import CrawlFlow
+import asyncio
+
+async def test():
+    flow = CrawlFlow()
+    print(f'并发控制信号量：{flow.page_semaphore._value}')
+    result = flow.config.build_url('jiazi')
+    print(f'URL构建: {result[:50]}...')
+    await flow.close()
+
+asyncio.run(test())
+"
+```
+
+### 时间记录
+- **开始时间**: 2025-08-01
+- **完成时间**: 2025-08-01
+- **总耗时**: 约60分钟
+- **主要工作**: 并发架构设计、现有Service集成、HttpClient优化、环境问题解决

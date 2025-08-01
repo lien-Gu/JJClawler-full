@@ -10,7 +10,7 @@ class CrawlConfig:
     """爬取配置类"""
 
     def __init__(self):
-        self.urls_file = Path(__file__).parent.parent.parent.joinpath("data/urls.json")
+        self.urls_file = Path(__file__).parent.parent.joinpath("data/urls.json")
         self._config = None
         self.params = None
         self.templates = None

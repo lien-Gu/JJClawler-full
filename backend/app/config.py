@@ -73,6 +73,11 @@ class CrawlerSettings(BaseSettings):
     # 爬取频率控制
     request_delay: float = Field(default=1.0, ge=0.1, le=60.0, description="请求间隔延迟（秒）")
     concurrent_requests: int = Field(default=5, ge=0, le=10, description="并发请求数")
+    
+    # 页面级并发配置
+    max_concurrent_pages: int = Field(default=3, ge=1, le=8, description="最大并发页面数")
+    page_retry_times: int = Field(default=2, ge=0, le=5, description="页面级重试次数")
+    page_retry_delay: float = Field(default=2.0, ge=0.5, le=10.0, description="页面重试延迟（秒）")
 
     class Config:
         env_prefix = "CRAWLER_"
