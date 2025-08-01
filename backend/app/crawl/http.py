@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''
-# @Project: PyCharm
-# @File    : http.py
-# @Time: 2025/7/23 23:46
-# @Author  : Leeby Gu
-'''
+"""
+HTTP客户端模块 - 优化的异步HTTP请求客户端
+
+提供高性能的HTTP请求功能，支持并发和顺序两种模式。
+重试逻辑由上层CrawlFlow处理，本模块专注于基础HTTP请求。
+
+Author: Leeby Gu
+Date: 2025/7/23 23:46
+"""
+
 import asyncio
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import httpx
 
@@ -19,20 +23,51 @@ logger = get_logger(__name__)
 
 
 class HttpClient:
-    def __init__(self, concurrent: bool = None):
-        config = settings.crawler
-        self.limits = config.concurrent_requests
-        self.concurrent = concurrent if concurrent is not None else self.limits > 1
-        self.delay = config.request_delay
-        self.timeout = config.timeout
-        self.retries = config.retry_times
+    """
+    统一HTTP客户端 - 专注基础HTTP请求功能
+    
+    特性:
+    - 连接池优化，支持keep-alive
+    - 统一的错误处理和结果格式
+    - 自动JSON解析
+    - 并发控制由上层CrawlFlow统一管理
+    """
 
-        # 创建优化的HTTP客户端
-        self._create_optimized_clients()
+    def __init__(self):
+        """
+        初始化HTTP客户端
+        """
+        self._config = settings.crawler
+        self._client = self._create_http_client()
 
-    def _create_optimized_clients(self):
-        """创建优化的HTTP客户端连接池"""
+    async def run(self, urls: Union[str, List[str]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        执行HTTP请求 - 唯一的对外接口
+        
+        Args:
+            urls: 单个URL字符串或URL列表
+            
+        Returns:
+            单个URL返回Dict，多个URL返回List[Dict]
+            错误格式: {"status": "error", "url": url, "error": error_msg}
+        """
+        if isinstance(urls, str):
+            return await self._request_single(urls)
 
+        if not urls:
+            return []
+
+        # 统一使用顺序处理，并发由上层控制
+        return await self._request_sequential(urls)
+
+    async def close(self):
+        """关闭HTTP客户端连接池"""
+        await self._client.aclose()
+
+    # ==================== 私有方法 ====================
+
+    def _create_http_client(self) -> httpx.AsyncClient:
+        """创建优化的HTTP客户端"""
         # 连接池配置
         limits = httpx.Limits(
             max_keepalive_connections=20,
@@ -43,98 +78,52 @@ class HttpClient:
         # 超时配置
         timeout = httpx.Timeout(
             connect=10.0,
-            read=self.timeout,
+            read=self._config.timeout,
             write=10.0,
             pool=5.0
         )
 
-        # 异步客户端（移除同步客户端，统一使用异步）
-        self.async_client = httpx.AsyncClient(
+        return httpx.AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            headers=settings.crawler.user_agent
+            headers=self._config.user_agent
         )
 
-    async def run(self, urls: str | List[str]) -> Dict | List[Dict]:
+    async def _request_single(self, url: str) -> Dict[str, Any]:
         """
-        运行爬取网页 - 优化版本
-        :param urls:
-        :return:
+        执行单个HTTP请求
+        
+        Args:
+            url: 目标URL
+            
+        Returns:
+            响应数据字典或错误信息
         """
-        if isinstance(urls, str):
-            return await self._request_single_with_retry(urls)
+        try:
+            response = await self._client.get(url)
+            response.raise_for_status()
+            return json.loads(response.content)
+        except (httpx.RequestError, json.JSONDecodeError, httpx.HTTPStatusError) as e:
+            logger.debug(f"HTTP请求失败 {url}: {e}")
+            return {"status": "error", "url": url, "error": str(e)}
 
-        if not self.concurrent:
-            return await self.run_synchronously(urls)
-
-        return await self.run_concurrently(urls)
-
-    async def _request_single_with_retry(self, url: str) -> Dict[str, Any]:
+    async def _request_sequential(self, urls: List[str]) -> List[Dict[str, Any]]:
         """
-        带重试的单个请求
-        :param url:
-        :return:
-        """
-        last_exception = None
-
-        for attempt in range(self.retries + 1):
-            try:
-                response = await self.async_client.get(url)
-                response.raise_for_status()
-                return json.loads(response.content)
-
-            except (httpx.RequestError, json.JSONDecodeError, httpx.HTTPStatusError) as e:
-                last_exception = e
-                if attempt < self.retries:
-                    retry_delay = self.delay * (2 ** attempt)  # 指数退避
-                    logger.debug(f"请求失败 {url}, 第 {attempt + 1} 次重试，延迟 {retry_delay:.1f}s")
-                    await asyncio.sleep(retry_delay)
-                else:
-                    logger.error(f"请求最终失败 {url}: {e}")
-
-        return {"status": "error", "url": url, "error": str(last_exception)}
-
-    async def run_concurrently(self, urls: List[str]) -> List[Dict]:
-        """
-        异步并发爬取网页
-        :param urls:
-        :return:
-        """
-        semaphore = asyncio.Semaphore(self.limits)
-        tasks = [self._request_and_get_content_async(url, semaphore) for url in urls]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        return results
-
-    async def run_synchronously(self, urls: List[str]) -> List[Dict]:
-        """
-        异步顺序爬取 - 支持重试机制
-        :param urls:
-        :return:
+        顺序执行多个HTTP请求
+        
+        Args:
+            urls: URL列表
+            
+        Returns:
+            响应数据列表
         """
         results = []
-        for url in urls:
-            await asyncio.sleep(self.delay)  # 请求间隔
-            result = await self._request_single_with_retry(url)
+        for i, url in enumerate(urls):
+            if i > 0:  # 第一个请求不需要延迟
+                await asyncio.sleep(self._config.request_delay)
+            result = await self._request_single(url)
             results.append(result)
         return results
 
-    async def _request_and_get_content_async(
-            self, url: str, semaphore: asyncio.Semaphore
-    ) -> Dict[str, Any]:
-        """
-        带信号量控制的异步请求 - 使用统一的重试机制
-        :param url:
-        :param semaphore:
-        :return:
-        """
-        async with semaphore:
-            await asyncio.sleep(self.delay)  # 请求间隔控制
-            return await self._request_single_with_retry(url)
-
-    async def close(self):
-        """
-        关闭请求连接池
-        :return:
-        """
-        await self.async_client.aclose()
+    # 移除并发相关方法，由上层CrawlFlow统一控制并发
