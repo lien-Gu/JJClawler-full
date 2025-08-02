@@ -51,10 +51,8 @@ class HttpClient:
 
         if isinstance(urls, str):
             return await self._request_single(urls)
-
         if not urls:
             return []
-
         # 统一使用顺序处理，并发由上层控制
         return await self._request_sequential(urls)
 

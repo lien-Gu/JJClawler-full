@@ -3,14 +3,16 @@
 """
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
 from typing import Tuple
 
+import httpx
 from sqlalchemy.orm import Session
-from tenacity import before_sleep_log, retry, retry_if_exception, stop_after_attempt, wait_exponential
+from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.crawl_config import CrawlConfig
@@ -20,7 +22,7 @@ from app.database.service.ranking_service import RankingService
 from app.logger import get_logger
 from .http import HttpClient
 from .parser import NovelPageParser, PageParser, RankingParser
-from ..models import BaseResult
+from ..models.base import BaseResult
 from ..utils import generate_batch_id
 
 
@@ -44,6 +46,9 @@ class PagesResult(BaseResult[PageParser]):
 
 @dataclass
 class NovelsResult(BaseResult[NovelPageParser]):
+    """
+    多书籍页面爬取结果
+    """
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,7 +82,7 @@ class CrawlFlow:
         # 统一并发控制 - 所有HTTP请求由此信号量管理
         self.request_semaphore = asyncio.Semaphore(self.crawler_config.max_concurrent_requests)
 
-    async def execute_crawl_task(self, page_ids: List[str]) -> Dict:
+    async def execute_crawl_task(self, page_ids: List[str]) -> Dict[str, Any]:
         """
         执行统一并发爬取任务 - 两阶段处理架构
         
@@ -92,9 +97,7 @@ class CrawlFlow:
             page_ids = [page_ids]
 
         start_time = time.time()
-
         logger.info(f"开始统一并发爬取 {len(page_ids)} 个页面: {page_ids}")
-
         try:
             # 阶段 1: 获取所有页面内容
             page_data = await self._fetch_pages(page_ids)
@@ -154,7 +157,7 @@ class CrawlFlow:
 
     @retry(stop=stop_after_attempt(5),
            wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception(Exception),
+           retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_page(self, page_id: str) -> PageParser | Exception:
         async with self.request_semaphore:
@@ -223,7 +226,7 @@ class CrawlFlow:
 
     @retry(stop=stop_after_attempt(5),
            wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception(Exception),
+           retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_book(self, novel_id: str) -> NovelPageParser | Exception:
         """
