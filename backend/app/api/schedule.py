@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, Query
 
 from ..models.base import DataResponse
-from ..models.schedule import JobHandlerType, JobInfo, JobStatus, SchedulerInfo, TriggerType
+from ..models.schedule import JobType, JobInfo, JobStatus, SchedulerInfo, TriggerType
 from ..schedule import get_scheduler
 from app.utils import generate_job_id
 router = APIRouter()
@@ -31,15 +31,15 @@ async def create_crawl_job(
     try:
         run_time = run_time if run_time else datetime.now()
         job_info = JobInfo(
-            job_id=generate_job_id(JobHandlerType.CRAWL, run_time),
-            trigger_type=JobHandlerType.CRAWL,
+            job_id=generate_job_id(JobType.CRAWL, run_time),
+            trigger_type=TriggerType.DATE,
             trigger_time=run_time,
-            handler=JobHandlerType.CRAWL,
+            type=JobType.CRAWL,
             page_ids=page_ids,
             result=None
         )
         job_info.get_page_ids()
-        job_info_with_result = await scheduler.add_crawl_job(job_info)
+        job_info_with_result = await scheduler.add_schedule_job(job_info)
 
         return DataResponse(
             success=True,

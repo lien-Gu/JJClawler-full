@@ -78,7 +78,7 @@ class JobInfo(BaseModel):
     job_id: str = Field(..., description="调度任务ID")
     trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
     trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
-    handler: JobType = Field(..., description="处理器类")
+    type: JobType = Field(..., description="处理器类")
     result: Optional[List[Dict[str, Any]]] = Field(default=None, description="任务执行历史结果列表")
     status: Optional[Tuple[JobStatus, str]] = Field(default=None, description="调度任务运行的状态")
     desc: Optional[str] = Field(None, description="任务描述")
@@ -97,7 +97,7 @@ class JobInfo(BaseModel):
         return {
             "status": self.status[0] if self.status else JobStatus.PENDING,
             "status_message": self.status[1] if self.status else "任务已创建",
-            "handler_type": self.handler,
+            "job_type": self.type,
             "page_ids": self.page_ids or [],
             "desc": self.desc or ""
         }
@@ -123,7 +123,7 @@ PREDEFINED_JOB_INFO = {
         job_id="jiazi_crawl",
         trigger_type=TriggerType.CRON,
         trigger_time={"hour": "*/1"},  # 每小时执行一次
-        handler=JobType.CRAWL,
+        type=JobType.CRAWL,
         status=(JobStatus.PENDING, "尚未初始化"),
         page_ids=["jiazi"],
         result=None,
@@ -133,7 +133,7 @@ PREDEFINED_JOB_INFO = {
         job_id="category_crawl",
         trigger_type=TriggerType.CRON,
         trigger_time={"hour": "6-18", "minute": "0"},  # 6-18点每小时执行
-        handler=JobType.CRAWL,
+        type=JobType.CRAWL,
         status=(JobStatus.PENDING, "尚未初始化"),
         page_ids=["category"],
         result=None,

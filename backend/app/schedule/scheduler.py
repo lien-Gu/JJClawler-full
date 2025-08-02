@@ -20,7 +20,7 @@ from app.config import SchedulerSettings, get_settings
 from app.crawl import CrawlFlow
 from app.logger import get_logger
 from app.models.schedule import (
-    JobHandlerType,
+    JobType,
     JobInfo,
     JobStatus,
     PREDEFINED_JOB_INFO,
@@ -41,7 +41,7 @@ class JobScheduler:
         """初始化调度器"""
         self.settings: SchedulerSettings = None
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_handlers: Dict = {}
+        self.job_func_mapping: Dict = {}
         self.logger = None
         self.start_time: Optional[datetime] = None
 
@@ -51,9 +51,9 @@ class JobScheduler:
     def _initial_variety(self):
         """注册默认任务处理器"""
         self.settings = get_settings().scheduler
-        self.job_handlers = {
-            JobHandlerType.CRAWL: self._add_report_job,
-            JobHandlerType.REPORT: self._add_report_job,
+        self.job_func_mapping = {
+            JobType.CRAWL: self.add_crawl_job,
+            JobType.REPORT: self._add_report_job,
         }
         self.logger = get_logger(__name__)
 
@@ -166,6 +166,16 @@ class JobScheduler:
 
         job.modify(metadata=update_dict)
 
+    async def add_schedule_job(self, job_info: JobInfo) -> JobInfo:
+        """
+        添加调度任务
+        :param job_info:
+        :return:
+        """
+        if not job_info.type:
+            raise ValueError("Job missing important field: type")
+        return self.job_func_mapping.get(job_info.type)(job_info)
+
     async def add_crawl_job(self, job_info: JobInfo) -> JobInfo:
         """
         添加爬虫调度任务
@@ -187,7 +197,7 @@ class JobScheduler:
 
         # 添加任务到调度器
         self.scheduler.add_job(
-            func=craw_task.execute_crawl_task(job_info.page_ids),
+            func=craw_task.execute_crawl_task,
             trigger=trigger,
             id=job_info.job_id,
             args=[job_info.page_ids or []],
@@ -261,7 +271,7 @@ class JobScheduler:
             trigger=cleanup_trigger,
             id="__system_job_cleanup__",
             metadata={
-                'handler_type': 'system',
+                'job_type': 'system',
                 'status': JobStatus.PENDING,
                 'status_message': '系统任务清理器',
                 'desc': '自动清理过期任务',
@@ -271,7 +281,9 @@ class JobScheduler:
                 'execution_results': [],
                 'last_result': None,
                 'last_execution_time': None,
-                'execution_count': 0
+                'execution_count': 0,
+                'total_success_count': 0,
+                'total_failure_count': 0,
             },
             remove_on_complete=False
         )
@@ -394,7 +406,7 @@ class JobScheduler:
         """加载预定义任务"""
         for job_id, job_info in PREDEFINED_JOB_INFO.items():
             try:
-                if job_info.handler == JobHandlerType.REPORT:
+                if job_info.type == JobType.REPORT:
                     continue  # 跳过报告任务
                 await self.add_crawl_job(job_info)
             except Exception as e:
@@ -431,7 +443,7 @@ class JobScheduler:
             job_id=job.id,
             trigger_type=trigger_type,
             trigger_time=trigger_time,
-            handler=metadata.get('handler_type', JobHandlerType.CRAWL),
+            type=metadata.get('job_type', JobType.CRAWL),
             status=(
                 metadata.get('status', JobStatus.PENDING),
                 metadata.get('status_message', '未知状态')
