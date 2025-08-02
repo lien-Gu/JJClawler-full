@@ -5,7 +5,7 @@
 移除了内存存储，实现了更简洁和稳定的架构。
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
@@ -87,27 +87,81 @@ class JobScheduler:
         job = self.scheduler.get_job(job_id)
         if not job or not job.metadata:
             raise ValueError("Job ID {} not found".format(job_id))
+
         update_dict = job.metadata.copy()
-        update_dict['timestamp'] = datetime.now()
+        current_time = datetime.now()
+        update_dict['updated_at'] = current_time.isoformat()
+
         if event.code == EVENT_JOB_SUBMITTED:
             update_dict["status"] = JobStatus.RUNNING
-            update_dict["description"] = "任务正在执行或者排队"
-            self.logger.info(f"任务 {job_id} 正在执行或者排队")
+            update_dict["status_message"] = "任务正在执行或者排队"
+            update_dict['execution_count'] = update_dict.get('execution_count', 0) + 1
+            self.logger.info(f"任务 {job_id} 正在执行或者排队 (第{update_dict['execution_count']}次)")
 
         elif event.code == EVENT_JOB_EXECUTED:
             update_dict["status"] = JobStatus.SUCCESS
-            update_dict["description"] = "任务执行完成"
-            self.logger.info(f"任务 {job_id} 执行成功")
+            update_dict["status_message"] = "任务执行完成"
+            update_dict['total_success_count'] = update_dict.get('total_success_count', 0) + 1
+            update_dict['last_execution_time'] = current_time.isoformat()
+
+            # 存储任务执行结果
+            execution_result = {
+                'timestamp': current_time.isoformat(),
+                'status': 'success',
+                'result': getattr(event, 'retval', None),
+                'duration': None  # 可以后续添加执行时间计算
+            }
+
+            # 更新执行结果历史(保留最近10次)
+            execution_results = update_dict.get('execution_results', [])
+            execution_results.append(execution_result)
+            update_dict['execution_results'] = execution_results[-10:]
+            update_dict['last_result'] = execution_result
+
+            self.logger.info(f"任务 {job_id} 执行成功 (成功{update_dict['total_success_count']}次)")
 
         elif event.code == EVENT_JOB_ERROR:
             update_dict["status"] = JobStatus.FAILED
             exception = event.exception
-            update_dict["description"] = "任务失败，失败原因：{}".format(str(exception))
-            self.logger.error("任务失败，失败原因：{}".format(str(exception)))
+            error_msg = str(exception)
+            update_dict["status_message"] = f"任务失败，失败原因：{error_msg}"
+            update_dict['total_failure_count'] = update_dict.get('total_failure_count', 0) + 1
+            update_dict['last_execution_time'] = current_time.isoformat()
+
+            # 存储失败信息
+            failure_result = {
+                'timestamp': current_time.isoformat(),
+                'status': 'failed',
+                'error': error_msg,
+                'exception_type': exception.__class__.__name__
+            }
+
+            execution_results = update_dict.get('execution_results', [])
+            execution_results.append(failure_result)
+            update_dict['execution_results'] = execution_results[-10:]
+            update_dict['last_result'] = failure_result
+
+            self.logger.error(f"任务 {job_id} 执行失败 (失败{update_dict['total_failure_count']}次): {error_msg}")
 
         elif event.code == EVENT_JOB_MISSED:
             update_dict["status"] = JobStatus.FAILED
-            update_dict["description"] = "任务错过执行时间"
+            update_dict["status_message"] = "任务错过执行时间"
+            update_dict['total_failure_count'] = update_dict.get('total_failure_count', 0) + 1
+            update_dict['last_execution_time'] = current_time.isoformat()
+
+            # 存储错过执行的信息
+            missed_result = {
+                'timestamp': current_time.isoformat(),
+                'status': 'missed',
+                'error': '任务错过执行时间',
+                'exception_type': 'MissedExecution'
+            }
+
+            execution_results = update_dict.get('execution_results', [])
+            execution_results.append(missed_result)
+            update_dict['execution_results'] = execution_results[-10:]
+            update_dict['last_result'] = missed_result
+
             self.logger.warning(f"任务 {job_id} 错过执行时间")
 
         job.modify(metadata=update_dict)
@@ -121,6 +175,15 @@ class JobScheduler:
         trigger = self._create_trigger(job_info.trigger_type, job_info.trigger_time)
         # 准备metadata - 存储所有业务信息
         metadata = job_info.to_metadata()
+
+        # 增强metadata结构以支持结果存储
+        metadata.update({
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat(),
+            'execution_results': [],  # 存储最近10次执行结果历史
+            'last_result': None,  # 最后一次执行结果
+            'last_execution_time': None,  # 最后执行时间
+        })
 
         # 添加任务到调度器
         self.scheduler.add_job(
@@ -167,6 +230,10 @@ class JobScheduler:
 
         # 加载预定义任务
         await self._load_predefined_jobs()
+
+        # 设置任务清理定时任务
+        await self._setup_cleanup_job()
+
         self.logger.info("任务调度器启动成功")
 
     async def shutdown(self) -> None:
@@ -179,6 +246,128 @@ class JobScheduler:
         self.scheduler = None
         self.start_time = None
         self.logger.info("任务调度器已关闭")
+
+    async def _setup_cleanup_job(self) -> None:
+        """设置任务清理定时任务"""
+        if not self.settings.job_cleanup_enabled:
+            self.logger.info("任务清理功能已禁用，跳过设置清理任务")
+            return
+
+        cleanup_trigger = IntervalTrigger(hours=self.settings.cleanup_interval_hours)
+
+        # 添加清理任务
+        self.scheduler.add_job(
+            func=self._cleanup_old_jobs,
+            trigger=cleanup_trigger,
+            id="__system_job_cleanup__",
+            metadata={
+                'handler_type': 'system',
+                'status': JobStatus.PENDING,
+                'status_message': '系统任务清理器',
+                'desc': '自动清理过期任务',
+                'is_system_job': True,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat(),
+                'execution_results': [],
+                'last_result': None,
+                'last_execution_time': None,
+                'execution_count': 0
+            },
+            remove_on_complete=False
+        )
+
+        self.logger.info(
+            f"任务清理器已设置，每{self.settings.cleanup_interval_hours}小时执行一次，保留{self.settings.job_retention_days}天内的任务")
+
+    def _cleanup_old_jobs(self) -> Dict[str, Any]:
+        """清理过期任务"""
+        if not self.scheduler:
+            return {"cleaned": 0, "error": "调度器未运行"}
+
+        try:
+            cutoff_date = datetime.now() - timedelta(days=self.settings.job_retention_days)
+            all_jobs = self.scheduler.get_jobs()
+
+            cleaned_count = 0
+            skipped_system = 0
+            skipped_active = 0
+            errors = []
+
+            for job in all_jobs:
+                if not job.metadata:
+                    continue
+
+                # 跳过系统任务
+                if job.metadata.get('is_system_job', False):
+                    skipped_system += 1
+                    continue
+
+                # 检查任务创建时间
+                created_at_str = job.metadata.get('created_at')
+                if not created_at_str:
+                    continue
+
+                try:
+                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    if created_at < cutoff_date:
+                        # 检查是否为一次性已完成任务，或者失败任务
+                        status = job.metadata.get('status')
+                        if status in [JobStatus.SUCCESS, JobStatus.FAILED]:
+                            self.scheduler.remove_job(job.id)
+                            cleaned_count += 1
+                            self.logger.debug(f"清理过期任务: {job.id}")
+                            if cleaned_count >= self.settings.cleanup_batch_size:
+                                break
+                        else:
+                            skipped_active += 1
+
+                except (ValueError, AttributeError) as e:
+                    error_msg = f"解析任务创建时间失败 {job.id}: {e}"
+                    self.logger.warning(error_msg)
+                    errors.append(error_msg)
+                    continue
+
+            result = {
+                "cleaned": cleaned_count,
+                "cutoff_date": cutoff_date.isoformat(),
+                "skipped_system": skipped_system,
+                "skipped_active": skipped_active,
+                "errors": errors
+            }
+
+            self.logger.info(
+                f"任务清理完成: 清理{cleaned_count}个, 跳过系统任务{skipped_system}个, 跳过活动任务{skipped_active}个")
+            return result
+
+        except Exception as e:
+            error_msg = f"任务清理失败: {e}"
+            self.logger.error(error_msg)
+            return {"cleaned": 0, "error": error_msg}
+
+    def get_cleanup_status(self) -> Dict[str, Any]:
+        """获取清理任务状态"""
+        if not self.scheduler:
+            return {"status": "scheduler_not_running"}
+
+        cleanup_job = self.scheduler.get_job("__system_job_cleanup__")
+        if not cleanup_job:
+            return {"status": "cleanup_job_not_found"}
+
+        metadata = cleanup_job.metadata or {}
+        return {
+            "status": "active",
+            "next_run_time": str(cleanup_job.next_run_time) if cleanup_job.next_run_time else None,
+            "last_result": metadata.get('last_result'),
+            "execution_count": metadata.get('execution_count', 0),
+            "success_count": metadata.get('total_success_count', 0),
+            "failure_count": metadata.get('total_failure_count', 0),
+            "config": {
+                "enabled": self.settings.job_cleanup_enabled,
+                "retention_days": self.settings.job_retention_days,
+                "interval_hours": self.settings.cleanup_interval_hours,
+                "batch_size": self.settings.cleanup_batch_size
+            }
+        }
 
     @staticmethod
     def _create_trigger(trigger_type: TriggerType, trigger_time: Dict[str, Any]):
@@ -210,101 +399,6 @@ class JobScheduler:
                 await self.add_crawl_job(job_info)
             except Exception as e:
                 self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
-
-    async def _add_single_job(self, job_info: JobInfo) -> JobInfo:
-        """添加单个任务到调度器"""
-        try:
-            # 创建触发器
-            trigger = self._create_trigger(job_info.trigger_type, job_info.trigger_time)
-
-            # 获取处理器
-            handler_class = self.job_handlers.get(job_info.handler)
-            if not handler_class:
-                raise ValueError(f"未找到处理器: {job_info.handler}")
-
-            handler = handler_class()
-
-            # 准备metadata - 存储所有业务信息
-            metadata = {
-                'handler_type': job_info.handler,
-                'page_ids': job_info.page_ids or [],
-                'status': JobStatus.PENDING,
-                'status_message': '任务已添加到调度器',
-                'desc': job_info.desc or f"{job_info.handler}任务",
-                'retry_count': 0,
-                'created_at': datetime.now().isoformat(),
-                'is_retry': False
-            }
-
-            # 添加任务到调度器
-            self.scheduler.add_job(
-                func=handler.execute,
-                trigger=trigger,
-                id=job_info.job_id,
-                args=[job_info.page_ids or []],
-                metadata=metadata
-            )
-
-            self.logger.info(f"单个任务添加成功: {job_info.job_id}")
-            return job_info
-
-        except Exception as e:
-            self.logger.error(f"添加单个任务失败 {job_info.job_id}: {e}")
-            job_info.status = (JobStatus.FAILED, f"添加任务失败: {str(e)}")
-            raise
-
-    async def add_batch_jobs(self, job_info: JobInfo) -> JobInfo:
-        """添加多个调度任务"""
-        try:
-            batch_jobs = []
-            failed_jobs = []
-
-            for page_id in job_info.page_ids:
-                try:
-                    # 为每个页面创建子任务
-                    sub_job_id = self._generate_job_id(job_info.handler, page_id)
-
-                    # 创建子任务
-                    sub_job_info = JobInfo(
-                        job_id=sub_job_id,
-                        trigger_type=job_info.trigger_type,
-                        trigger_time=job_info.trigger_time,
-                        handler=job_info.handler,
-                        page_ids=[page_id],
-                        desc=f"{job_info.handler}任务 - {page_id}"
-                    )
-
-                    # 添加子任务
-                    await self._add_single_job(sub_job_info)
-                    batch_jobs.append(sub_job_id)
-
-                except Exception as e:
-                    self.logger.error(f"添加子任务失败 {page_id}: {e}")
-                    failed_jobs.append(page_id)
-
-            # 更新批次任务状态
-            total_jobs = len(job_info.page_ids)
-            success_jobs = len(batch_jobs)
-            failed_count = len(failed_jobs)
-
-            if success_jobs == total_jobs:
-                job_info.status = (JobStatus.PENDING, f"批次任务全部添加成功 ({success_jobs}/{total_jobs})")
-            elif success_jobs > 0:
-                job_info.status = (JobStatus.PENDING,
-                                   f"批次任务部分添加成功 ({success_jobs}/{total_jobs}), 失败: {failed_count}")
-            else:
-                job_info.status = (JobStatus.FAILED, f"批次任务全部添加失败 ({failed_count}/{total_jobs})")
-
-            if failed_jobs:
-                job_info.desc = f"{job_info.desc or '批次任务'} - 失败页面: {', '.join(failed_jobs)}"
-
-            self.logger.info(f"批次任务处理完成: {job_info.job_id}, 成功: {success_jobs}, 失败: {failed_count}")
-            return job_info
-
-        except Exception as e:
-            self.logger.error(f"添加批次任务失败 {job_info.job_id}: {e}")
-            job_info.status = (JobStatus.FAILED, f"批次任务处理失败: {str(e)}")
-            raise
 
     def get_job_info(self, job_id: str) -> Optional[JobInfo]:
         """从APScheduler的metadata获取任务信息"""
@@ -344,7 +438,15 @@ class JobScheduler:
             ),
             page_ids=metadata.get('page_ids', []),
             desc=metadata.get('desc', ''),
-            result=metadata.get('last_result')
+            result=metadata.get('execution_results', []),  # 返回执行历史而不是单个结果
+            # 可以扩展返回更多执行统计信息
+            last_result=metadata.get('last_result'),
+            execution_stats={
+                'total_executions': metadata.get('execution_count', 0),
+                'success_count': metadata.get('total_success_count', 0),
+                'failure_count': metadata.get('total_failure_count', 0),
+                'last_execution_time': metadata.get('last_execution_time')
+            }
         )
 
     def get_scheduler_info(self) -> Dict[str, Any]:

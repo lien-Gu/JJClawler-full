@@ -79,11 +79,15 @@ class JobInfo(BaseModel):
     trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
     trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
     handler: JobHandlerType = Field(..., description="处理器类")
-    result: Optional[List[JobResultModel]] = Field(default=None, description="任务运行结果")
+    result: Optional[List[Dict[str, Any]]] = Field(default=None, description="任务执行历史结果列表")
     status: Optional[Tuple[JobStatus, str]] = Field(default=None, description="调度任务运行的状态")
-    description: Optional[str] = Field(None, description="调度状态描述")
+    desc: Optional[str] = Field(None, description="任务描述")
     # 爬虫任务需要的参数
     page_ids: Optional[List[str]] = Field(None, description="爬虫任务需要爬取的页面")
+    
+    # 新增执行统计字段
+    last_result: Optional[Dict[str, Any]] = Field(None, description="最后一次执行结果")
+    execution_stats: Optional[Dict[str, Any]] = Field(None, description="执行统计信息")
 
     def get_page_ids(self):
         from app.crawl_config import CrawlConfig
@@ -91,15 +95,17 @@ class JobInfo(BaseModel):
 
     def to_metadata(self) -> dict:
         return {
-            "status": self.status,
-            "description": self.message,
-            "handler_class": self.handler,
-            "page_ids": ",".join(self.page_ids),
+            "status": self.status[0] if self.status else JobStatus.PENDING,
+            "status_message": self.status[1] if self.status else "任务已创建",
+            "handler_type": self.handler,
+            "page_ids": self.page_ids or [],
+            "desc": self.desc or ""
         }
+        
     def from_metadata(self, metadata: dict):
-        self.status = metadata["status"]
-        self.description = metadata["description"]
-        self.page_ids = metadata["page_ids"]
+        self.status = (metadata.get("status", JobStatus.PENDING), metadata.get("status_message", ""))
+        self.desc = metadata.get("desc", "")
+        self.page_ids = metadata.get("page_ids", [])
 
 
 

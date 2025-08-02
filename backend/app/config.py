@@ -99,20 +99,17 @@ class SchedulerSettings(BaseSettings):
     # 事件系统配置
     enable_event_logging: bool = Field(default=True, description="是否启用事件日志记录")
     event_retry_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="事件处理失败重试延迟（秒）")
+    
+    # 任务清理配置
+    job_cleanup_enabled: bool = Field(default=True, description="是否启用任务清理功能")
+    job_retention_days: int = Field(default=7, ge=1, le=365, description="任务保留天数")
+    cleanup_interval_hours: int = Field(default=24, ge=1, le=168, description="清理任务执行间隔(小时)")
+    cleanup_batch_size: int = Field(default=100, ge=10, le=1000, description="每次清理的任务批量大小")
 
     class Config:
         env_prefix = "SCHEDULER_"
         env_file_encoding = "utf-8"
-    
-    @field_validator("max_workers")
-    @classmethod
-    def validate_max_workers(cls, v: int):
-        """验证最大工作线程数"""
-        if v < 1:
-            raise ValueError("最大工作线程数必须大于0")
-        if v > 20:
-            raise ValueError("最大工作线程数不应超过20，以免资源消耗过大")
-        return v
+
 
 
 class LoggingSettings(BaseSettings):
