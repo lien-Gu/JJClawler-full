@@ -30,11 +30,11 @@ class TriggerType(str, Enum):
     DATE = "date"  # 指定日期
 
 
-class JobHandlerType(str, Enum):
+class JobType(str, Enum):
     """任务处理器类型"""
 
-    CRAWL = "CrawlJobHandler"  # 爬虫任务
-    REPORT = "ReportJobHandler"  # 报告任务
+    CRAWL = "crawl"  # 爬虫任务
+    REPORT = "report"  # 报告任务
 
 
 class CrawTaskInfo(BaseModel):
@@ -78,7 +78,7 @@ class JobInfo(BaseModel):
     job_id: str = Field(..., description="调度任务ID")
     trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
     trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
-    handler: JobHandlerType = Field(..., description="处理器类")
+    handler: JobType = Field(..., description="处理器类")
     result: Optional[List[Dict[str, Any]]] = Field(default=None, description="任务执行历史结果列表")
     status: Optional[Tuple[JobStatus, str]] = Field(default=None, description="调度任务运行的状态")
     desc: Optional[str] = Field(None, description="任务描述")
@@ -123,7 +123,7 @@ PREDEFINED_JOB_INFO = {
         job_id="jiazi_crawl",
         trigger_type=TriggerType.CRON,
         trigger_time={"hour": "*/1"},  # 每小时执行一次
-        handler=JobHandlerType.CRAWL,
+        handler=JobType.CRAWL,
         status=(JobStatus.PENDING, "尚未初始化"),
         page_ids=["jiazi"],
         result=None,
@@ -133,7 +133,7 @@ PREDEFINED_JOB_INFO = {
         job_id="category_crawl",
         trigger_type=TriggerType.CRON,
         trigger_time={"hour": "6-18", "minute": "0"},  # 6-18点每小时执行
-        handler=JobHandlerType.CRAWL,
+        handler=JobType.CRAWL,
         status=(JobStatus.PENDING, "尚未初始化"),
         page_ids=["category"],
         result=None,
