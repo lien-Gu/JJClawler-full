@@ -35,7 +35,6 @@ class JobMetadata:
     # 核心字段
     job_type: JobType
     status: JobStatus = JobStatus.PENDING
-    status_message: str = "任务已创建"
     desc: str = ""
     
     # 任务特定字段
@@ -43,14 +42,11 @@ class JobMetadata:
     is_system_job: bool = False
     
     # 时间戳字段
-    created_at: str = None
-    updated_at: str = None
     last_execution_time: str = None
     
     # 执行统计字段
     execution_count: int = 0
-    total_success_count: int = 0
-    total_failure_count: int = 0
+    success_count: int = 0
     
     # 结果存储字段
     execution_results: List[Dict[str, Any]] = None
@@ -58,12 +54,6 @@ class JobMetadata:
     
     def __post_init__(self):
         """初始化后处理"""
-        current_time = datetime.now().isoformat()
-        
-        if self.created_at is None:
-            self.created_at = current_time
-        if self.updated_at is None:
-            self.updated_at = current_time
         if self.page_ids is None:
             self.page_ids = []
         if self.execution_results is None:
@@ -79,7 +69,6 @@ class JobMetadata:
         return cls(
             job_type=job_info.type,
             status=job_info.status[0] if job_info.status else JobStatus.PENDING,
-            status_message=job_info.status[1] if job_info.status else "任务已创建",
             desc=job_info.desc or "",
             page_ids=job_info.page_ids or []
         )
@@ -88,9 +77,8 @@ class JobMetadata:
     def create_system_cleanup_job(cls) -> "JobMetadata":
         """创建系统清理任务的metadata"""
         return cls(
-            job_type=JobType.CRAWL,  # 使用CRAWL类型，但标记为系统任务
+            job_type=JobType.SYSTEM,
             status=JobStatus.PENDING,
-            status_message="系统任务清理器",
             desc="自动清理过期任务",
             is_system_job=True
         )
@@ -159,18 +147,15 @@ class JobScheduler:
 
         update_dict = job.metadata.copy()
         current_time = datetime.now()
-        update_dict['updated_at'] = current_time.isoformat()
 
         if event.code == EVENT_JOB_SUBMITTED:
             update_dict["status"] = JobStatus.RUNNING
-            update_dict["status_message"] = "任务正在执行或者排队"
             update_dict['execution_count'] = update_dict.get('execution_count', 0) + 1
             self.logger.info(f"任务 {job_id} 正在执行或者排队 (第{update_dict['execution_count']}次)")
 
         elif event.code == EVENT_JOB_EXECUTED:
             update_dict["status"] = JobStatus.SUCCESS
-            update_dict["status_message"] = "任务执行完成"
-            update_dict['total_success_count'] = update_dict.get('total_success_count', 0) + 1
+            update_dict['success_count'] = update_dict.get('success_count', 0) + 1
             update_dict['last_execution_time'] = current_time.isoformat()
 
             # 存储任务执行结果
@@ -187,14 +172,12 @@ class JobScheduler:
             update_dict['execution_results'] = execution_results[-10:]
             update_dict['last_result'] = execution_result
 
-            self.logger.info(f"任务 {job_id} 执行成功 (成功{update_dict['total_success_count']}次)")
+            self.logger.info(f"任务 {job_id} 执行成功 (成功{update_dict['success_count']}次)")
 
         elif event.code == EVENT_JOB_ERROR:
             update_dict["status"] = JobStatus.FAILED
             exception = event.exception
             error_msg = str(exception)
-            update_dict["status_message"] = f"任务失败，失败原因：{error_msg}"
-            update_dict['total_failure_count'] = update_dict.get('total_failure_count', 0) + 1
             update_dict['last_execution_time'] = current_time.isoformat()
 
             # 存储失败信息
@@ -210,12 +193,12 @@ class JobScheduler:
             update_dict['execution_results'] = execution_results[-10:]
             update_dict['last_result'] = failure_result
 
-            self.logger.error(f"任务 {job_id} 执行失败 (失败{update_dict['total_failure_count']}次): {error_msg}")
+            # 计算失败次数: execution_count - success_count
+            failure_count = update_dict.get('execution_count', 0) - update_dict.get('success_count', 0)
+            self.logger.error(f"任务 {job_id} 执行失败 (失败{failure_count}次): {error_msg}")
 
         elif event.code == EVENT_JOB_MISSED:
             update_dict["status"] = JobStatus.FAILED
-            update_dict["status_message"] = "任务错过执行时间"
-            update_dict['total_failure_count'] = update_dict.get('total_failure_count', 0) + 1
             update_dict['last_execution_time'] = current_time.isoformat()
 
             # 存储错过执行的信息
@@ -455,8 +438,8 @@ class JobScheduler:
             "next_run_time": str(cleanup_job.next_run_time) if cleanup_job.next_run_time else None,
             "last_result": metadata.get('last_result'),
             "execution_count": metadata.get('execution_count', 0),
-            "success_count": metadata.get('total_success_count', 0),
-            "failure_count": metadata.get('total_failure_count', 0),
+            "success_count": metadata.get('success_count', 0),
+            "failure_count": metadata.get('execution_count', 0) - metadata.get('success_count', 0),
             "config": {
                 "enabled": self.settings.job_cleanup_enabled,
                 "retention_days": self.settings.job_retention_days,
@@ -530,7 +513,7 @@ class JobScheduler:
             type=metadata.get('job_type', JobType.CRAWL),
             status=(
                 metadata.get('status', JobStatus.PENDING),
-                metadata.get('status_message', '未知状态')
+                ""
             ),
             page_ids=metadata.get('page_ids', []),
             desc=metadata.get('desc', ''),
@@ -539,8 +522,8 @@ class JobScheduler:
             last_result=metadata.get('last_result'),
             execution_stats={
                 'total_executions': metadata.get('execution_count', 0),
-                'success_count': metadata.get('total_success_count', 0),
-                'failure_count': metadata.get('total_failure_count', 0),
+                'success_count': metadata.get('success_count', 0),
+                'failure_count': metadata.get('execution_count', 0) - metadata.get('success_count', 0),
                 'last_execution_time': metadata.get('last_execution_time')
             }
         )

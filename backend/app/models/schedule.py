@@ -35,6 +35,7 @@ class JobType(str, Enum):
 
     CRAWL = "crawl"  # 爬虫任务
     REPORT = "report"  # 报告任务
+    SYSTEM = "system"  # 系统任务
 
 
 class CrawTaskInfo(BaseModel):
