@@ -1,7 +1,7 @@
 """
 统一数据解析器 - 简化版本
 """
-
+import itertools
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -157,6 +157,7 @@ class PageParser:
                 sub_rank_info.parse_ranking_info(sub_ranking_data, rank_info.ranking_info)
                 result.append(sub_rank_info)
         self.rankings = result
+
 
 
 class NovelPageParser:
