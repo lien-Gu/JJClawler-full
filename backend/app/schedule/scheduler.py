@@ -5,20 +5,19 @@
 移除了内存存储，实现了更简洁和稳定的架构。
 """
 
-import uuid
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
-from apscheduler.triggers.base import BaseTrigger
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.config import get_settings, SchedulerSettings
+from app.config import SchedulerSettings, get_settings
+from app.crawl import CrawlFlow
 from app.logger import get_logger
 from app.models.schedule import (
     JobHandlerType,
@@ -27,6 +26,8 @@ from app.models.schedule import (
     PREDEFINED_JOB_INFO,
     TriggerType,
 )
+
+craw_task = CrawlFlow()
 
 
 class JobScheduler:
@@ -117,18 +118,18 @@ class JobScheduler:
         :param job_info:
         :return:
         """
-        res_job = None
         trigger = self._create_trigger(job_info.trigger_type, job_info.trigger_time)
         # 准备metadata - 存储所有业务信息
-        metadata =job_info.to_metadata()
+        metadata = job_info.to_metadata()
 
         # 添加任务到调度器
         self.scheduler.add_job(
-            func=handler.execute,
+            func=craw_task.execute_crawl_task(job_info.page_ids),
             trigger=trigger,
             id=job_info.job_id,
             args=[job_info.page_ids or []],
-            metadata=metadata
+            metadata=metadata,
+            remove_on_complete=False
         )
 
         self.logger.info(f"单个任务添加成功: {job_info.job_id}")
