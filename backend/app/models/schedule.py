@@ -93,19 +93,6 @@ class JobInfo(BaseModel):
         from app.crawl_config import CrawlConfig
         self.page_ids = CrawlConfig().get_page_ids(self.page_ids)
 
-    def to_metadata(self) -> dict:
-        return {
-            "status": self.status[0] if self.status else JobStatus.PENDING,
-            "status_message": self.status[1] if self.status else "任务已创建",
-            "job_type": self.type,
-            "page_ids": self.page_ids or [],
-            "desc": self.desc or ""
-        }
-        
-    def from_metadata(self, metadata: dict):
-        self.status = (metadata.get("status", JobStatus.PENDING), metadata.get("status_message", ""))
-        self.desc = metadata.get("desc", "")
-        self.page_ids = metadata.get("page_ids", [])
 
 
 

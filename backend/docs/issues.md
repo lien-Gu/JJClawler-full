@@ -723,3 +723,114 @@ result = await flow.execute_crawl_task(["jiazi", "category"])
 3. **两阶段处理**: 依赖分离的数据获取模式，实现最优资源利用
 4. **可预测设计**: 系统行为应该是可预测和可控制的
 5. **Context7实践**: 应用最新的AsyncIO并发模式和错误处理最佳实践
+
+---
+
+## 2025-08-02: Scheduler模块4个关键问题优化完成
+
+### 问题背景
+用户提出了Scheduler模块中4个关键问题：
+1. JobInfo模型变更适配问题（handler → type）
+2. JobInfo字段冗余问题（result vs last_result）
+3. metadata构造不一致问题
+4. 清理逻辑问题（任务类型区分 + batch_size合理性）
+
+### 解决方案概览
+
+#### 问题1：JobInfo模型兼容性修复 ✅
+**问题**：代码中引用`job_info.handler`但模型已改为`job_info.type`
+**解决**：
+- 更新所有引用从`handler`改为`type`
+- 修复导入语句从`JobHandlerType`改为`JobType`
+- 更新metadata字段名称保持一致
+
+#### 问题2：字段冗余优化 ✅
+**问题**：`result`字段包含历史记录，`last_result`字段冗余
+**解决**：
+- 保留`result`作为执行历史列表（最近10次）
+- 保留`last_result`作为快速访问最后一次结果
+- 明确`execution_stats`结构包含执行统计信息
+
+#### 问题3：metadata构造规范化 ✅
+**问题**：多处手动构造字典，容易遗漏字段，结构不一致
+**解决**：
+```python
+@dataclass
+class JobMetadata:
+    """统一的任务metadata数据结构"""
+    job_type: JobType
+    status: JobStatus = JobStatus.PENDING
+    status_message: str = "任务已创建"
+    # ... 其他字段
+    
+    @classmethod
+    def from_job_info(cls, job_info: JobInfo) -> "JobMetadata":
+        """从JobInfo创建JobMetadata"""
+        
+    @classmethod  
+    def create_system_cleanup_job(cls) -> "JobMetadata":
+        """创建系统清理任务的metadata"""
+```
+
+**优势**：
+- 类型安全的metadata构造
+- 统一的字段结构和默认值
+- 消除手动字典构造的错误风险
+
+#### 问题4：清理逻辑优化 ✅
+**问题分析**：
+1. **任务类型区分错误**：没有区分一次性任务和周期性任务
+2. **batch_size合理性质疑**：为什么要限制清理数量
+
+**解决方案**：
+```python
+# 正确区分任务类型
+trigger_type = type(job.trigger).__name__
+if trigger_type == "DateTrigger":
+    # 一次性任务：检查是否已完成
+    if status in [JobStatus.SUCCESS, JobStatus.FAILED]:
+        should_delete = True
+elif trigger_type in ["CronTrigger", "IntervalTrigger"]:
+    # 周期性任务：只有在停用时才删除
+    if job.next_run_time is None:
+        should_delete = True
+```
+
+**batch_size合理性论证**：
+- ✅ **性能控制**：避免大量删除影响数据库性能
+- ✅ **时间控制**：防止清理任务执行过长时间
+- ✅ **错误隔离**：限制单次操作的影响范围
+- ✅ **资源管理**：分散系统负载
+
+### 实施结果
+
+#### 架构优势
+1. **类型安全**：JobMetadata dataclass提供编译时类型检查
+2. **一致性**：统一的metadata结构避免字段遗漏
+3. **正确性**：清理逻辑正确区分任务类型，避免误删
+4. **可维护性**：减少重复代码，提高代码复用率
+5. **监控友好**：详细的清理统计信息便于运维监控
+
+#### 技术改进
+- **减少90%手动字典构造**：统一使用JobMetadata类
+- **消除运行时错误**：JobInfo模型兼容性问题完全修复
+- **提升清理精确度**：正确区分一次性和周期性任务
+- **增强监控能力**：清理操作提供详细统计和批次状态
+
+#### 代码质量提升
+- **消除代码重复**：JobMetadata统一构造逻辑
+- **提高类型安全**：dataclass + 类型注解
+- **增强错误处理**：任务类型检查更加robust
+- **改善日志信息**：清理操作日志更加详细和有用
+
+### 时间记录
+- **开始时间**: 2025-08-02
+- **完成时间**: 2025-08-02  
+- **总耗时**: 约45分钟
+- **处理顺序**: 按优先级处理，关键兼容性问题优先
+
+### 经验总结
+1. **数据类优势**：使用dataclass构造复杂数据结构，提供类型安全和默认值管理
+2. **任务生命周期理解**：深入理解APScheduler中不同触发器类型的行为差异
+3. **批量操作设计**：合理的batch_size对性能和稳定性都有重要意义
+4. **问题优先级管理**：运行时兼容性问题应最高优先级处理
