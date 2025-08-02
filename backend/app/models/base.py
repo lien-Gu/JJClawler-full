@@ -3,8 +3,9 @@
 """
 
 from datetime import datetime
-from typing import Generic, TypeVar, Optional, List
-
+from typing import Any, Dict, Generic, TypeVar, Optional, List
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
 # 泛型类型变量
@@ -34,3 +35,26 @@ class DataResponse(BaseResponse, Generic[T]):
 class BaseSchema(BaseModel):
     class Config:
         from_attributes = True
+
+
+
+class BaseResult(ABC, Generic[T]):
+    success_items: List[T] = field(default_factory=list)
+    failed_items: Dict[str, Exception] = field(default_factory=dict)
+
+    @property
+    def total_num(self) -> int:
+        return len(self.success_items) + len(self.failed_items)
+
+    @property
+    def success_num(self) -> int:
+        return len(self.success_items)
+
+    @property
+    def failed_ids(self) -> List[str]:
+        return list(self.failed_items.keys())
+
+    @abstractmethod
+    def to_dict(self) -> Dict[str, Any]:
+        pass
+

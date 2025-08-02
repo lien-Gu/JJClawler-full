@@ -158,6 +158,12 @@ class PageParser:
                 result.append(sub_rank_info)
         self.rankings = result
 
+    def get_novel_ids(self) -> List[str]:
+        res = set()
+        for ranking in self.rankings:
+            res |= ranking.get_novel_ids()
+        return list(res)
+
 
 
 class NovelPageParser:
