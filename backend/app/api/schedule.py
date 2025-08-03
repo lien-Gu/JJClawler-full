@@ -5,11 +5,12 @@
 from datetime import datetime
 from typing import List
 
+from apscheduler.triggers.date import DateTrigger
 from fastapi import APIRouter, Query
 
 from app.utils import generate_job_id
 from ..models.base import DataResponse
-from ..models.schedule import JobType, SchedulerInfo, TriggerType, Job, JobBasic
+from ..models.schedule import Job, JobBasic, JobType, SchedulerInfo
 from ..schedule import get_scheduler
 
 router = APIRouter()
@@ -20,7 +21,7 @@ scheduler = get_scheduler()
 async def create_crawl_job(
         page_ids: List[str] = Query(["jiazi"], description="爬取的页面id列表"),
         run_time: datetime = Query(None, description="任务运行时间"),
-) -> DataResponse[List[dict]]:
+) -> DataResponse[JobBasic]:
     """
     创建爬取任务,爬取列表中的所有页面。
     每个页面ID对应一个独立的调度任务。
@@ -35,8 +36,7 @@ async def create_crawl_job(
         job = Job(
             job_id=generate_job_id(JobType.CRAWL, run_time),
             job_type=JobType.CRAWL,
-            trigger_type=TriggerType.DATE,
-            trigger_time={"run_time": run_time},
+            trigger=DateTrigger(run_date=run_time),
             desc=f"手动创建的爬取任务",
             page_ids=page_ids
         )
@@ -53,12 +53,12 @@ async def create_crawl_job(
         return DataResponse(
             success=False,
             message=f"任务创建失败: {str(e)}",
-            data=[]
+            data=None
         )
 
 
 @router.get("/status/{job_id}", response_model=DataResponse[JobBasic])
-async def get_task_status(job_id: str,) -> DataResponse[dict]:
+async def get_task_status(job_id: str, ) -> DataResponse[JobBasic]:
     """
     获取指定调度任务的详细信息
     

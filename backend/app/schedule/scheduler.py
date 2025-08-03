@@ -8,22 +8,17 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 
+import humanize
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import SchedulerSettings, get_settings
-from app.crawl import CrawlFlow
 from app.logger import get_logger
-from app.models import JobBasic
-from app.models.schedule import (JobStatus, JobType, SchedulerInfo, TriggerType, Job, get_predefined_jobs,
-                                 get_clean_up_job)
-
-craw_task = CrawlFlow()
+from app.models.schedule import (Job, JobInfo, JobStatus, JobType, SchedulerInfo, get_clean_up_job, get_predefined_jobs)
+from app.schedule.listener import JobListener
 
 
 class JobScheduler:
@@ -35,128 +30,34 @@ class JobScheduler:
 
     def __init__(self):
         """初始化调度器"""
-        self.settings: SchedulerSettings = None
+        self.settings: SchedulerSettings = get_settings().scheduler
         self.scheduler: Optional[AsyncIOScheduler] = None
         self.job_func_mapping: Dict = {}
-        self.logger = None
+        self.logger = get_logger(__name__)
         self.start_time: Optional[datetime] = None
+        self.listener: Optional[JobListener] = None
 
         # 初始化参数
-        self._initial_variety()
 
-    def _initial_variety(self):
-        """注册默认任务处理器"""
-        self.settings = get_settings().scheduler
-        self.job_func_mapping = {
-            JobType.CRAWL: craw_task.execute_crawl_task,
-            # JobType.REPORT: self._add_report_job,  # 暂时注释，需要后续迁移
+        self.job_func_mapping = self.get_func_mapping()
+
+    @staticmethod
+    def get_func_mapping():
+        from app.crawl import CrawlFlow
+        craw_task = CrawlFlow()
+        return {
+            JobType.CRAWL: craw_task.execute_crawl_task
         }
-        self.logger = get_logger(__name__)
-
-    def _create_scheduler_with_config(self) -> AsyncIOScheduler:
-        """创建APScheduler 3.x实例并应用配置"""
-        db_url = self.settings.job_store_url
-        # 创建调度器
-        scheduler = AsyncIOScheduler(
-            jobstores=SQLAlchemyJobStore(url=db_url, tablename=self.settings.job_store_table_name),
-            executors=ThreadPoolExecutor(self.settings.max_workers),
-            timezone=self.settings.timezone
-        )
-        self.logger.info(
-            f"调度器配置完成 - 最大工作线程: {self.settings.max_workers}, "
-            f"任务存储URL: {db_url}"
-        )
-        return scheduler
 
     def _register_event_listeners(self) -> None:
         """注册事件监听器 - 3.x版本API"""
         if self.scheduler is None:
             return
         # 注册事件监听器
-        self.scheduler.add_listener(self._job_listener,
+        self.scheduler.add_listener(self.listener.listen_jobs,
                                     EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
 
         self.logger.info("事件监听器注册完成")
-
-    def _job_listener(self, event):
-        # TODO:此代码过长，将不同的事件分成不同的函数，简化这个代码的逻辑
-        job_id = event.job_id
-        job = self.scheduler.get_job(job_id)
-        if not job or not job.metadata:
-            raise ValueError("Job ID {} not found".format(job_id))
-
-        update_dict = job.metadata.copy()
-        current_time = datetime.now()
-
-        if event.code == EVENT_JOB_SUBMITTED:
-            update_dict["status"] = JobStatus.RUNNING
-            update_dict['execution_count'] = update_dict.get('execution_count', 0) + 1
-            self.logger.info(f"任务 {job_id} 正在执行或者排队 (第{update_dict['execution_count']}次)")
-
-        elif event.code == EVENT_JOB_EXECUTED:
-            update_dict["status"] = JobStatus.SUCCESS
-            update_dict['success_count'] = update_dict.get('success_count', 0) + 1
-            update_dict['last_execution_time'] = current_time.isoformat()
-
-            # 存储任务执行结果
-            execution_result = {
-                'timestamp': current_time.isoformat(),
-                'status': 'success',
-                'result': getattr(event, 'retval', None),
-                'duration': None  # 可以后续添加执行时间计算
-            }
-
-            # 更新执行结果历史(保留最近10次)
-            execution_results = update_dict.get('execution_results', [])
-            execution_results.append(execution_result)
-            update_dict['execution_results'] = execution_results[-10:]
-            update_dict['last_result'] = execution_result
-
-            self.logger.info(f"任务 {job_id} 执行成功 (成功{update_dict['success_count']}次)")
-
-        elif event.code == EVENT_JOB_ERROR:
-            update_dict["status"] = JobStatus.FAILED
-            exception = event.exception
-            error_msg = str(exception)
-            update_dict['last_execution_time'] = current_time.isoformat()
-
-            # 存储失败信息
-            failure_result = {
-                'timestamp': current_time.isoformat(),
-                'status': 'failed',
-                'error': error_msg,
-                'exception_type': exception.__class__.__name__
-            }
-
-            execution_results = update_dict.get('execution_results', [])
-            execution_results.append(failure_result)
-            update_dict['execution_results'] = execution_results[-10:]
-            update_dict['last_result'] = failure_result
-
-            # 计算失败次数: execution_count - success_count
-            failure_count = update_dict.get('execution_count', 0) - update_dict.get('success_count', 0)
-            self.logger.error(f"任务 {job_id} 执行失败 (失败{failure_count}次): {error_msg}")
-
-        elif event.code == EVENT_JOB_MISSED:
-            update_dict["status"] = JobStatus.FAILED
-            update_dict['last_execution_time'] = current_time.isoformat()
-
-            # 存储错过执行的信息
-            missed_result = {
-                'timestamp': current_time.isoformat(),
-                'status': 'missed',
-                'error': '任务错过执行时间',
-                'exception_type': 'MissedExecution'
-            }
-
-            execution_results = update_dict.get('execution_results', [])
-            execution_results.append(missed_result)
-            update_dict['execution_results'] = execution_results[-10:]
-            update_dict['last_result'] = missed_result
-
-            self.logger.warning(f"任务 {job_id} 错过执行时间")
-
-        job.modify(metadata=update_dict)
 
     async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
         """
@@ -166,17 +67,19 @@ class JobScheduler:
         :return:
         """
         if not exe_func:
-            func = self.job_func_mapping.get(job.job_type)
+            func = self.job_func_mapping.get(job.job_type, None)
         else:
             func = exe_func
         args = job.page_ids if job.job_type == JobType.CRAWL else None
+        if func is None:
+            raise ValueError(f"cannot found execute function for {job.job_type}")
         # 添加任务到调度器
         self.scheduler.add_job(
             func=func,
-            trigger=self._create_trigger(job.trigger_type, job.trigger_time),
+            trigger=job.trigger,
             id=job.job_id,
             args=[args],
-            metadata=job.to_scheduler_metadata(),
+            metadata=job.model_dump_json(exclude={"trigger"}),
             remove_on_complete=False
         )
 
@@ -194,11 +97,20 @@ class JobScheduler:
         self.logger.info("正在启动任务调度器...")
 
         # 创建调度器并配置
-        self.scheduler = self._create_scheduler_with_config()
+        self.scheduler = AsyncIOScheduler(
+            jobstores=SQLAlchemyJobStore(url=self.settings.job_store_url, tablename=self.settings.job_store_table_name),
+            executors=ThreadPoolExecutor(self.settings.max_workers),
+            timezone=self.settings.timezone
+        )
+        self.logger.info("调度器配置完成")
         self.start_time = datetime.now()
 
         # 注册事件监听器
-        self._register_event_listeners()
+        self.listener = JobListener(self.scheduler)
+        self.scheduler.add_listener(self.listener.listen_jobs,
+                                    EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
+
+        self.logger.info("事件监听器注册完成")
 
         # 启动调度器
         self.scheduler.start()
@@ -224,6 +136,7 @@ class JobScheduler:
         self.scheduler.shutdown(wait=True)
         self.scheduler = None
         self.start_time = None
+        self.listener = None
         self.logger.info("任务调度器已关闭")
 
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
@@ -262,7 +175,12 @@ class JobScheduler:
 
     @staticmethod
     def _should_cleanup_job(job, cutoff_date: datetime) -> Tuple[bool, str]:
-        """<UNK>"""
+        """
+        任务是否应当被清理——非系统任务，非长期任务，已经完成或者失败了的早于清理时间的任务
+        :param job: 任务
+        :param cutoff_date: 清理时间
+        :return:
+        """
         created_at = datetime.fromisoformat(job.metadata.get('created_at').replace('Z', '+00:00'))
         if created_at > cutoff_date:
             return False, "active job"
@@ -276,99 +194,35 @@ class JobScheduler:
             return True, "completed_onetime_job"
         return False, "active_job"
 
-    def get_cleanup_status(self) -> Dict[str, Any]:
-        """获取清理任务状态"""
-        if not self.scheduler:
-            return {"status": "scheduler_not_running"}
-
-        cleanup_job = self.scheduler.get_job("__system_job_cleanup__")
-        if not cleanup_job:
-            return {"status": "cleanup_job_not_found"}
-
-        metadata = cleanup_job.metadata or {}
-        return {
-            "status": "active",
-            "next_run_time": str(cleanup_job.next_run_time) if cleanup_job.next_run_time else None,
-            "last_result": metadata.get('last_result'),
-            "execution_count": metadata.get('execution_count', 0),
-            "success_count": metadata.get('success_count', 0),
-            "failure_count": metadata.get('execution_count', 0) - metadata.get('success_count', 0),
-            "config": {
-                "enabled": self.settings.job_cleanup_enabled,
-                "retention_days": self.settings.job_retention_days,
-                "interval_hours": self.settings.cleanup_interval_hours,
-                "batch_size": self.settings.cleanup_batch_size
-            }
-        }
-
-    @staticmethod
-    def _create_trigger(trigger_type: TriggerType, trigger_time: Dict[str, Any]):
+    def get_job_info(self, job_id: str) -> Optional[JobInfo]:
         """
-        根据触发器类型创建触发器
-
-        :param trigger_type:
-        :param trigger_time:
-        :return:
-        """
-        if trigger_type == TriggerType.DATE:
-            run_time = trigger_time.get("run_time", None)
-            if not run_time:
-                run_time = datetime.now()
-            return DateTrigger(run_date=run_time)
-        elif trigger_type == TriggerType.CRON:
-            return CronTrigger(**trigger_time)
-        elif trigger_type == TriggerType.INTERVAL:
-            return IntervalTrigger(**trigger_time)
-        else:
-            raise ValueError(f"不支持的触发器类型: {trigger_type}")
-
-    def get_job_info(self, job_id: str) -> Optional[JobBasic]:
-        """
-        # TODO:联系代码上下文，利用pydantic特性优化这个代码
-        从APScheduler的metadata获取任务信息
-        :param job_id:
-        :return:
+        从APScheduler的metadata获取任务信息 - 使用Pydantic特性优化
+        查询清理任务cleanup_job_not_found也可以
+        :param job_id: 任务ID
+        :return: JobBasic对象或None
         """
         if not self.scheduler:
-            return None
+            return JobInfo(err="调度器没有成功运行")
 
         job = self.scheduler.get_job(job_id)
         if not job or not job.metadata:
-            return None
+            return JobInfo(err=f"该任务{job_id}不存在")
 
-        # 从触发器推断trigger_type和trigger_time
-        trigger_type = TriggerType.DATE  # 默认值
-        trigger_time = {}
-
-        if isinstance(job.trigger, CronTrigger):
-            trigger_type = TriggerType.CRON
-            # 简化的trigger_time，实际可能需要更复杂的逻辑
-            trigger_time = {"hour": "*", "minute": "*"}
-        elif isinstance(job.trigger, IntervalTrigger):
-            trigger_type = TriggerType.INTERVAL
-            trigger_time = {"seconds": job.trigger.interval.total_seconds()}
-        elif isinstance(job.trigger, DateTrigger):
-            trigger_type = TriggerType.DATE
-            trigger_time = {"run_time": job.trigger.run_date}
-
-        # 使用Job.from_scheduler_data重构Job对象
-        return JobBasic.model_validate(
-            job_id=job.id,
-            trigger_type=trigger_type,
-            trigger_time=trigger_time,
-            metadata=job.metadata
-        )
+        try:
+            job_info = JobInfo.model_validate(job.metadata)
+            return job_info
+        except Exception as e:
+            self.logger.error(f"获取任务信息失败 {job_id}: {e}")
+            return JobInfo(err=str(e))
 
     def get_scheduler_info(self) -> SchedulerInfo:
-        """获取调度器状态信息"""
-        # TODO：使用第三方库humanize优化时间的计算方法，根据申请的情况修改代码实现
+        """获取调度器状态信息 - 使用humanize库优化时间计算"""
         if not self.scheduler:
-            return {
-                "status": "stopped",
-                "job_wait": [],
-                "job_running": [],
-                "run_time": "0天0小时0分钟0秒"
-            }
+            return SchedulerInfo(
+                status="stopped",
+                jobs=[],
+                run_time="0天0小时0分钟0秒"
+            )
 
         try:
             # 获取所有任务
@@ -384,30 +238,22 @@ class JobScheduler:
                 }
                 job_list.append(job_data)
 
-            # 计算运行时间
-            run_time = "0天0小时0分钟0秒"
-            if self.start_time:
-                delta = datetime.now() - self.start_time
-                days = delta.days
-                hours, remainder = divmod(delta.seconds, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                run_time = f"{days}天{hours}小时{minutes}分钟{seconds}秒"
+            # 计算运行时间 - 使用humanize库优化
+            run_time = self._calculate_run_time()
 
-            return {
-                "status": "running",
-                "job_wait": job_list,  # 简化：将所有任务都列为等待状态
-                "job_running": [],
-                "run_time": run_time
-            }
+            return SchedulerInfo(
+                status="running",
+                jobs=job_list,
+                run_time=humanize.naturaldelta(datetime.now() - self.start_time)
+            )
 
         except Exception as e:
             self.logger.error(f"获取调度器状态失败: {e}")
-            return {
-                "status": "error",
-                "job_wait": [],
-                "job_running": [],
-                "run_time": "未知"
-            }
+            return SchedulerInfo(
+                status="error",
+                jobs=[],
+                run_time="未知"
+            )
 
 
 # 全局调度器实例

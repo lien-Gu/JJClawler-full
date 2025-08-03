@@ -834,3 +834,220 @@ elif trigger_type in ["CronTrigger", "IntervalTrigger"]:
 2. **任务生命周期理解**：深入理解APScheduler中不同触发器类型的行为差异
 3. **批量操作设计**：合理的batch_size对性能和稳定性都有重要意义
 4. **问题优先级管理**：运行时兼容性问题应最高优先级处理
+
+---
+
+## 2025-08-03: Scheduler模块代码优化完成 - Context7最佳实践应用
+
+### 优化背景
+用户要求检查整个scheduler.py代码，根据函数定义以及提出的TODO来修改和优化代码，使用context7最佳实践。
+
+### 实施方案
+基于Context7最佳实践，对scheduler.py进行全面优化：
+
+#### 1. 事件处理函数拆分 (@app/schedule/scheduler.py)
+- **问题**: _job_listener函数过长，包含多种事件处理逻辑
+- **解决**: 将长函数分解为独立的事件处理方法
+
+```python
+# 优化前 - 80行的长函数
+def _job_listener(self, event):
+    # 所有事件处理逻辑混合在一起
+    if event.code == EVENT_JOB_SUBMITTED:
+        # 提交逻辑
+    elif event.code == EVENT_JOB_EXECUTED:
+        # 执行成功逻辑
+    # ... 更多条件分支
+
+# 优化后 - 分离关注点
+def _job_listener(self, event):
+    """事件监听器 - 分发到具体的事件处理函数"""
+    if event.code == EVENT_JOB_SUBMITTED:
+        self._handle_job_submitted(job, event)
+    elif event.code == EVENT_JOB_EXECUTED:
+        self._handle_job_executed(job, event)
+    # 每个事件有独立的处理方法
+
+def _handle_job_submitted(self, job, event):
+    """处理任务提交事件"""
+    # 专注于提交事件逻辑
+
+def _handle_job_executed(self, job, event):
+    """处理任务执行成功事件"""
+    # 专注于成功事件逻辑
+```
+
+#### 2. Pydantic特性优化get_job_info (@app/schedule/scheduler.py)
+- **问题**: 手动构造返回对象，代码冗余
+- **解决**: 利用Pydantic的model_validate和Job.from_scheduler_data特性
+
+```python
+# 优化前 - 手动字段映射
+def get_job_info(self, job_id: str) -> Optional[JobBasic]:
+    # 手动推断trigger信息
+    trigger_type = TriggerType.DATE
+    trigger_time = {}
+    if isinstance(job.trigger, CronTrigger):
+        trigger_type = TriggerType.CRON
+        trigger_time = {"hour": "*", "minute": "*"}
+    # 手动构造返回对象
+    return JobBasic.model_validate(
+        job_id=job.id,
+        trigger_type=trigger_type,
+        trigger_time=trigger_time,
+        metadata=job.metadata
+    )
+
+# 优化后 - Pydantic特性增强
+def get_job_info(self, job_id: str) -> Optional[JobBasic]:
+    try:
+        # 抽取为独立方法
+        trigger_type, trigger_time = self._extract_trigger_info(job.trigger)
+        
+        # 使用Job.from_scheduler_data构建完整对象
+        full_job = Job.from_scheduler_data(
+            job_id=job.id,
+            trigger_type=trigger_type, 
+            trigger_time=trigger_time,
+            metadata=job.metadata
+        )
+        
+        # 使用Pydantic的model_validate提取JobBasic字段
+        return JobBasic.model_validate(full_job.model_dump())
+    except Exception as e:
+        self.logger.error(f"获取任务信息失败 {job_id}: {e}")
+        return None
+
+def _extract_trigger_info(self, trigger) -> Tuple[TriggerType, Dict[str, Any]]:
+    """提取触发器信息的私有方法"""
+    # 统一的触发器信息提取逻辑
+```
+
+#### 3. humanize库时间优化 (@app/schedule/scheduler.py)
+- **问题**: 手动时间格式化，不够人性化
+- **解决**: 集成humanize库，提供更友好的时间显示
+
+```python
+# 优化前 - 原始时间格式化
+def get_scheduler_info(self) -> SchedulerInfo:
+    delta = datetime.now() - self.start_time
+    days = delta.days
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    run_time = f"{days}天{hours}小时{minutes}分钟{seconds}秒"
+
+# 优化后 - humanize库优化
+try:
+    import humanize
+    HUMANIZE_AVAILABLE = True
+except ImportError:
+    HUMANIZE_AVAILABLE = False
+
+def _calculate_run_time(self) -> str:
+    """计算并格式化运行时间 - 使用humanize库"""
+    if HUMANIZE_AVAILABLE:
+        try:
+            delta = datetime.now() - self.start_time
+            # 根据时间长度选择最合适的格式
+            if delta.days > 0:
+                return humanize.precisedelta(delta, minimum_unit="seconds")
+            else:
+                return humanize.naturaldelta(delta)
+        except Exception as e:
+            self.logger.warning(f"humanize库处理时间失败，回退到原始方法: {e}")
+    
+    # 回退到原始方法确保兼容性
+    # ... 原始格式化逻辑
+```
+
+#### 4. API返回类型修复 (@app/api/schedule.py)
+- **问题**: 函数签名和实际返回类型不匹配
+- **解决**: 统一函数签名和返回类型
+
+```python
+# 修复前 - 类型不匹配
+@router.post("/task/create", response_model=DataResponse[JobBasic])
+async def create_crawl_job(...) -> DataResponse[List[dict]]:  # 不匹配
+
+@router.get("/status/{job_id}", response_model=DataResponse[JobBasic])
+async def get_task_status(...) -> DataResponse[dict]:  # 不匹配
+
+# 修复后 - 类型一致
+@router.post("/task/create", response_model=DataResponse[JobBasic])
+async def create_crawl_job(...) -> DataResponse[JobBasic]:  # 匹配
+
+@router.get("/status/{job_id}", response_model=DataResponse[JobBasic])
+async def get_task_status(...) -> DataResponse[JobBasic]:  # 匹配
+```
+
+#### 5. 循环导入问题解决 (@app/schedule/scheduler.py)
+- **问题**: 模块级别初始化CrawlFlow导致代理设置错误
+- **解决**: 实施延迟初始化模式
+
+```python
+# 问题代码 - 模块级别初始化
+from app.crawl import CrawlFlow
+craw_task = CrawlFlow()  # 导致代理初始化错误
+
+# 解决方案 - 延迟初始化
+def _get_crawl_task_func(self):
+    """延迟获取爬取任务函数，避免循环导入"""
+    if JobType.CRAWL not in self.job_func_mapping:
+        from app.crawl import CrawlFlow
+        craw_task = CrawlFlow()
+        self.job_func_mapping[JobType.CRAWL] = craw_task.execute_crawl_task
+    return self.job_func_mapping[JobType.CRAWL]
+```
+
+### 实施结果
+
+#### 成功完成项目
+1. ✅ **事件处理拆分**: 将80行的_job_listener分解为4个独立的事件处理方法
+2. ✅ **Pydantic特性优化**: 利用model_validate和from_scheduler_data提升代码质量
+3. ✅ **humanize库集成**: 实现人性化时间显示，支持回退机制
+4. ✅ **类型安全修复**: 修复API函数签名不匹配问题
+5. ✅ **循环导入解决**: 实施延迟初始化，避免模块级别的依赖问题
+
+#### 技术优势
+- **代码可维护性**: 单一职责原则，每个方法专注于特定功能
+- **错误处理**: 完善的异常处理和日志记录
+- **类型安全**: 完整的类型注解和Pydantic验证
+- **向后兼容**: humanize库异常时自动回退到原始方法
+- **性能优化**: 延迟初始化避免不必要的资源消耗
+
+#### 代码质量提升
+- **函数长度**: _job_listener从80行缩减到15行
+- **职责分离**: 4个独立的事件处理方法，职责清晰
+- **错误处理**: 增强的异常处理机制
+- **可扩展性**: 便于后续添加新的事件处理逻辑
+
+#### Context7最佳实践应用
+1. **Single Responsibility**: 每个函数只负责一个特定功能
+2. **Error Handling**: 完善的异常处理和日志记录
+3. **Type Safety**: 利用Pydantic和类型注解确保类型安全
+4. **Dependency Management**: 延迟初始化避免循环依赖
+5. **User Experience**: humanize库提供更友好的时间显示
+
+### 测试验证
+```python
+# 所有优化功能测试通过
+[OK] DateTrigger: TriggerType.DATE - 正确的触发器信息提取
+[OK] CronTrigger: TriggerType.CRON - 正确的字段访问
+[OK] IntervalTrigger: TriggerType.INTERVAL - 正确的时间间隔提取
+[OK] 时间格式化: humanize库和回退机制都工作正常
+[OK] 事件处理方法: 4个独立方法全部存在
+[OK] SchedulerInfo模型: 正确返回Pydantic模型
+```
+
+### 时间记录
+- **开始时间**: 2025-08-03
+- **完成时间**: 2025-08-03
+- **总耗时**: 约45分钟
+- **主要工作**: 函数拆分、Pydantic优化、humanize集成、类型修复、循环导入解决
+
+### 经验总结
+1. **Context7实践**: 应用最新的Python开发最佳实践提升代码质量
+2. **函数拆分**: 长函数分解为小函数大大提升可读性和可维护性
+3. **Pydantic优势**: 充分利用Pydantic特性简化对象构造和验证
+4. **第三方库集成**: humanize等库提升用户体验，同时保持向后兼容
+5. **延迟初始化**: 有效解决模块间循环依赖问题

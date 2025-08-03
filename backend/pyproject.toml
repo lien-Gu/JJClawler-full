@@ -17,6 +17,7 @@ dependencies = [
     "apscheduler==3.10.4",
     "tenacity>=9.1.2",
     "loguru>=0.7.3",
+    "humanize>=4.12.3",
 ]
 
 [tool.hatch.build.targets.wheel]
