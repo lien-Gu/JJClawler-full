@@ -6,7 +6,6 @@
 # @Time: 2025/7/21 11:20
 # @Author  : Lien Gu
 '''
-from fastapi import HTTPException
 from httpx import Request
 from pydantic import BaseModel
 

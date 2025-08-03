@@ -101,7 +101,7 @@ class Job(JobBasic):
 
 
 # 预定义任务配置 - 使用Job模型
-def get_predefined_jobs():
+def get_predefined_jobs()->List[Job]:
     """获取预定义的调度任务列表"""
 
     return [
@@ -122,3 +122,16 @@ def get_predefined_jobs():
             page_ids=["category"]
         )
     ]
+
+def get_clean_up_job()->Job:
+    """<UNK>"""
+    from app.config import SchedulerSettings
+    interval_hour = SchedulerSettings.cleanup_interval_hours
+    return Job(
+            job_id="__system_job_cleanup__",
+            job_type=JobType.SYSTEM,
+            trigger_type=TriggerType.INTERVAL,
+            trigger_time={"hours": interval_hour},
+            desc="自动清理过期任务",
+            is_system_job=True
+        )

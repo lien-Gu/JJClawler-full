@@ -19,7 +19,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.config import SchedulerSettings, get_settings
 from app.crawl import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import (JobStatus, JobType, TriggerType,Job, get_predefined_jobs)
+from app.models.schedule import (JobStatus, JobType, TriggerType, Job, get_predefined_jobs, get_clean_up_job)
 
 craw_task = CrawlFlow()
 
@@ -46,7 +46,7 @@ class JobScheduler:
         """注册默认任务处理器"""
         self.settings = get_settings().scheduler
         self.job_func_mapping = {
-            JobType.CRAWL: self.add_crawl_job,
+            JobType.CRAWL: craw_task.execute_crawl_task,
             # JobType.REPORT: self._add_report_job,  # 暂时注释，需要后续迁移
         }
         self.logger = get_logger(__name__)
@@ -155,39 +155,29 @@ class JobScheduler:
 
         job.modify(metadata=update_dict)
 
-    async def add_schedule_job(self, job: Job) -> Job:
+    async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
         """
         添加调度任务
         :param job:
+        :param exe_func: 指定函数
         :return:
         """
-        if not job.job_type:
-            raise ValueError("Job missing important field: job_type")
-        return await self.job_func_mapping.get(job.job_type)(job)
-
-    async def add_crawl_job(self, job: Job) -> Job:
-        """
-        添加爬虫调度任务
-        :param job:
-        :return:
-        """
-        trigger = self._create_trigger(job.trigger_type, job.trigger_time)
-
-        # 使用统一的Job模型创建metadata
-        metadata = job.to_scheduler_metadata()
-
+        if not exe_func:
+            func = self.job_func_mapping.get(job.job_type)
+        else:
+            func = exe_func
+        args = job.page_ids if job.job_type == JobType.CRAWL else None
         # 添加任务到调度器
         self.scheduler.add_job(
-            func=craw_task.execute_crawl_task,
-            trigger=trigger,
+            func=func,
+            trigger=self._create_trigger(job.trigger_type, job.trigger_time),
             id=job.job_id,
-            args=[job.page_ids or []],
-            metadata=metadata,
+            args=[args],
+            metadata=job.to_scheduler_metadata(),
             remove_on_complete=False
         )
 
         self.logger.info(f"单个任务添加成功: {job.job_id}")
-
         return job
 
     # _add_report_job 方法已删除，不再支持报告任务
@@ -211,10 +201,14 @@ class JobScheduler:
         self.scheduler.start()
 
         # 加载预定义任务
-        await self._load_predefined_jobs()
+        self.logger.info("添加预定义任务")
+        for job in get_predefined_jobs():
+            await self.add_schedule_job(job)
 
         # 设置任务清理定时任务
-        await self._setup_cleanup_job()
+        if self.settings.job_cleanup_enabled:
+            self.logger.info("添加清理任务")
+            await self.add_schedule_job(get_clean_up_job(), exe_func=self._cleanup_old_jobs)
 
         self.logger.info("任务调度器启动成功")
 
@@ -228,36 +222,6 @@ class JobScheduler:
         self.scheduler = None
         self.start_time = None
         self.logger.info("任务调度器已关闭")
-
-    async def _setup_cleanup_job(self) -> None:
-        """设置任务清理定时任务"""
-        if not self.settings.job_cleanup_enabled:
-            self.logger.info("任务清理功能已禁用，跳过设置清理任务")
-            return
-
-        cleanup_trigger = IntervalTrigger(hours=self.settings.cleanup_interval_hours)
-
-        # 创建系统清理任务的Job对象
-        cleanup_job = Job(
-            job_id="__system_job_cleanup__",
-            job_type=JobType.SYSTEM,
-            trigger_type=TriggerType.INTERVAL,
-            trigger_time={"hours": self.settings.cleanup_interval_hours},
-            desc="自动清理过期任务",
-            is_system_job=True
-        )
-
-        # 添加清理任务
-        self.scheduler.add_job(
-            func=self._cleanup_old_jobs,
-            trigger=cleanup_trigger,
-            id=cleanup_job.job_id,
-            metadata=cleanup_job.to_scheduler_metadata(),
-            remove_on_complete=False
-        )
-
-        self.logger.info(
-            f"任务清理器已设置，每{self.settings.cleanup_interval_hours}小时执行一次，保留{self.settings.job_retention_days}天内的任务")
 
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
         """清理过期任务"""
@@ -403,19 +367,6 @@ class JobScheduler:
             return IntervalTrigger(**trigger_time)
         else:
             raise ValueError(f"不支持的触发器类型: {trigger_type}")
-
-    async def _load_predefined_jobs(self) -> None:
-        """加载预定义任务"""
-        predefined_jobs = get_predefined_jobs()
-
-        for job in predefined_jobs:
-            try:
-                if job.job_type == JobType.REPORT:
-                    continue  # 跳过报告任务
-                await self.add_crawl_job(job)
-                self.logger.info(f"成功加载预定义任务: {job.job_id}")
-            except Exception as e:
-                self.logger.error(f"加载预定义任务失败 {job.job_id}: {e}")
 
     def get_job_info(self, job_id: str) -> Optional[Job]:
         """从APScheduler的metadata获取任务信息"""
