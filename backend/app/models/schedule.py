@@ -8,9 +8,9 @@
 """
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class JobStatus(str, Enum):
@@ -38,65 +38,6 @@ class JobType(str, Enum):
     SYSTEM = "system"  # 系统任务
 
 
-class CrawTaskInfo(BaseModel):
-    """
-    爬虫任务信息
-    """
-    page_id: str = Field(..., description="页面ID")
-    rankings: List[Dict[str, Any]] = Field(default_factory=list, description="该页面中的榜单列表")
-    summary: Dict[str, Any] = Field(default_factory=dict, description="该爬取任务爬取了多少个榜单，多少本书籍")
-
-
-class JobResultModel(BaseModel):
-    """
-    任务执行结果模型
-    """
-    success: bool = Field(default=True, description="任务是否执行成功")
-    message: str = Field(default="成功完成任务", description="执行结果消息")
-    data: Optional[CrawTaskInfo | Dict[str, Any]] = Field(None, description="执行结果数据")
-    exception: Optional[str] = Field(None, description="异常信息")
-    execution_time: Optional[float] = Field(None, description="执行时间（秒）")
-
-    @classmethod
-    def success_result(cls, message: str, data: Optional[Dict[str, Any]] = None) -> "JobResultModel":
-        """创建成功结果"""
-        return cls(success=True, message=message, data=data)
-
-    @classmethod
-    def error_result(cls, message: str, exception: Optional[Exception] = None) -> "JobResultModel":
-        """创建错误结果"""
-        return cls(
-            success=False,
-            message=message,
-            exception=str(exception) if exception else None
-        )
-
-
-class JobInfo(BaseModel):
-    """
-    调度任务信息
-    """
-    job_id: str = Field(..., description="调度任务ID")
-    trigger_type: TriggerType = Field(..., description="调度任务触发器类型")
-    trigger_time: Dict[str, Any] = Field(..., description="运行的时间参数，用于传给scheduler.add_job()作为参数")
-    type: JobType = Field(..., description="处理器类")
-    result: Optional[List[Dict[str, Any]]] = Field(default=None, description="任务执行历史结果列表")
-    status: Optional[Tuple[JobStatus, str]] = Field(default=None, description="调度任务运行的状态")
-    desc: Optional[str] = Field(None, description="任务描述")
-    # 爬虫任务需要的参数
-    page_ids: Optional[List[str]] = Field(None, description="爬虫任务需要爬取的页面")
-    
-    # 新增执行统计字段
-    last_result: Optional[Dict[str, Any]] = Field(None, description="最后一次执行结果")
-    execution_stats: Optional[Dict[str, Any]] = Field(None, description="执行统计信息")
-
-    def get_page_ids(self):
-        from app.crawl_config import CrawlConfig
-        self.page_ids = CrawlConfig().get_page_ids(self.page_ids)
-
-
-
-
 class SchedulerInfo(BaseModel):
     """
     调度器信息
@@ -106,25 +47,78 @@ class SchedulerInfo(BaseModel):
     run_time: str = Field(..., description="调度器运行的时间，格式为：%d天%h小时%m分钟%s秒")
 
 
-PREDEFINED_JOB_INFO = {
-    "jiazi_crawl": JobInfo(
-        job_id="jiazi_crawl",
-        trigger_type=TriggerType.CRON,
-        trigger_time={"hour": "*/1"},  # 每小时执行一次
-        type=JobType.CRAWL,
-        status=(JobStatus.PENDING, "尚未初始化"),
-        page_ids=["jiazi"],
-        result=None,
-        desc="夹子榜单定时爬取任务"
-    ),
-    "category_crawl": JobInfo(
-        job_id="category_crawl",
-        trigger_type=TriggerType.CRON,
-        trigger_time={"hour": "6-18", "minute": "0"},  # 6-18点每小时执行
-        type=JobType.CRAWL,
-        status=(JobStatus.PENDING, "尚未初始化"),
-        page_ids=["category"],
-        result=None,
-        desc="分类页面定时爬取任务"
-    )
-}
+class JobBasic(BaseModel):
+    # 核心字段
+    job_id: str
+    job_type: JobType
+    trigger_type: TriggerType
+    trigger_time: Dict[str, Any]
+    desc: str = ""
+
+    # 状态字段
+    status: JobStatus = JobStatus.PENDING
+
+    # 结果字段
+    execution_results: List[Dict[str, Any]] = Field(default_factory=list)
+    last_result: Optional[Dict[str, Any]] = None
+
+
+class Job(JobBasic):
+    """统一的任务数据模型 - 使用Pydantic但保持简洁"""
+    page_ids: List[str] = Field(default_factory=list)
+    is_system_job: bool = False
+
+    # 统计字段
+    execution_count: int = 0
+    success_count: int = 0
+    last_execution_time: Optional[datetime] = None
+
+    # 计算属性
+    @computed_field
+    @property
+    def failure_count(self) -> int:
+        return max(0, self.execution_count - self.success_count)
+
+    def to_scheduler_metadata(self) -> Dict[str, Any]:
+        data = self.model_dump(exclude={"job_id", "trigger_type", "trigger_time"})
+        # 处理datetime序列化
+        if data.get("last_execution_time"):
+            data["last_execution_time"] = data["last_execution_time"].isoformat()
+        return data
+
+    @classmethod
+    def from_scheduler_data(cls, job_id: str, trigger_type: TriggerType,
+                            trigger_time: Dict[str, Any], metadata: Dict[str, Any]) -> "Job":
+        if metadata.get("last_execution_time"):
+            metadata["last_execution_time"] = datetime.fromisoformat(metadata["last_execution_time"])
+
+        return cls(
+            job_id=job_id,
+            trigger_type=trigger_type,
+            trigger_time=trigger_time,
+            **metadata
+        )
+
+
+# 预定义任务配置 - 使用Job模型
+def get_predefined_jobs():
+    """获取预定义的调度任务列表"""
+
+    return [
+        Job(
+            job_id="jiazi_crawl",
+            job_type=JobType.CRAWL,
+            trigger_type=TriggerType.CRON,
+            trigger_time={"hour": "*/1"},  # 每小时执行一次
+            desc="夹子榜单定时爬取任务",
+            page_ids=["jiazi"]
+        ),
+        Job(
+            job_id="category_crawl",
+            job_type=JobType.CRAWL,
+            trigger_type=TriggerType.CRON,
+            trigger_time={"hour": "6-18", "minute": "0"},  # 6-18点每小时执行
+            desc="分类页面定时爬取任务",
+            page_ids=["category"]
+        )
+    ]

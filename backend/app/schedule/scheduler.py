@@ -6,8 +6,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, Optional
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -20,69 +19,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.config import SchedulerSettings, get_settings
 from app.crawl import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import (
-    JobType,
-    JobInfo,
-    JobStatus,
-    PREDEFINED_JOB_INFO,
-    TriggerType,
-)
-
-@dataclass
-class JobMetadata:
-    """统一的任务metadata数据结构"""
-    
-    # 核心字段
-    job_type: JobType
-    status: JobStatus = JobStatus.PENDING
-    desc: str = ""
-    
-    # 任务特定字段
-    page_ids: List[str] = None
-    is_system_job: bool = False
-    
-    # 时间戳字段
-    last_execution_time: str = None
-    
-    # 执行统计字段
-    execution_count: int = 0
-    success_count: int = 0
-    
-    # 结果存储字段
-    execution_results: List[Dict[str, Any]] = None
-    last_result: Dict[str, Any] = None
-    
-    def __post_init__(self):
-        """初始化后处理"""
-        if self.page_ids is None:
-            self.page_ids = []
-        if self.execution_results is None:
-            self.execution_results = []
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式，用于APScheduler metadata"""
-        return asdict(self)
-    
-    @classmethod
-    def from_job_info(cls, job_info: JobInfo) -> "JobMetadata":
-        """从JobInfo创建JobMetadata"""
-        return cls(
-            job_type=job_info.type,
-            status=job_info.status[0] if job_info.status else JobStatus.PENDING,
-            desc=job_info.desc or "",
-            page_ids=job_info.page_ids or []
-        )
-    
-    @classmethod
-    def create_system_cleanup_job(cls) -> "JobMetadata":
-        """创建系统清理任务的metadata"""
-        return cls(
-            job_type=JobType.SYSTEM,
-            status=JobStatus.PENDING,
-            desc="自动清理过期任务",
-            is_system_job=True
-        )
-
+from app.models.schedule import (JobStatus, JobType, TriggerType,Job, get_predefined_jobs)
 
 craw_task = CrawlFlow()
 
@@ -110,7 +47,7 @@ class JobScheduler:
         self.settings = get_settings().scheduler
         self.job_func_mapping = {
             JobType.CRAWL: self.add_crawl_job,
-            JobType.REPORT: self._add_report_job,
+            # JobType.REPORT: self._add_report_job,  # 暂时注释，需要后续迁移
         }
         self.logger = get_logger(__name__)
 
@@ -218,52 +155,42 @@ class JobScheduler:
 
         job.modify(metadata=update_dict)
 
-    async def add_schedule_job(self, job_info: JobInfo) -> JobInfo:
+    async def add_schedule_job(self, job: Job) -> Job:
         """
         添加调度任务
-        :param job_info:
+        :param job:
         :return:
         """
-        if not job_info.type:
-            raise ValueError("Job missing important field: type")
-        return self.job_func_mapping.get(job_info.type)(job_info)
+        if not job.job_type:
+            raise ValueError("Job missing important field: job_type")
+        return await self.job_func_mapping.get(job.job_type)(job)
 
-    async def add_crawl_job(self, job_info: JobInfo) -> JobInfo:
+    async def add_crawl_job(self, job: Job) -> Job:
         """
         添加爬虫调度任务
-        :param job_info:
+        :param job:
         :return:
         """
-        trigger = self._create_trigger(job_info.trigger_type, job_info.trigger_time)
-        
-        # 使用统一的JobMetadata创建metadata
-        job_metadata = JobMetadata.from_job_info(job_info)
-        metadata = job_metadata.to_dict()
+        trigger = self._create_trigger(job.trigger_type, job.trigger_time)
+
+        # 使用统一的Job模型创建metadata
+        metadata = job.to_scheduler_metadata()
 
         # 添加任务到调度器
         self.scheduler.add_job(
             func=craw_task.execute_crawl_task,
             trigger=trigger,
-            id=job_info.job_id,
-            args=[job_info.page_ids or []],
+            id=job.job_id,
+            args=[job.page_ids or []],
             metadata=metadata,
             remove_on_complete=False
         )
 
-        self.logger.info(f"单个任务添加成功: {job_info.job_id}")
+        self.logger.info(f"单个任务添加成功: {job.job_id}")
 
-        return job_info
+        return job
 
-    async def _add_report_job(self, job_info: JobInfo) -> JobInfo:
-
-        """
-        添加报告调度任务，暂时不实现
-
-        :param trigger_type:
-        :param trigger_time:
-        :return:
-        """
-        pass
+    # _add_report_job 方法已删除，不再支持报告任务
 
     async def start(self) -> None:
         """启动调度器"""
@@ -310,15 +237,22 @@ class JobScheduler:
 
         cleanup_trigger = IntervalTrigger(hours=self.settings.cleanup_interval_hours)
 
-        # 使用统一的JobMetadata创建系统清理任务
-        cleanup_metadata = JobMetadata.create_system_cleanup_job()
-        
+        # 创建系统清理任务的Job对象
+        cleanup_job = Job(
+            job_id="__system_job_cleanup__",
+            job_type=JobType.SYSTEM,
+            trigger_type=TriggerType.INTERVAL,
+            trigger_time={"hours": self.settings.cleanup_interval_hours},
+            desc="自动清理过期任务",
+            is_system_job=True
+        )
+
         # 添加清理任务
         self.scheduler.add_job(
             func=self._cleanup_old_jobs,
             trigger=cleanup_trigger,
-            id="__system_job_cleanup__",
-            metadata=cleanup_metadata.to_dict(),
+            id=cleanup_job.job_id,
+            metadata=cleanup_job.to_scheduler_metadata(),
             remove_on_complete=False
         )
 
@@ -360,14 +294,14 @@ class JobScheduler:
                         trigger_type = type(job.trigger).__name__
                         status = job.metadata.get('status')
                         should_delete = False
-                        
+
                         if trigger_type == "DateTrigger":
                             # 一次性任务：检查是否已完成
                             if status in [JobStatus.SUCCESS, JobStatus.FAILED]:
                                 should_delete = True
                             else:
                                 skipped_active += 1
-                                
+
                         elif trigger_type in ["CronTrigger", "IntervalTrigger"]:
                             # 周期性任务：只有在停用时才删除
                             if job.next_run_time is None:
@@ -378,15 +312,16 @@ class JobScheduler:
                         else:
                             # 未知触发器类型，保守处理
                             skipped_active += 1
-                            
+
                         if should_delete:
                             self.scheduler.remove_job(job.id)
                             cleaned_count += 1
                             self.logger.debug(f"清理过期任务: {job.id} (类型: {trigger_type})")
-                            
+
                             # batch_size限制是合理的：控制单次操作影响范围，避免性能问题
                             if cleaned_count >= self.settings.cleanup_batch_size:
-                                self.logger.info(f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
+                                self.logger.info(
+                                    f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
                                 break
 
                 except (ValueError, AttributeError) as e:
@@ -396,9 +331,9 @@ class JobScheduler:
                     continue
 
             # 统计总的待处理任务数
-            total_eligible_jobs = len([j for j in all_jobs 
-                                     if j.metadata and not j.metadata.get('is_system_job', False)])
-            
+            total_eligible_jobs = len([j for j in all_jobs
+                                       if j.metadata and not j.metadata.get('is_system_job', False)])
+
             result = {
                 "cleaned": cleaned_count,
                 "cutoff_date": cutoff_date.isoformat(),
@@ -471,15 +406,18 @@ class JobScheduler:
 
     async def _load_predefined_jobs(self) -> None:
         """加载预定义任务"""
-        for job_id, job_info in PREDEFINED_JOB_INFO.items():
-            try:
-                if job_info.type == JobType.REPORT:
-                    continue  # 跳过报告任务
-                await self.add_crawl_job(job_info)
-            except Exception as e:
-                self.logger.error(f"加载预定义任务失败 {job_id}: {e}")
+        predefined_jobs = get_predefined_jobs()
 
-    def get_job_info(self, job_id: str) -> Optional[JobInfo]:
+        for job in predefined_jobs:
+            try:
+                if job.job_type == JobType.REPORT:
+                    continue  # 跳过报告任务
+                await self.add_crawl_job(job)
+                self.logger.info(f"成功加载预定义任务: {job.job_id}")
+            except Exception as e:
+                self.logger.error(f"加载预定义任务失败 {job.job_id}: {e}")
+
+    def get_job_info(self, job_id: str) -> Optional[Job]:
         """从APScheduler的metadata获取任务信息"""
         if not self.scheduler:
             return None
@@ -487,9 +425,6 @@ class JobScheduler:
         job = self.scheduler.get_job(job_id)
         if not job or not job.metadata:
             return None
-
-        # 从metadata重构JobInfo
-        metadata = job.metadata
 
         # 从触发器推断trigger_type和trigger_time
         trigger_type = TriggerType.DATE  # 默认值
@@ -506,26 +441,12 @@ class JobScheduler:
             trigger_type = TriggerType.DATE
             trigger_time = {"run_time": job.trigger.run_date}
 
-        return JobInfo(
+        # 使用Job.from_scheduler_data重构Job对象
+        return Job.from_scheduler_data(
             job_id=job.id,
             trigger_type=trigger_type,
             trigger_time=trigger_time,
-            type=metadata.get('job_type', JobType.CRAWL),
-            status=(
-                metadata.get('status', JobStatus.PENDING),
-                ""
-            ),
-            page_ids=metadata.get('page_ids', []),
-            desc=metadata.get('desc', ''),
-            result=metadata.get('execution_results', []),  # 返回执行历史而不是单个结果
-            # 可以扩展返回更多执行统计信息
-            last_result=metadata.get('last_result'),
-            execution_stats={
-                'total_executions': metadata.get('execution_count', 0),
-                'success_count': metadata.get('success_count', 0),
-                'failure_count': metadata.get('execution_count', 0) - metadata.get('success_count', 0),
-                'last_execution_time': metadata.get('last_execution_time')
-            }
+            metadata=job.metadata
         )
 
     def get_scheduler_info(self) -> Dict[str, Any]:

@@ -92,11 +92,15 @@ def delta_to_str(delta: timedelta | int = None) -> str:
     return str_format.format(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
-def generate_job_id(job_type: str, run_time: datetime) -> str:
+def generate_job_id(job_type: str, run_time: datetime, page_id: str = None) -> str:
     """
-    根据任务类型和运行时间生成job_id
+    根据任务类型、运行时间和页面ID生成job_id
     :param job_type:
     :param run_time:
+    :param page_id:
     :return:
     """
-    return f"{job_type}_{run_time.strftime('%Y%m%d%H%M%S')}"
+    base_id = f"{job_type}_{run_time.strftime('%Y%m%d_%H%M%S')}"
+    if page_id:
+        return f"{base_id}_{page_id}"
+    return base_id
