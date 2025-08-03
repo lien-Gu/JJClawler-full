@@ -67,9 +67,9 @@ async def get_task_status(job_id: str,) -> DataResponse[dict]:
     """
     try:
         # 从调度器获取任务信息
-        job = scheduler.get_job_info(job_id)
+        job_basic_info = scheduler.get_job_info(job_id)
 
-        if job is None:
+        if job_basic_info is None:
             return DataResponse(
                 success=False,
                 message=f"未找到任务: {job_id}",
@@ -79,7 +79,7 @@ async def get_task_status(job_id: str,) -> DataResponse[dict]:
         return DataResponse(
             success=True,
             message="获取任务状态成功",
-            data=JobBasic.model_validate(job)
+            data=job_basic_info
         )
 
     except Exception as e:

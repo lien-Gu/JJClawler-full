@@ -80,7 +80,7 @@ class Job(JobBasic):
         return max(0, self.execution_count - self.success_count)
 
     def to_scheduler_metadata(self) -> Dict[str, Any]:
-        data = self.model_dump(exclude={"job_id", "trigger_type", "trigger_time"})
+        data = self.model_dump(exclude={"job_id", "trigger_type", "trigger_time"},mode="json")
         # 处理datetime序列化
         if data.get("last_execution_time"):
             data["last_execution_time"] = data["last_execution_time"].isoformat()

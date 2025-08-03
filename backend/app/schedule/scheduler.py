@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -19,7 +19,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.config import SchedulerSettings, get_settings
 from app.crawl import CrawlFlow
 from app.logger import get_logger
-from app.models.schedule import (JobStatus, JobType, TriggerType, Job, get_predefined_jobs, get_clean_up_job)
+from app.models import JobBasic
+from app.models.schedule import (JobStatus, JobType, SchedulerInfo, TriggerType, Job, get_predefined_jobs,
+                                 get_clean_up_job)
 
 craw_task = CrawlFlow()
 
@@ -77,6 +79,7 @@ class JobScheduler:
         self.logger.info("事件监听器注册完成")
 
     def _job_listener(self, event):
+        # TODO:此代码过长，将不同的事件分成不同的函数，简化这个代码的逻辑
         job_id = event.job_id
         job = self.scheduler.get_job(job_id)
         if not job or not job.metadata:
@@ -227,100 +230,51 @@ class JobScheduler:
         """清理过期任务"""
         if not self.scheduler:
             return {"cleaned": 0, "error": "调度器未运行"}
-
         try:
             cutoff_date = datetime.now() - timedelta(days=self.settings.job_retention_days)
             all_jobs = self.scheduler.get_jobs()
-
-            cleaned_count = 0
-            skipped_system = 0
-            skipped_active = 0
-            errors = []
-
+            stats = {"cleaned_count": 0, "errors": []}
             for job in all_jobs:
-                if not job.metadata:
-                    continue
-
-                # 跳过系统任务
-                if job.metadata.get('is_system_job', False):
-                    skipped_system += 1
-                    continue
-
-                # 检查任务创建时间
-                created_at_str = job.metadata.get('created_at')
-                if not created_at_str:
-                    continue
-
-                try:
-                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                    if created_at < cutoff_date:
-                        # 正确区分一次性任务和周期性任务
-                        trigger_type = type(job.trigger).__name__
-                        status = job.metadata.get('status')
-                        should_delete = False
-
-                        if trigger_type == "DateTrigger":
-                            # 一次性任务：检查是否已完成
-                            if status in [JobStatus.SUCCESS, JobStatus.FAILED]:
-                                should_delete = True
-                            else:
-                                skipped_active += 1
-
-                        elif trigger_type in ["CronTrigger", "IntervalTrigger"]:
-                            # 周期性任务：只有在停用时才删除
-                            if job.next_run_time is None:
-                                should_delete = True
-                                self.logger.debug(f"清理已停用的周期性任务: {job.id}")
-                            else:
-                                skipped_active += 1
-                        else:
-                            # 未知触发器类型，保守处理
-                            skipped_active += 1
-
-                        if should_delete:
-                            self.scheduler.remove_job(job.id)
-                            cleaned_count += 1
-                            self.logger.debug(f"清理过期任务: {job.id} (类型: {trigger_type})")
-
-                            # batch_size限制是合理的：控制单次操作影响范围，避免性能问题
-                            if cleaned_count >= self.settings.cleanup_batch_size:
-                                self.logger.info(
-                                    f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
-                                break
-
-                except (ValueError, AttributeError) as e:
-                    error_msg = f"解析任务创建时间失败 {job.id}: {e}"
-                    self.logger.warning(error_msg)
-                    errors.append(error_msg)
-                    continue
-
-            # 统计总的待处理任务数
-            total_eligible_jobs = len([j for j in all_jobs
-                                       if j.metadata and not j.metadata.get('is_system_job', False)])
-
+                should_cleanup, reason = self._should_cleanup_job(job, cutoff_date)
+                if should_cleanup:
+                    try:
+                        self.scheduler.remove_job(job.id)
+                        stats["cleaned_count"] += 1
+                    except Exception as e:
+                        error_msg = f"移除任务 {job.id}失败: {e}"
+                        self.logger.error(error_msg)
+                        stats["errors"].append(error_msg)
+                if stats["cleaned_count"] >= self.settings.cleanup_batch_size:
+                    self.logger.info(f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
+                    break
             result = {
-                "cleaned": cleaned_count,
+                "cleaned": stats["cleaned_count"],
                 "cutoff_date": cutoff_date.isoformat(),
-                "skipped_system": skipped_system,
-                "skipped_active": skipped_active,
-                "total_jobs_checked": len(all_jobs),
-                "eligible_jobs": total_eligible_jobs,
-                "batch_size_reached": cleaned_count >= self.settings.cleanup_batch_size,
-                "errors": errors
+                "batch_size_reached": stats["cleaned_count"] >= self.settings.cleanup_batch_size,
+                "errors": stats["errors"],
             }
-
-            if result["batch_size_reached"]:
-                self.logger.info(
-                    f"任务清理完成(达到批量限制): 清理{cleaned_count}个, 跳过系统任务{skipped_system}个, 跳过活动任务{skipped_active}个, 检查总数{len(all_jobs)}个")
-            else:
-                self.logger.info(
-                    f"任务清理完成: 清理{cleaned_count}个, 跳过系统任务{skipped_system}个, 跳过活动任务{skipped_active}个, 检查总数{len(all_jobs)}个")
+            self.logger.info("\n".join([f"{k}:{v}" for k, v in result.items()]))
             return result
-
         except Exception as e:
-            error_msg = f"任务清理失败: {e}"
+            error_msg = f"任务清理过程发生意外错误: {e}"
             self.logger.error(error_msg)
             return {"cleaned": 0, "error": error_msg}
+
+    @staticmethod
+    def _should_cleanup_job(job, cutoff_date: datetime) -> Tuple[bool, str]:
+        """<UNK>"""
+        created_at = datetime.fromisoformat(job.metadata.get('created_at').replace('Z', '+00:00'))
+        if created_at > cutoff_date:
+            return False, "active job"
+        if not job.metadata:
+            return False, "no metadata"
+        if job.metadata.get('is_system_job', False):
+            return False, "system job"
+        is_onetime = isinstance(job.trigger, DateTrigger)
+        status = job.metadata.get('status')
+        if is_onetime and status in [JobStatus.SUCCESS, JobStatus.FAILED]:
+            return True, "completed_onetime_job"
+        return False, "active_job"
 
     def get_cleanup_status(self) -> Dict[str, Any]:
         """获取清理任务状态"""
@@ -368,8 +322,13 @@ class JobScheduler:
         else:
             raise ValueError(f"不支持的触发器类型: {trigger_type}")
 
-    def get_job_info(self, job_id: str) -> Optional[Job]:
-        """从APScheduler的metadata获取任务信息"""
+    def get_job_info(self, job_id: str) -> Optional[JobBasic]:
+        """
+        # TODO:联系代码上下文，利用pydantic特性优化这个代码
+        从APScheduler的metadata获取任务信息
+        :param job_id:
+        :return:
+        """
         if not self.scheduler:
             return None
 
@@ -393,15 +352,16 @@ class JobScheduler:
             trigger_time = {"run_time": job.trigger.run_date}
 
         # 使用Job.from_scheduler_data重构Job对象
-        return Job.from_scheduler_data(
+        return JobBasic.model_validate(
             job_id=job.id,
             trigger_type=trigger_type,
             trigger_time=trigger_time,
             metadata=job.metadata
         )
 
-    def get_scheduler_info(self) -> Dict[str, Any]:
+    def get_scheduler_info(self) -> SchedulerInfo:
         """获取调度器状态信息"""
+        # TODO：使用第三方库humanize优化时间的计算方法，根据申请的情况修改代码实现
         if not self.scheduler:
             return {
                 "status": "stopped",
