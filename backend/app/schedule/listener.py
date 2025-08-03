@@ -16,14 +16,23 @@ from app.models.schedule import (JobStatus)
 
 
 class JobListener:
-    def __init__(self, scheduler: AsyncIOScheduler):
-        self.scheduler = scheduler
+    def __init__(self):
+        """初始化监听器，不持有scheduler引用"""
         self.logger = get_logger(__name__)
+        self._scheduler = None  # 延迟设置scheduler引用
+    
+    def set_scheduler(self, scheduler: AsyncIOScheduler):
+        """设置scheduler引用，在scheduler启动时调用"""
+        self._scheduler = scheduler
 
     def listen_jobs(self, event):
         """任务事件监听器 - 分发到具体的事件处理函数"""
+        if not self._scheduler:
+            self.logger.error("Scheduler引用未设置，无法处理事件")
+            return
+            
         job_id = event.job_id
-        job = self.scheduler.get_job(job_id)
+        job = self._scheduler.get_job(job_id)
         if not job or not job.metadata:
             self.logger.error(f"任务 {job_id} 不存在或无metadata")
             return

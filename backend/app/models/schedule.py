@@ -82,6 +82,8 @@ class Job(JobInfo):
     trigger: BaseTrigger = Field(..., description="调度任务触发器")
 
     is_system_job: bool = False
+    
+    model_config = {"arbitrary_types_allowed": True}
 
 
 # 预定义任务配置 - 使用Job模型

@@ -37,17 +37,15 @@ class JobScheduler:
         self.start_time: Optional[datetime] = None
         self.listener: Optional[JobListener] = None
 
-        # 初始化参数
+        # 延迟初始化job_func_mapping，避免循环导入
 
-        self.job_func_mapping = self.get_func_mapping()
-
-    @staticmethod
-    def get_func_mapping():
-        from app.crawl import CrawlFlow
-        craw_task = CrawlFlow()
-        return {
-            JobType.CRAWL: craw_task.execute_crawl_task
-        }
+    def _get_crawl_task_func(self):
+        """延迟获取爬取任务函数，避免循环导入"""
+        if JobType.CRAWL not in self.job_func_mapping:
+            from app.crawl import CrawlFlow
+            craw_task = CrawlFlow()
+            self.job_func_mapping[JobType.CRAWL] = craw_task.execute_crawl_task
+        return self.job_func_mapping[JobType.CRAWL]
 
     def _register_event_listeners(self) -> None:
         """注册事件监听器 - 3.x版本API"""
@@ -67,7 +65,10 @@ class JobScheduler:
         :return:
         """
         if not exe_func:
-            func = self.job_func_mapping.get(job.job_type, None)
+            if job.job_type == JobType.CRAWL:
+                func = self._get_crawl_task_func()
+            else:
+                func = self.job_func_mapping.get(job.job_type, None)
         else:
             func = exe_func
         args = job.page_ids if job.job_type == JobType.CRAWL else None
@@ -106,7 +107,8 @@ class JobScheduler:
         self.start_time = datetime.now()
 
         # 注册事件监听器
-        self.listener = JobListener(self.scheduler)
+        self.listener = JobListener()
+        self.listener.set_scheduler(self.scheduler)
         self.scheduler.add_listener(self.listener.listen_jobs,
                                     EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
 
@@ -254,6 +256,27 @@ class JobScheduler:
                 jobs=[],
                 run_time="未知"
             )
+
+    def _calculate_run_time(self) -> str:
+        """计算并格式化运行时间 - 使用humanize库"""
+        if not self.start_time:
+            return "未知"
+
+        try:
+            delta = datetime.now() - self.start_time
+            # 使用humanize库进行人性化时间格式化
+            if delta.days > 0:
+                return humanize.precisedelta(delta, minimum_unit="seconds")
+            else:
+                return humanize.naturaldelta(delta)
+        except Exception as e:
+            self.logger.warning(f"humanize库处理时间失败，回退到原始方法: {e}")
+            # 回退到原始的时间格式化方法
+            delta = datetime.now() - self.start_time
+            days = delta.days
+            hours, remainder = divmod(delta.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{days}天{hours}小时{minutes}分钟{seconds}秒"
 
 
 # 全局调度器实例
