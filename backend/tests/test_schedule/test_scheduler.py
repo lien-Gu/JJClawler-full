@@ -1,20 +1,21 @@
 """
-TaskScheduler模块测试
+JobScheduler模块测试
 
-测试调度器的核心功能，使用mock的APScheduler避免实际调度
+测试app/schedule/scheduler.py的核心功能，使用mock的APScheduler避免实际调度
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from apscheduler.triggers.date import DateTrigger
 
-from app.models.schedule import JobHandlerType, JobInfo, JobStatus, TriggerType
-from app.schedule.scheduler import JobScheduler
+from app.models.schedule import Job, JobInfo, JobStatus, JobType, SchedulerInfo
+from app.schedule.scheduler import JobScheduler, get_scheduler
 
 
-class TestTaskScheduler:
-    """TaskScheduler测试类"""
+class TestJobScheduler:
+    """JobScheduler测试类"""
 
     @pytest.fixture
     def scheduler(self):
@@ -25,91 +26,83 @@ class TestTaskScheduler:
     def mock_apscheduler(self):
         """Mock APScheduler"""
         mock_scheduler = MagicMock()
-        mock_scheduler.start_in_background = AsyncMock()
-        mock_scheduler.stop = AsyncMock()
-        mock_scheduler.add_schedule = AsyncMock()
-        mock_scheduler.get_schedules = AsyncMock(return_value=[])
+        mock_scheduler.start = MagicMock()
+        mock_scheduler.shutdown = MagicMock()
+        mock_scheduler.add_job = MagicMock()
+        mock_scheduler.get_job = MagicMock()
+        mock_scheduler.get_jobs = MagicMock(return_value=[])
+        mock_scheduler.remove_job = MagicMock()
+        mock_scheduler.add_listener = MagicMock()
         return mock_scheduler
 
     @pytest.fixture
-    def sample_job_info(self):
-        """示例任务信息"""
-        return JobInfo(
-            job_id="test_job_123",
-            trigger_type=TriggerType.DATE,
-            trigger_time={"run_time": datetime.now()},
-            handler=JobHandlerType.CRAWL,
-            page_ids=["jiazi"],
-            desc="测试任务"
+    def sample_job(self):
+        """示例任务"""
+        return Job(
+            job_id="CRAWL_20250803_123456",
+            job_type=JobType.CRAWL,
+            trigger=DateTrigger(run_date=datetime.now()),
+            desc="测试任务",
+            page_ids=["jiazi"]
         )
 
     def test_scheduler_initialization(self, scheduler):
         """测试调度器初始化"""
         assert scheduler.scheduler is None
         assert scheduler.start_time is None
-        assert len(scheduler.job_handlers) == 2  # CRAWL 和 REPORT
-        assert JobHandlerType.CRAWL in scheduler.job_handlers
-        assert JobHandlerType.REPORT in scheduler.job_handlers
+        assert scheduler.listener is None
+        assert scheduler.job_func_mapping is not None
+        assert JobType.CRAWL in scheduler.job_func_mapping
 
-    def test_generate_job_id_with_page_id(self, scheduler):
-        """测试任务ID生成 - 带页面ID"""
-        job_id = scheduler._generate_job_id("CrawlJobHandler", "jiazi")
-        
-        assert "CrawlJobHandler" in job_id
-        assert "jiazi" in job_id
-        assert len(job_id.split("_")) >= 3  # handler_pageid_timestamp
+    def test_get_job_func_crawl_type(self, scheduler):
+        """测试获取爬取任务执行函数"""
+        func = scheduler._get_job_func(JobType.CRAWL)
+        assert func is not None
+        assert callable(func)
 
-    def test_generate_job_id_without_page_id(self, scheduler):
-        """测试任务ID生成 - 不带页面ID"""
-        job_id = scheduler._generate_job_id("CrawlJobHandler")
-        
-        assert "CrawlJobHandler" in job_id
-        assert len(job_id.split("_")) >= 3  # handler_timestamp_uuid
+    def test_get_job_func_invalid_type(self, scheduler):
+        """测试获取无效任务类型函数"""
+        with pytest.raises(ValueError, match="job type .* is not supported"):
+            scheduler._get_job_func("invalid_type")
 
-    def test_create_date_trigger(self, scheduler):
-        """测试DATE触发器创建"""
-        run_time = datetime.now()
-        trigger_time = {"run_time": run_time}
-        
-        trigger = scheduler._create_trigger(TriggerType.DATE, trigger_time)
-        
-        assert trigger is not None
-        assert trigger.run_date == run_time
-
-    def test_create_cron_trigger(self, scheduler):
-        """测试CRON触发器创建"""
-        trigger_time = {"hour": "10", "minute": "30"}
-        
-        trigger = scheduler._create_trigger(TriggerType.CRON, trigger_time)
-        
-        assert trigger is not None
-
-    def test_create_interval_trigger(self, scheduler):
-        """测试INTERVAL触发器创建"""
-        trigger_time = {"seconds": 60}
-        
-        trigger = scheduler._create_trigger(TriggerType.INTERVAL, trigger_time)
-        
-        assert trigger is not None
-
-    def test_create_invalid_trigger(self, scheduler):
-        """测试无效触发器类型"""
-        with pytest.raises(ValueError, match="不支持的触发器类型"):
-            scheduler._create_trigger("invalid_type", {})
-
-    @patch('app.schedule.scheduler.AsyncScheduler')
-    async def test_start_scheduler_success(self, mock_scheduler_class, scheduler, mock_apscheduler):
+    @pytest.mark.asyncio
+    @patch('app.schedule.scheduler.AsyncIOScheduler')
+    @patch('app.schedule.scheduler.JobListener')
+    async def test_start_scheduler_success(self, mock_listener_class, mock_scheduler_class, scheduler):
         """测试启动调度器 - 成功场景"""
+        mock_apscheduler = MagicMock()
         mock_scheduler_class.return_value = mock_apscheduler
         
-        # Mock get_full_page_ids
-        with patch.object(scheduler, 'get_full_page_ids', return_value=["jiazi"]):
+        mock_listener = MagicMock()
+        mock_listener_class.return_value = mock_listener
+
+        # Mock预定义任务和清理任务
+        with patch('app.models.schedule.get_predefined_jobs', return_value=[]), \
+             patch('app.models.schedule.get_clean_up_job') as mock_cleanup:
+            
+            mock_cleanup_job = Job(
+                job_id="__system_job_cleanup__",
+                job_type=JobType.SYSTEM,
+                trigger=DateTrigger(run_date=datetime.now()),
+                desc="清理任务"
+            )
+            mock_cleanup.return_value = mock_cleanup_job
+            
             await scheduler.start()
-        
+
         assert scheduler.scheduler is not None
         assert scheduler.start_time is not None
-        mock_apscheduler.start_in_background.assert_called_once()
+        assert scheduler.listener is not None
+        
+        # 验证APScheduler配置
+        mock_scheduler_class.assert_called_once()
+        mock_apscheduler.start.assert_called_once()
+        
+        # 验证事件监听器注册
+        mock_listener.set_scheduler.assert_called_once_with(mock_apscheduler)
+        mock_apscheduler.add_listener.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_start_scheduler_already_started(self, scheduler, mock_apscheduler):
         """测试启动调度器 - 已经启动"""
         scheduler.scheduler = mock_apscheduler
@@ -117,8 +110,9 @@ class TestTaskScheduler:
         await scheduler.start()
         
         # 应该不会重复启动
-        mock_apscheduler.start_in_background.assert_not_called()
+        mock_apscheduler.start.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_shutdown_scheduler(self, scheduler, mock_apscheduler):
         """测试关闭调度器"""
         scheduler.scheduler = mock_apscheduler
@@ -128,119 +122,307 @@ class TestTaskScheduler:
         
         assert scheduler.scheduler is None
         assert scheduler.start_time is None
-        mock_apscheduler.stop.assert_called_once()
+        assert scheduler.listener is None
+        mock_apscheduler.shutdown.assert_called_once_with(wait=True)
 
+    @pytest.mark.asyncio
     async def test_shutdown_scheduler_not_started(self, scheduler):
         """测试关闭调度器 - 未启动状态"""
         await scheduler.shutdown()
         # 应该正常执行，不抛异常
 
-    @patch('app.schedule.scheduler.AsyncScheduler')
-    async def test_add_single_job_success(self, mock_scheduler_class, scheduler, mock_apscheduler, sample_job_info):
-        """测试添加单个任务 - 成功场景"""
-        mock_scheduler_class.return_value = mock_apscheduler
+    @pytest.mark.asyncio
+    async def test_add_schedule_job_success(self, scheduler, sample_job, mock_apscheduler):
+        """测试添加调度任务 - 成功场景"""
         scheduler.scheduler = mock_apscheduler
         
-        # Mock get_full_page_ids
-        with patch.object(scheduler, 'get_full_page_ids', return_value=["jiazi"]):
-            result = await scheduler.add_job(sample_job_info)
+        result = await scheduler.add_schedule_job(sample_job)
         
-        assert result.job_id == sample_job_info.job_id
-        assert result.status[0] == JobStatus.PENDING
-        assert sample_job_info.job_id in scheduler._job_store
-        mock_apscheduler.add_schedule.assert_called_once()
+        assert result == sample_job
+        
+        # 验证APScheduler被正确调用
+        mock_apscheduler.add_job.assert_called_once()
+        call_args = mock_apscheduler.add_job.call_args
+        assert call_args[1]['id'] == sample_job.job_id
+        assert call_args[1]['trigger'] == sample_job.trigger
+        assert call_args[1]['args'] == [sample_job.page_ids]
 
-    @patch('app.schedule.scheduler.AsyncScheduler')
-    async def test_add_batch_jobs_success(self, mock_scheduler_class, scheduler, mock_apscheduler):
-        """测试添加批次任务 - 成功场景"""
-        mock_scheduler_class.return_value = mock_apscheduler
+    @pytest.mark.asyncio
+    async def test_add_schedule_job_with_custom_func(self, scheduler, sample_job, mock_apscheduler):
+        """测试添加调度任务 - 自定义执行函数"""
         scheduler.scheduler = mock_apscheduler
         
-        # 创建多页面任务
-        batch_job_info = JobInfo(
-            job_id="batch_job_456",
-            trigger_type=TriggerType.DATE,
-            trigger_time={"run_time": datetime.now()},
-            handler=JobHandlerType.CRAWL,
-            page_ids=["jiazi", "category"],
-            desc="批次测试任务"
+        custom_func = MagicMock()
+        result = await scheduler.add_schedule_job(sample_job, exe_func=custom_func)
+        
+        assert result == sample_job
+        
+        # 验证使用了自定义函数
+        call_args = mock_apscheduler.add_job.call_args
+        assert call_args[1]['func'] == custom_func
+
+    @pytest.mark.asyncio
+    async def test_add_schedule_job_system_type(self, scheduler, mock_apscheduler):
+        """测试添加系统任务"""
+        scheduler.scheduler = mock_apscheduler
+        
+        system_job = Job(
+            job_id="__system_job_cleanup__",
+            job_type=JobType.SYSTEM,
+            trigger=DateTrigger(run_date=datetime.now()),
+            desc="系统清理任务"
         )
         
-        # Mock get_full_page_ids
-        with patch.object(scheduler, 'get_full_page_ids', return_value=["jiazi", "category"]):
-            result = await scheduler.add_job(batch_job_info)
+        custom_func = MagicMock()
+        result = await scheduler.add_schedule_job(system_job, exe_func=custom_func)
         
-        assert result.job_id == "batch_job_456"
-        assert result.status[0] == JobStatus.PENDING
-        assert "批次任务全部添加成功" in result.status[1]
-        # 应该调用add_schedule两次（每个页面一次）
-        assert mock_apscheduler.add_schedule.call_count == 2
+        assert result == system_job
+        
+        # 验证系统任务使用自定义函数
+        call_args = mock_apscheduler.add_job.call_args
+        assert call_args[1]['func'] == custom_func
+        assert call_args[1]['args'] == [None]  # 系统任务args为None
 
-    async def test_get_job_info_success(self, scheduler, sample_job_info, mock_apscheduler):
+    def test_get_job_info_success(self, scheduler, mock_apscheduler):
         """测试获取任务信息 - 成功场景"""
         scheduler.scheduler = mock_apscheduler
-        scheduler._job_store[sample_job_info.job_id] = sample_job_info
         
-        result = await scheduler.get_job_info(sample_job_info.job_id)
+        # Mock APScheduler job
+        mock_job = MagicMock()
+        mock_job.metadata = '{"job_id": "test_job", "job_type": "crawl", "desc": "测试任务"}'
+        mock_apscheduler.get_job.return_value = mock_job
+        
+        result = scheduler.get_job_info("test_job")
         
         assert result is not None
-        assert result.job_id == sample_job_info.job_id
+        assert isinstance(result, JobInfo)
+        mock_apscheduler.get_job.assert_called_once_with("test_job")
 
-    async def test_get_job_info_not_found(self, scheduler):
+    def test_get_job_info_not_found(self, scheduler, mock_apscheduler):
         """测试获取任务信息 - 任务不存在"""
-        result = await scheduler.get_job_info("nonexistent_job")
+        scheduler.scheduler = mock_apscheduler
+        mock_apscheduler.get_job.return_value = None
         
-        assert result is None
+        result = scheduler.get_job_info("nonexistent_job")
+        
+        assert result is not None
+        assert result.err == "该任务nonexistent_job不存在"
 
-    async def test_get_scheduler_info_running(self, scheduler, mock_apscheduler):
+    def test_get_job_info_no_metadata(self, scheduler, mock_apscheduler):
+        """测试获取任务信息 - 无元数据"""
+        scheduler.scheduler = mock_apscheduler
+        
+        mock_job = MagicMock()
+        mock_job.metadata = None
+        mock_apscheduler.get_job.return_value = mock_job
+        
+        result = scheduler.get_job_info("test_job")
+        
+        assert result is not None
+        assert result.err == "该任务test_job不存在"
+
+    def test_get_job_info_scheduler_not_running(self, scheduler):
+        """测试获取任务信息 - 调度器未运行"""
+        result = scheduler.get_job_info("test_job")
+        
+        assert result is not None
+        assert result.err == "调度器没有成功运行"
+
+    def test_get_scheduler_info_running(self, scheduler, mock_apscheduler):
         """测试获取调度器状态 - 运行中"""
         scheduler.scheduler = mock_apscheduler
         scheduler.start_time = datetime.now()
         
-        # Mock schedules
-        mock_schedule = MagicMock()
-        mock_schedule.id = "test_schedule"
-        mock_schedule.next_fire_time = datetime.now()
-        mock_schedule.trigger = "date"
-        mock_apscheduler.get_schedules.return_value = [mock_schedule]
+        # Mock jobs
+        mock_job = MagicMock()
+        mock_job.id = "test_job"
+        mock_job.next_run_time = datetime.now()
+        mock_job.trigger = "date"
+        mock_job.metadata = {"status": "pending"}
+        mock_apscheduler.get_jobs.return_value = [mock_job]
         
-        result = await scheduler.get_scheduler_info()
+        with patch('humanize.naturaldelta', return_value="1小时30分钟"):
+            result = scheduler.get_scheduler_info()
         
-        assert result["status"] == "running"
-        assert len(result["job_wait"]) == 1
-        assert "天" in result["run_time"]
+        assert isinstance(result, SchedulerInfo)
+        assert result.status == "running"
+        assert len(result.jobs) == 1
+        assert result.jobs[0]["id"] == "test_job"
+        assert result.jobs[0]["status"] == "pending"
 
-    async def test_get_scheduler_info_stopped(self, scheduler):
+    def test_get_scheduler_info_stopped(self, scheduler):
         """测试获取调度器状态 - 未启动"""
-        result = await scheduler.get_scheduler_info()
+        result = scheduler.get_scheduler_info()
         
-        assert result["status"] == "stopped"
-        assert result["job_wait"] == []
-        assert result["job_running"] == []
-        assert result["run_time"] == "0天0小时0分钟0秒"
+        assert isinstance(result, SchedulerInfo)
+        assert result.status == "stopped"
+        assert result.jobs == []
+        assert result.run_time == "0天0小时0分钟0秒"
 
-    def test_get_full_page_ids_success(self, scheduler):
-        """测试获取完整页面ID列表 - 成功场景"""
-        with patch('app.crawl_config.CrawlConfig') as mock_config:
-            mock_instance = mock_config.return_value
-            mock_instance.get_page_ids.return_value = ["jiazi", "category"]
-            
-            result = scheduler.get_full_page_ids(["jiazi"])
-            
-            assert result == ["jiazi", "category"]
-            mock_instance.get_page_ids.assert_called_once_with(["jiazi"])
-
-    def test_get_full_page_ids_fallback(self, scheduler):
-        """测试获取完整页面ID列表 - 异常回退"""
-        with patch('app.crawl_config.CrawlConfig', side_effect=Exception("Config error")):
-            result = scheduler.get_full_page_ids(["jiazi"])
-            
-            assert result == ["jiazi"]
-
-    def test_get_full_page_ids_empty(self, scheduler):
-        """测试获取完整页面ID列表 - 空输入"""
-        result = scheduler.get_full_page_ids(None)
-        assert result == []
+    def test_get_scheduler_info_error(self, scheduler, mock_apscheduler):
+        """测试获取调度器状态 - 异常场景"""
+        scheduler.scheduler = mock_apscheduler
+        scheduler.start_time = datetime.now()
         
-        result = scheduler.get_full_page_ids([])
-        assert result == []
+        # 模拟异常
+        mock_apscheduler.get_jobs.side_effect = Exception("数据库连接失败")
+        
+        result = scheduler.get_scheduler_info()
+        
+        assert isinstance(result, SchedulerInfo)
+        assert result.status == "error"
+        assert result.jobs == []
+        assert result.run_time == "未知"
+
+    def test_calculate_run_time_with_humanize(self, scheduler):
+        """测试运行时间计算 - humanize库正常"""
+        scheduler.start_time = datetime.now() - timedelta(hours=2, minutes=30)
+        
+        with patch('humanize.naturaldelta', return_value="2小时30分钟"):
+            result = scheduler._calculate_run_time()
+        
+        assert result == "2小时30分钟"
+
+    def test_calculate_run_time_humanize_fallback(self, scheduler):
+        """测试运行时间计算 - humanize库异常回退"""
+        scheduler.start_time = datetime.now() - timedelta(days=1, hours=2, minutes=30, seconds=15)
+        
+        # 需要同时模拟precisedelta和naturaldelta异常
+        with patch('humanize.precisedelta', side_effect=Exception("humanize错误")), \
+             patch('humanize.naturaldelta', side_effect=Exception("humanize错误")):
+            result = scheduler._calculate_run_time()
+        
+        assert "天" in result and "小时" in result and "分钟" in result and "秒" in result
+
+    def test_calculate_run_time_no_start_time(self, scheduler):
+        """测试运行时间计算 - 无启动时间"""
+        scheduler.start_time = None
+        
+        result = scheduler._calculate_run_time()
+        
+        assert result == "未知"
+
+    def test_cleanup_old_jobs_success(self, scheduler, mock_apscheduler):
+        """测试清理过期任务 - 成功场景"""
+        from datetime import timezone
+        
+        scheduler.scheduler = mock_apscheduler
+        
+        # Mock过期任务
+        mock_job = MagicMock()
+        mock_job.id = "old_job"
+        old_time = datetime.now(timezone.utc) - timedelta(days=10)
+        mock_job.metadata = {
+            "created_at": old_time.isoformat().replace('+00:00', 'Z'),
+            "status": JobStatus.SUCCESS,
+            "is_system_job": False
+        }
+        mock_job.trigger = DateTrigger(run_date=datetime.now())
+        mock_apscheduler.get_jobs.return_value = [mock_job]
+        
+        result = scheduler._cleanup_old_jobs()
+        
+        assert result["cleaned"] == 1
+        assert result["errors"] == []
+        mock_apscheduler.remove_job.assert_called_once_with("old_job")
+
+    def test_cleanup_old_jobs_scheduler_not_running(self, scheduler):
+        """测试清理过期任务 - 调度器未运行"""
+        result = scheduler._cleanup_old_jobs()
+        
+        assert result["cleaned"] == 0
+        assert result["error"] == "调度器未运行"
+
+    def test_should_cleanup_job_completed_onetime(self, scheduler):
+        """测试任务清理判断 - 已完成的一次性任务"""
+        from datetime import timezone
+        
+        mock_job = MagicMock()
+        # 创建带时区的datetime对象
+        old_time = datetime.now(timezone.utc) - timedelta(days=10)
+        mock_job.metadata = {
+            "created_at": old_time.isoformat().replace('+00:00', 'Z'),
+            "status": JobStatus.SUCCESS,
+            "is_system_job": False
+        }
+        mock_job.trigger = DateTrigger(run_date=datetime.now())
+        
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+        should_cleanup, reason = scheduler._should_cleanup_job(mock_job, cutoff_date)
+        
+        assert should_cleanup is True
+        assert reason == "completed_onetime_job"
+
+    def test_should_cleanup_job_system_job(self, scheduler):
+        """测试任务清理判断 - 系统任务不清理"""
+        from datetime import timezone
+        
+        mock_job = MagicMock()
+        old_time = datetime.now(timezone.utc) - timedelta(days=10)
+        mock_job.metadata = {
+            "created_at": old_time.isoformat().replace('+00:00', 'Z'),
+            "is_system_job": True
+        }
+        
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+        should_cleanup, reason = scheduler._should_cleanup_job(mock_job, cutoff_date)
+        
+        assert should_cleanup is False
+        assert reason == "system job"
+
+    def test_should_cleanup_job_recent_job(self, scheduler):
+        """测试任务清理判断 - 最近的任务不清理"""
+        from datetime import timezone
+        
+        mock_job = MagicMock()
+        recent_time = datetime.now(timezone.utc)
+        mock_job.metadata = {
+            "created_at": recent_time.isoformat().replace('+00:00', 'Z'),
+            "status": JobStatus.SUCCESS,
+            "is_system_job": False
+        }
+        
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+        should_cleanup, reason = scheduler._should_cleanup_job(mock_job, cutoff_date)
+        
+        assert should_cleanup is False
+        assert reason == "active job"
+
+
+class TestSchedulerSingleton:
+    """测试调度器单例模式"""
+
+    def test_get_scheduler_singleton(self):
+        """测试获取调度器单例"""
+        scheduler1 = get_scheduler()
+        scheduler2 = get_scheduler()
+        
+        assert scheduler1 is scheduler2
+        assert isinstance(scheduler1, JobScheduler)
+
+    @patch('app.schedule.scheduler._scheduler', None)
+    def test_get_scheduler_new_instance(self):
+        """测试创建新的调度器实例"""
+        scheduler = get_scheduler()
+        
+        assert isinstance(scheduler, JobScheduler)
+
+    @pytest.mark.asyncio
+    async def test_start_stop_scheduler_functions(self):
+        """测试启动和停止调度器的便捷函数"""
+        from app.schedule.scheduler import start_scheduler, stop_scheduler
+        
+        # Mock调度器实例
+        with patch('app.schedule.scheduler.get_scheduler') as mock_get_scheduler:
+            mock_scheduler = MagicMock()
+            mock_scheduler.start = AsyncMock()
+            mock_scheduler.shutdown = AsyncMock()
+            mock_get_scheduler.return_value = mock_scheduler
+            
+            # 测试启动函数
+            await start_scheduler()
+            mock_scheduler.start.assert_called_once()
+            
+            # 测试停止函数
+            await stop_scheduler()
+            mock_scheduler.shutdown.assert_called_once()

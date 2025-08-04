@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import humanize
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
@@ -32,20 +32,22 @@ class JobScheduler:
         """初始化调度器"""
         self.settings: SchedulerSettings = get_settings().scheduler
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_func_mapping: Dict = {}
+        self.job_func_mapping: Dict = None
         self.logger = get_logger(__name__)
         self.start_time: Optional[datetime] = None
         self.listener: Optional[JobListener] = None
 
-        # 延迟初始化job_func_mapping，避免循环导入
+        from app.crawl import CrawlFlow
+        self.job_func_mapping = {
+            JobType.CRAWL: CrawlFlow().execute_crawl_task
+        }
 
-    def _get_crawl_task_func(self):
-        """延迟获取爬取任务函数，避免循环导入"""
-        if JobType.CRAWL not in self.job_func_mapping:
-            from app.crawl import CrawlFlow
-            craw_task = CrawlFlow()
-            self.job_func_mapping[JobType.CRAWL] = craw_task.execute_crawl_task
-        return self.job_func_mapping[JobType.CRAWL]
+    def _get_job_func(self, job_type: JobType) -> Optional[Callable]:
+        """获取任务执行函数 - 延迟初始化避免代理配置问题"""
+        func = self.job_func_mapping.get(job_type, None)
+        if func is None:
+            raise ValueError(f"job type {job_type} is not supported")
+        return func
 
     def _register_event_listeners(self) -> None:
         """注册事件监听器 - 3.x版本API"""
@@ -65,10 +67,7 @@ class JobScheduler:
         :return:
         """
         if not exe_func:
-            if job.job_type == JobType.CRAWL:
-                func = self._get_crawl_task_func()
-            else:
-                func = self.job_func_mapping.get(job.job_type, None)
+            func = self._get_job_func(job.job_type)
         else:
             func = exe_func
         args = job.page_ids if job.job_type == JobType.CRAWL else None
@@ -146,7 +145,8 @@ class JobScheduler:
         if not self.scheduler:
             return {"cleaned": 0, "error": "调度器未运行"}
         try:
-            cutoff_date = datetime.now() - timedelta(days=self.settings.job_retention_days)
+            from datetime import timezone
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.settings.job_retention_days)
             all_jobs = self.scheduler.get_jobs()
             stats = {"cleaned_count": 0, "errors": []}
             for job in all_jobs:

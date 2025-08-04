@@ -109,9 +109,10 @@ def get_predefined_jobs() -> List[Job]:
 
 
 def get_clean_up_job() -> Job:
-    """<UNK>"""
-    from app.config import SchedulerSettings
-    interval_hour = SchedulerSettings.cleanup_interval_hours
+    """获取清理任务配置"""
+    from app.config import get_settings
+    settings = get_settings()
+    interval_hour = settings.scheduler.cleanup_interval_hours
     return Job(
         job_id="__system_job_cleanup__",
         job_type=JobType.SYSTEM,
