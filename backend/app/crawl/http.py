@@ -14,7 +14,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Union
 
-import httpx
+from httpx import AsyncClient, RequestError, Limits, Timeout, HTTPStatusError
 
 from app.config import settings
 from app.logger import get_logger
@@ -62,29 +62,32 @@ class HttpClient:
 
     # ==================== 私有方法 ====================
 
-    def _create_http_client(self) -> httpx.AsyncClient:
+    def _create_http_client(self) -> AsyncClient | None:
         """创建优化的HTTP客户端"""
         # 连接池配置
-        limits = httpx.Limits(
+        limits = Limits(
             max_keepalive_connections=20,
             max_connections=30,
             keepalive_expiry=30
         )
 
         # 超时配置
-        timeout = httpx.Timeout(
+        timeout = Timeout(
             connect=10.0,
             read=self._config.timeout,
             write=10.0,
             pool=5.0
         )
 
-        return httpx.AsyncClient(
+        client = AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            headers=self._config.user_agent
+            headers=self._config.user_agent,
+            trust_env=False,
         )
+
+        return client
 
     async def _request_single(self, url: str) -> Dict[str, Any]:
         """
@@ -96,7 +99,7 @@ class HttpClient:
             response = await self._client.get(url)
             response.raise_for_status()
             return json.loads(response.content)
-        except (httpx.RequestError, json.JSONDecodeError, httpx.HTTPStatusError) as e:
+        except (RequestError, json.JSONDecodeError, HTTPStatusError) as e:
             logger.debug(f"HTTP请求失败 {url}: {e}")
             return {"status": "error", "url": url, "error": str(e)}
 
@@ -113,4 +116,3 @@ class HttpClient:
             result = await self._request_single(url)
             results.append(result)
         return results
-
