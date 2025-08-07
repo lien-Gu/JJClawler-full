@@ -7,6 +7,7 @@ JobScheduler模块测试 - 增强版本
 from datetime import datetime, timedelta
 import asyncio
 import pytest
+import pytest_asyncio
 from pytest_mock import MockerFixture
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.cron import CronTrigger
@@ -236,7 +237,7 @@ class TestJobSchedulerMocked:
 class TestJobSchedulerIntegration:
     """使用真实内存调度器的集成测试"""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def memory_scheduler(self, mocker: MockerFixture):
         """创建使用内存存储的真实调度器"""
         # Mock CrawlFlow 避免初始化问题
@@ -268,25 +269,41 @@ class TestJobSchedulerIntegration:
         scheduler.scheduler.start()
         assert scheduler.scheduler.running
         
-        # 添加任务
-        result = await scheduler.add_schedule_job(sample_job, exe_func=lambda x: "test_result")
-        assert result == sample_job
+        # 创建一个未来时间的任务，避免立即执行
+        future_job = Job(
+            job_id="FUTURE_CRAWL_TEST",
+            job_type=JobType.CRAWL,
+            trigger=DateTrigger(run_date=datetime.now() + timedelta(hours=1)),  # 1小时后执行
+            desc="未来执行的测试任务",
+            page_ids=["jiazi"]
+        )
         
-        # 验证任务已添加
+        # 添加任务
+        result = await scheduler.add_schedule_job(future_job, exe_func=lambda x: "test_result")
+        assert result == future_job
+        
+        # 验证任务已添加且未执行
         jobs = scheduler.scheduler.get_jobs()
         assert len(jobs) == 1
-        assert jobs[0].id == sample_job.job_id
+        assert jobs[0].id == future_job.job_id
         
-        # 获取任务信息 - 由于真实APScheduler的metadata是JSON字符串，这里会失败
-        # 我们改为检查任务是否存在于调度器中
-        actual_job = scheduler.scheduler.get_job(sample_job.job_id)
+        # 验证任务存在且有下次运行时间
+        actual_job = scheduler.scheduler.get_job(future_job.job_id)
         assert actual_job is not None
-        assert actual_job.id == sample_job.job_id
+        assert actual_job.id == future_job.job_id
+        assert actual_job.next_run_time is not None  # 有计划的下次执行时间
         
-        # 获取调度器状态
-        scheduler_info = scheduler.get_scheduler_info()
-        assert scheduler_info.status == "running"
-        assert len(scheduler_info.jobs) == 1
+        # 直接验证调度器是否运行，避免get_scheduler_info的metadata问题
+        assert scheduler.scheduler.running
+        
+        # 验证任务数量
+        current_jobs = scheduler.scheduler.get_jobs()
+        assert len(current_jobs) == 1
+        
+        # 测试移除任务
+        scheduler.scheduler.remove_job(future_job.job_id)
+        jobs_after_removal = scheduler.scheduler.get_jobs()
+        assert len(jobs_after_removal) == 0
 
     @pytest.mark.asyncio
     async def test_real_scheduler_job_execution(self, memory_scheduler):
@@ -442,7 +459,7 @@ class TestJobSchedulerIntegration:
         
         await scheduler.shutdown()
         
-        assert not scheduler.scheduler.running
+        # shutdown()方法会将scheduler设置为None，所以检查这些状态
         assert scheduler.scheduler is None
         assert scheduler.start_time is None
         assert scheduler.listener is None

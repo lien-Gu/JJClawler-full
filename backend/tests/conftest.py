@@ -2,7 +2,7 @@
 pytest配置文件 - 统一的测试fixtures和测试数据
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -372,6 +372,101 @@ def mock_ranking_history_data():
             "snapshot_time": datetime(2024, 1, 15, 12, 0, 0),
         },
     ]
+
+
+# ==================== Scheduler模块测试数据 ====================
+
+
+@pytest.fixture
+def sample_job():
+    """示例任务"""
+    from app.models.schedule import Job, JobType
+    from apscheduler.triggers.date import DateTrigger
+    return Job(
+        job_id="CRAWL_20250803_123456",
+        job_type=JobType.CRAWL,
+        trigger=DateTrigger(run_date=datetime.now()),
+        desc="测试任务",
+        page_ids=["jiazi"]
+    )
+
+
+@pytest.fixture
+def sample_system_job():
+    """示例系统任务"""
+    from app.models.schedule import Job, JobType
+    from apscheduler.triggers.cron import CronTrigger
+    return Job(
+        job_id="SYSTEM_CLEANUP_20250803",
+        job_type=JobType.SYSTEM,
+        trigger=CronTrigger(hour=2, minute=0),
+        desc="系统清理任务",
+        is_system_job=True
+    )
+
+
+@pytest.fixture
+def sample_job_metadata():
+    """示例任务metadata"""
+    from app.models.schedule import JobStatus, JobType
+    return {
+        "job_id": "CRAWL_20250803_123456",
+        "job_type": JobType.CRAWL.value,
+        "desc": "测试任务",
+        "page_ids": ["jiazi"],
+        "status": JobStatus.PENDING.value,
+        "created_at": datetime.now().isoformat(),
+        "is_system_job": False,
+        "failure_count": 0
+    }
+
+
+@pytest.fixture
+def expired_job_metadata():
+    """过期任务metadata"""
+    from app.models.schedule import JobStatus, JobType
+    return {
+        "job_id": "OLD_CRAWL_20250101",
+        "job_type": JobType.CRAWL.value,
+        "desc": "过期的测试任务",
+        "page_ids": ["jiazi"],
+        "status": JobStatus.SUCCESS.value,
+        "created_at": (datetime.now() - timedelta(days=10)).isoformat(),
+        "is_system_job": False,
+        "failure_count": 0
+    }
+
+
+@pytest.fixture
+def system_job_metadata():
+    """系统任务metadata"""
+    from app.models.schedule import JobStatus, JobType
+    return {
+        "job_id": "SYSTEM_CLEANUP",
+        "job_type": JobType.SYSTEM.value,
+        "desc": "系统清理任务",
+        "page_ids": None,
+        "status": JobStatus.PENDING.value,
+        "created_at": datetime.now().isoformat(),
+        "is_system_job": True,
+        "failure_count": 0
+    }
+
+
+@pytest.fixture
+def recent_job_metadata():
+    """最近任务metadata"""
+    from app.models.schedule import JobStatus, JobType
+    return {
+        "job_id": "RECENT_CRAWL",
+        "job_type": JobType.CRAWL.value,
+        "desc": "最近的测试任务",
+        "page_ids": ["jiazi"],
+        "status": JobStatus.PENDING.value,
+        "created_at": datetime.now().isoformat(),
+        "is_system_job": False,
+        "failure_count": 0
+    }
 
 
 # ==================== 通用测试常量 ====================
