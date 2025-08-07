@@ -12,7 +12,8 @@
       "Bash(git add:*)",
       "Bash(unset all_proxy)",
       "Bash(unset http_proxy)",
-      "Bash(unset https_proxy)"
+      "Bash(unset https_proxy)",
+      "Bash(del teststest_crawltest_crawl_flow_fixed.py)"
     ],
     "deny": []
   }

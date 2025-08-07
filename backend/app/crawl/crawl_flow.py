@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
-from app.crawl_config import CrawlConfig
+from app.crawl.crawl_config import CrawlConfig
 from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService

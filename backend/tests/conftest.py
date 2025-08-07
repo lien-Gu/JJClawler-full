@@ -37,6 +37,11 @@ def db_session():
     """模拟数据库会话"""
     return Mock()
 
+@pytest.fixture
+def test_db_session():
+    """测试数据库会话"""
+    return Mock()
+
 
 # ==================== Mock数据 ====================
 
@@ -186,8 +191,6 @@ def mock_crawl_result():
         "failure": {"success": False, "error_message": "网络连接失败"},
     }
 
-
-# ==================== 调度器测试数据 ====================
 
 
 @pytest.fixture
