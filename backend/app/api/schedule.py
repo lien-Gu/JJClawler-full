@@ -45,8 +45,12 @@ async def create_crawl_job(
 
         return DataResponse(
             success=True,
-            message=f"成功创建爬取任务",
-            data=JobBasic.model_validate(created_job)
+            message=f"成功创建爬取任务: {created_job.job_id}",
+            data=JobBasic(
+                job_id=created_job.job_id,
+                job_type=created_job.job_type,
+                desc=created_job.desc
+            )
         )
 
     except Exception as e:
@@ -57,37 +61,6 @@ async def create_crawl_job(
         )
 
 
-@router.get("/status/{job_id}", response_model=DataResponse[JobBasic])
-async def get_task_status(job_id: str, ) -> DataResponse[JobBasic]:
-    """
-    获取指定调度任务的详细信息
-    
-    :param job_id: 调度任务的ID
-    :return: 包含任务详细信息的响应
-    """
-    try:
-        # 从调度器获取任务信息
-        job_basic_info = scheduler.get_job_info(job_id)
-
-        if job_basic_info is None:
-            return DataResponse(
-                success=False,
-                message=f"未找到任务: {job_id}",
-                data=None
-            )
-
-        return DataResponse(
-            success=True,
-            message="获取任务状态成功",
-            data=job_basic_info
-        )
-
-    except Exception as e:
-        return DataResponse(
-            success=False,
-            message=f"获取任务状态失败: {str(e)}",
-            data=None
-        )
 
 
 @router.get("/status", response_model=DataResponse[SchedulerInfo])

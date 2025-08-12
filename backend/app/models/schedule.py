@@ -2,7 +2,7 @@
 调度模块数据模型
 
 定义调度器相关的请求/响应模型和数据结构：
-- 任务状态和结果模型
+- 基础任务模型
 - 调度器管理模型
 - API请求/响应模型
 """
@@ -13,17 +13,7 @@ from typing import Any, Dict, List, Optional
 from apscheduler.triggers.base import BaseTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from pydantic import BaseModel, Field, computed_field
-
-
-class JobStatus(str, Enum):
-    """任务状态枚举"""
-
-    PENDING = "pending"  # 等待执行
-    RUNNING = "running"  # 正在执行
-    SUCCESS = "success"  # 执行成功
-    FAILED = "failed"  # 执行失败
-    NOT_STARTED = "not_started"
+from pydantic import BaseModel, Field
 
 
 class JobType(str, Enum):
@@ -44,43 +34,17 @@ class SchedulerInfo(BaseModel):
 
 
 class JobBasic(BaseModel):
-    # 核心字段
+    """基础任务信息 - 仅包含核心字段"""
     job_id: str = ""
     job_type: JobType = JobType.CRAWL
     desc: str = ""
     err: Optional[str] = None
 
 
-class JobInfo(JobBasic):
-    # 业务字段
-    page_ids: List[str] = Field(default_factory=list)
-
-    status: JobStatus = JobStatus.PENDING
-
-    # 结果字段
-    execution_results: List[Dict[str, Any]] = Field(default_factory=list)
-
-    # 统计字段
-    execution_count: int = 0
-    success_count: int = 0
-    last_execution_time: Optional[datetime] = None
-
-    # 计算属性
-    @computed_field
-    @property
-    def failure_count(self) -> int:
-        return max(0, self.execution_count - self.success_count)
-
-    def last_result(self) -> Optional[Dict[str, Any]]:
-        if not self.execution_results:
-            return None
-        return self.execution_results[-1]
-
-
-class Job(JobInfo):
-    """统一的任务数据模型 - 使用Pydantic但保持简洁"""
+class Job(JobBasic):
+    """任务数据模型 - 简化版本"""
     trigger: BaseTrigger = Field(..., description="调度任务触发器")
-
+    page_ids: List[str] = Field(default_factory=list, description="页面ID列表") 
     is_system_job: bool = False
     
     model_config = {"arbitrary_types_allowed": True}

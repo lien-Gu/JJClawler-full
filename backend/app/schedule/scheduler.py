@@ -1,15 +1,15 @@
 """
 任务调度器 - 使用APScheduler 3.10.x稳定版本
 
-重构后的调度器使用APScheduler 3.x的SQLAlchemyJobStore和metadata存储，
-移除了内存存储，实现了更简洁和稳定的架构。
+重构后的调度器使用APScheduler 3.x的SQLAlchemyJobStore，
+移除metadata存储，仅保留基本的任务调度功能。
 """
 
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import humanize
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
+from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -17,15 +17,15 @@ from apscheduler.triggers.date import DateTrigger
 
 from app.config import SchedulerSettings, get_settings
 from app.logger import get_logger
-from app.models.schedule import (Job, JobInfo, JobStatus, JobType, SchedulerInfo, get_clean_up_job, get_predefined_jobs)
+from app.models.schedule import (Job, JobType, SchedulerInfo, get_clean_up_job, get_predefined_jobs)
 from app.schedule.listener import JobListener
 
 
 class JobScheduler:
     """任务调度器主类 - 基于APScheduler 3.x稳定版本
     
-    重构后的调度器完全依赖APScheduler的存储机制，
-    使用job metadata存储业务信息，实现了架构简化。
+    简化的调度器，仅提供基本的任务调度功能，
+    不存储任务状态信息，专注于任务执行。
     """
 
     def __init__(self):
@@ -49,15 +49,6 @@ class JobScheduler:
             raise ValueError(f"job type {job_type} is not supported")
         return func
 
-    def _register_event_listeners(self) -> None:
-        """注册事件监听器 - 3.x版本API"""
-        if self.scheduler is None:
-            return
-        # 注册事件监听器
-        self.scheduler.add_listener(self.listener.listen_jobs,
-                                    EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
-
-        self.logger.info("事件监听器注册完成")
 
     async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
         """
@@ -73,20 +64,18 @@ class JobScheduler:
         args = job.page_ids if job.job_type == JobType.CRAWL else None
         if func is None:
             raise ValueError(f"cannot found execute function for {job.job_type}")
-        # 添加任务到调度器
+        # 添加任务到调度器 - 不使用metadata
         self.scheduler.add_job(
             func=func,
             trigger=job.trigger,
             id=job.job_id,
             args=[args],
-            metadata=job.model_dump_json(exclude={"trigger"}),
             remove_on_complete=False
         )
 
         self.logger.info(f"单个任务添加成功: {job.job_id}")
         return job
 
-    # _add_report_job 方法已删除，不再支持报告任务
 
     async def start(self) -> None:
         """启动调度器"""
@@ -105,11 +94,9 @@ class JobScheduler:
         self.logger.info("调度器配置完成")
         self.start_time = datetime.now()
 
-        # 注册事件监听器
+        # 注册事件监听器 - 仅监听失败事件
         self.listener = JobListener()
-        self.listener.set_scheduler(self.scheduler)
-        self.scheduler.add_listener(self.listener.listen_jobs,
-                                    EVENT_JOB_SUBMITTED | EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED)
+        self.scheduler.add_listener(self.listener.listen_job_failure, EVENT_JOB_ERROR)
 
         self.logger.info("事件监听器注册完成")
 
@@ -141,7 +128,7 @@ class JobScheduler:
         self.logger.info("任务调度器已关闭")
 
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
-        """清理过期任务"""
+        """清理过期任务 - 简化版本，仅清理DateTrigger的已完成任务"""
         if not self.scheduler:
             return {"cleaned": 0, "error": "调度器未运行"}
         try:
@@ -149,26 +136,30 @@ class JobScheduler:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.settings.job_retention_days)
             all_jobs = self.scheduler.get_jobs()
             stats = {"cleaned_count": 0, "errors": []}
+            
             for job in all_jobs:
                 should_cleanup, reason = self._should_cleanup_job(job, cutoff_date)
                 if should_cleanup:
                     try:
                         self.scheduler.remove_job(job.id)
                         stats["cleaned_count"] += 1
+                        self.logger.info(f"清理过期任务: {job.id} (原因: {reason})")
                     except Exception as e:
                         error_msg = f"移除任务 {job.id}失败: {e}"
                         self.logger.error(error_msg)
                         stats["errors"].append(error_msg)
+                        
                 if stats["cleaned_count"] >= self.settings.cleanup_batch_size:
                     self.logger.info(f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
                     break
+                    
             result = {
                 "cleaned": stats["cleaned_count"],
                 "cutoff_date": cutoff_date.isoformat(),
                 "batch_size_reached": stats["cleaned_count"] >= self.settings.cleanup_batch_size,
                 "errors": stats["errors"],
             }
-            self.logger.info("\n".join([f"{k}:{v}" for k, v in result.items()]))
+            self.logger.info(f"任务清理完成: 清理了{stats['cleaned_count']}个任务")
             return result
         except Exception as e:
             error_msg = f"任务清理过程发生意外错误: {e}"
@@ -178,47 +169,24 @@ class JobScheduler:
     @staticmethod
     def _should_cleanup_job(job, cutoff_date: datetime) -> Tuple[bool, str]:
         """
-        任务是否应当被清理——非系统任务，非长期任务，已经完成或者失败了的早于清理时间的任务
+        简化的任务清理判断 - 不依赖metadata
         :param job: 任务
         :param cutoff_date: 清理时间
         :return:
         """
-        created_at = datetime.fromisoformat(job.metadata.get('created_at').replace('Z', '+00:00'))
-        if created_at > cutoff_date:
-            return False, "active job"
-        if not job.metadata:
-            return False, "no metadata"
-        if job.metadata.get('is_system_job', False):
+        # 系统任务不清理
+        if "__system_job" in job.id:
             return False, "system job"
+            
+        # 只清理DateTrigger且已经没有下次运行时间的任务
         is_onetime = isinstance(job.trigger, DateTrigger)
-        status = job.metadata.get('status')
-        if is_onetime and status in [JobStatus.SUCCESS, JobStatus.FAILED]:
+        if is_onetime and job.next_run_time is None:
             return True, "completed_onetime_job"
+        
         return False, "active_job"
 
-    def get_job_info(self, job_id: str) -> Optional[JobInfo]:
-        """
-        从APScheduler的metadata获取任务信息 - 使用Pydantic特性优化
-        查询清理任务cleanup_job_not_found也可以
-        :param job_id: 任务ID
-        :return: JobBasic对象或None
-        """
-        if not self.scheduler:
-            return JobInfo(err="调度器没有成功运行")
-
-        job = self.scheduler.get_job(job_id)
-        if not job or not job.metadata:
-            return JobInfo(err=f"该任务{job_id}不存在")
-
-        try:
-            job_info = JobInfo.model_validate(job.metadata)
-            return job_info
-        except Exception as e:
-            self.logger.error(f"获取任务信息失败 {job_id}: {e}")
-            return JobInfo(err=str(e))
-
     def get_scheduler_info(self) -> SchedulerInfo:
-        """获取调度器状态信息 - 使用humanize库优化时间计算"""
+        """获取调度器状态信息 - 简化版本，不依赖metadata"""
         if not self.scheduler:
             return SchedulerInfo(
                 status="stopped",
@@ -236,17 +204,17 @@ class JobScheduler:
                     "id": job.id,
                     "next_run_time": str(job.next_run_time) if job.next_run_time else None,
                     "trigger": str(job.trigger),
-                    "status": job.metadata.get('status', 'unknown') if job.metadata else 'unknown'
+                    "status": "scheduled" if job.next_run_time else "completed"
                 }
                 job_list.append(job_data)
 
-            # 计算运行时间 - 使用humanize库优化
+            # 计算运行时间
             run_time = self._calculate_run_time()
 
             return SchedulerInfo(
                 status="running",
                 jobs=job_list,
-                run_time=humanize.naturaldelta(datetime.now() - self.start_time)
+                run_time=run_time
             )
 
         except Exception as e:
