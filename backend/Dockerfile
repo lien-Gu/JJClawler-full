@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN echo "deb http://mirrors.tencent.com/debian/ bookworm main" > /etc/apt/sources.list && \
     echo "deb http://mirrors.tencent.com/debian/ bookworm-updates main" >> /etc/apt/sources.list
 
-# 安装系统依赖（简化版）
+# 安装系统依赖
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -21,23 +21,25 @@ RUN apt-get update && apt-get install -y \
 RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple/
 
 # 复制依赖文件
-COPY pyproject.toml poetry.lock* requirements.txt ./
+COPY pyproject.toml uv.lock ./
 
-# 尝试使用 Poetry，失败则使用 pip
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --only main --no-interaction --no-ansi || \
-    pip install -r requirements.txt
+# 安装 uv 并安装依赖
+RUN pip install uv && \
+    uv sync --no-dev --frozen
 
 # 复制应用代码
 COPY app/ ./app/
 COPY data/ ./data/
 
-# 创建数据目录
-RUN mkdir -p /app/data/failures /app/data/tasks/history
+# 创建必要的目录
+RUN mkdir -p /app/data /app/logs /app/app/crawl/data /app/app/crawl/logs
 
-# 设置数据目录权限
-RUN chmod -R 755 /app/data
+# 设置目录权限
+RUN chmod -R 755 /app/data /app/logs /app/app/crawl
+
+# 创建非root用户
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /app
 
 # 暴露端口
 EXPOSE 8000
@@ -45,6 +47,9 @@ EXPOSE 8000
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+
+# 切换到非root用户
+USER appuser
 
 # 启动命令
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

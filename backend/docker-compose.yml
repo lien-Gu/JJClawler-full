@@ -11,13 +11,46 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./logs:/app/logs
     environment:
+      # 基础配置
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # 应用配置
       - DEBUG=false
       - DATABASE_URL=sqlite:///./data/jjcrawler.db
       - CORS_ORIGINS=*
+      
+      # 爬虫配置
+      - MAX_CONCURRENT_REQUESTS=8
+      - REQUEST_DELAY=1.0
+      - RETRY_TIMES=2
+      
+      # 调度器配置
+      - SCHEDULER_ENABLED=true
+      - CLEANUP_ENABLED=true
+      - CLEANUP_INTERVAL_HOURS=24
+      
+    networks:
+      - jjcrawler-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  jjcrawler-network:
+    driver: bridge
+
+volumes:
+  jjcrawler-data:
+    driver: local
