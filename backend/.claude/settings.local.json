@@ -14,7 +14,8 @@
       "Bash(unset http_proxy)",
       "Bash(unset https_proxy)",
       "Bash(del teststest_crawltest_crawl_flow_fixed.py)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

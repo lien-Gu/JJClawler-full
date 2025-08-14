@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import humanize
 from apscheduler.events import EVENT_JOB_ERROR
@@ -19,6 +19,28 @@ from app.config import SchedulerSettings, get_settings
 from app.logger import get_logger
 from app.models.schedule import (Job, JobType, SchedulerInfo, get_clean_up_job, get_predefined_jobs)
 from app.schedule.listener import JobListener
+
+
+def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
+    """
+    爬取任务包装函数 - 独立函数可被APScheduler正确序列化
+    
+    Args:
+        page_ids: 页面ID列表
+        
+    Returns:
+        爬取结果
+    """
+    from app.crawl import CrawlFlow
+    import asyncio
+    
+    # 每次调用时创建新的CrawlFlow实例，避免序列化问题
+    crawl_flow = CrawlFlow()
+    try:
+        return asyncio.run(crawl_flow.execute_crawl_task(page_ids))
+    finally:
+        # 确保资源清理
+        asyncio.run(crawl_flow.close())
 
 
 class JobScheduler:
@@ -37,9 +59,9 @@ class JobScheduler:
         self.start_time: Optional[datetime] = None
         self.listener: Optional[JobListener] = None
 
-        from app.crawl import CrawlFlow
+        # 使用独立函数映射，避免序列化问题
         self.job_func_mapping = {
-            JobType.CRAWL: CrawlFlow().execute_crawl_task
+            JobType.CRAWL: crawl_task_wrapper
         }
 
     def _get_job_func(self, job_type: JobType) -> Optional[Callable]:
@@ -48,6 +70,7 @@ class JobScheduler:
         if func is None:
             raise ValueError(f"job type {job_type} is not supported")
         return func
+
 
 
     async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
@@ -61,15 +84,22 @@ class JobScheduler:
             func = self._get_job_func(job.job_type)
         else:
             func = exe_func
-        args = job.page_ids if job.job_type == JobType.CRAWL else None
         if func is None:
             raise ValueError(f"cannot found execute function for {job.job_type}")
+        
+        # 为不同任务类型准备参数
+        if job.job_type == JobType.CRAWL:
+            # crawl_task_wrapper函数期望page_ids作为第一个参数
+            job_args = [job.page_ids]
+        else:
+            job_args = []
+            
         # 添加任务到调度器 - 不使用metadata
         self.scheduler.add_job(
             func=func,
             trigger=job.trigger,
             id=job.job_id,
-            args=[args],
+            args=job_args,
             remove_on_complete=False
         )
 
@@ -133,6 +163,10 @@ class JobScheduler:
         self.start_time = None
         self.listener = None
         self.logger.info("任务调度器已关闭")
+
+    def is_running(self) -> bool:
+        """检查调度器是否运行中"""
+        return self.scheduler is not None and self.scheduler.running
 
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
         """清理过期任务 - 简化版本，仅清理DateTrigger的已完成任务"""

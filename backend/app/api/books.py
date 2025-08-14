@@ -131,7 +131,8 @@ async def get_book_ranking_history(
     # 检查书籍是否存在
     book = book_service.get_book_by_novel_id(db, novel_id)
 
-    ranking_infos = get_book_ranking_history_with_details(
+    # 使用ranking_service获取排名历史数据
+    ranking_infos = ranking_service.get_book_ranking_history(
         db, book.novel_id, days
     )
 

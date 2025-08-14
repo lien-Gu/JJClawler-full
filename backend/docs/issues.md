@@ -1117,3 +1117,105 @@ self.scheduler = AsyncIOScheduler(
 2. **错误信息分析**: `'object has no attribute 'items'` 通常表示期望字典但收到了其他类型
 3. **Context7价值**: 通过Context7快速获取准确的APScheduler配置示例
 4. **配置验证**: 大型项目中的配置错误可能在启动时才暴露，需要系统性测试
+
+---
+
+## 2025-08-14: CrawlFlow序列化问题修复 - pickle错误解决方案
+
+### 问题背景
+在修复APScheduler配置问题后，出现新错误：`ERROR-任务调度器启动失败: cannot pickle '_thread.RLock' object`
+
+### 错误分析
+**根本原因**: CrawlFlow类包含不可序列化的asyncio.Semaphore对象，APScheduler在序列化任务函数时无法处理这些对象。
+
+**具体问题位置** (@app/schedule/scheduler.py:42):
+```python
+# 错误的直接实例化方式
+self.job_func_mapping = {
+    JobType.CRAWL: CrawlFlow().execute_crawl_task  # CrawlFlow包含不可序列化对象
+}
+```
+
+**根本原因**:
+1. CrawlFlow初始化时创建`asyncio.Semaphore()`对象（包含RLock）
+2. APScheduler需要序列化任务函数和其绑定的对象
+3. RLock对象无法被pickle序列化
+
+### 解决方案
+采用**独立包装函数**架构，避免直接保存包含不可序列化对象的实例：
+
+#### 1. 创建独立包装函数 (@app/schedule/scheduler.py)
+```python
+def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
+    """
+    爬取任务包装函数 - 独立函数可被APScheduler正确序列化
+    """
+    from app.crawl import CrawlFlow
+    import asyncio
+    
+    # 每次调用时创建新的CrawlFlow实例，避免序列化问题
+    crawl_flow = CrawlFlow()
+    try:
+        return asyncio.run(crawl_flow.execute_crawl_task(page_ids))
+    finally:
+        # 确保资源清理
+        asyncio.run(crawl_flow.close())
+```
+
+#### 2. 修改函数映射 (@app/schedule/scheduler.py)
+```python
+# 正确的配置方式
+self.job_func_mapping = {
+    JobType.CRAWL: crawl_task_wrapper  # 使用独立函数，可被序列化
+}
+```
+
+#### 3. 修复参数传递问题
+发现并修复了参数传递错误：
+```python
+# 修复前 - 参数嵌套问题
+args = [job.page_ids]  # 创建嵌套列表
+
+# 修复后 - 正确的参数传递
+if job.job_type == JobType.CRAWL:
+    job_args = [job.page_ids]  # crawl_task_wrapper期望page_ids作为第一个参数
+else:
+    job_args = []
+```
+
+### 实施结果
+
+#### 成功完成的修复
+1. ✅ **序列化问题解决**: 使用独立函数避免不可序列化对象
+2. ✅ **参数传递修复**: 解决"positional arguments longer than callable can handle"错误
+3. ✅ **资源管理**: 每次调用时创建和清理CrawlFlow实例
+4. ✅ **调度器启动**: APScheduler成功启动并添加任务
+
+#### 架构优势
+- **序列化安全**: 独立函数可被APScheduler正确序列化
+- **资源隔离**: 每个任务使用独立的CrawlFlow实例
+- **内存管理**: 任务完成后自动清理资源
+- **错误隔离**: 单个任务失败不影响调度器状态
+
+### 剩余问题
+1. **任务ID冲突**: "Job identifier conflicts with an existing job" - 需要清理数据库中的旧任务
+2. **API响应超时**: 所有HTTP请求都无响应，可能存在死锁或阻塞问题
+3. **书籍API错误**: books.py中存在未定义函数引用
+
+### 技术细节
+- **独立函数优势**: 模块级函数没有绑定实例，可被pickle正确序列化
+- **延迟初始化**: 任务执行时才创建CrawlFlow，避免序列化问题
+- **异步处理**: 使用asyncio.run()在同步上下文中运行异步任务
+- **资源清理**: finally块确保CrawlFlow实例被正确关闭
+
+### 时间记录
+- **开始时间**: 2025-08-14
+- **完成时间**: 2025-08-14
+- **总耗时**: 约20分钟
+- **主要工作**: 序列化问题分析、独立函数创建、参数传递修复
+
+### 经验总结
+1. **序列化陷阱**: 包含线程对象的类实例无法被pickle序列化
+2. **APScheduler限制**: 任务函数及其依赖都必须可序列化
+3. **架构设计**: 调度器任务应使用独立函数而非实例方法
+4. **资源管理**: 短生命周期的任务应该使用临时实例而非长期持有

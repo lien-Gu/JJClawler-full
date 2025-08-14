@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Tuple
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import ranking
+from app.models import book, ranking
 from ..db.ranking import Ranking, RankingSnapshot
 from ...utils import filter_dict, get_model_fields
 
@@ -89,6 +89,16 @@ class RankingService:
         return snapshot_objs
 
     # ==================== API使用的方法 ====================
+
+    def get_book_ranking_history(self, db: Session, novel_id: int, days: int) -> List[book.BookRankingInfo]:
+        """
+        根据书ID获取days天内的书籍排名信息
+
+        :param db:
+        :param novel_id:
+        :param days:
+        :return:
+        """
 
     @staticmethod
     def get_ranking_by_id(db: Session, ranking_id: int) -> Ranking | None:
@@ -372,7 +382,7 @@ class RankingService:
         # 2. 使用子查询获取每小时最新的batch_id
         # 构造小时级时间截断函数
         hour_truncate = func.strftime('%Y-%m-%d %H:00:00', RankingSnapshot.snapshot_time)
-        
+
         latest_batches_subquery = select(
             hour_truncate.label('snapshot_hour'),
             RankingSnapshot.batch_id,
