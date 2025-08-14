@@ -87,8 +87,15 @@ class JobScheduler:
 
         # 创建调度器并配置
         self.scheduler = AsyncIOScheduler(
-            jobstores=SQLAlchemyJobStore(url=self.settings.job_store_url, tablename=self.settings.job_store_table_name),
-            executors=ThreadPoolExecutor(self.settings.max_workers),
+            jobstores={
+                'default': SQLAlchemyJobStore(
+                    url=self.settings.job_store_url, 
+                    tablename=self.settings.job_store_table_name
+                )
+            },
+            executors={
+                'default': ThreadPoolExecutor(self.settings.max_workers)
+            },
             timezone=self.settings.timezone
         )
         self.logger.info("调度器配置完成")

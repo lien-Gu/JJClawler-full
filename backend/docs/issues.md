@@ -1051,3 +1051,69 @@ def _get_crawl_task_func(self):
 3. **Pydantic优势**: 充分利用Pydantic特性简化对象构造和验证
 4. **第三方库集成**: humanize等库提升用户体验，同时保持向后兼容
 5. **延迟初始化**: 有效解决模块间循环依赖问题
+
+---
+
+## 2025-08-14: APScheduler配置错误修复 - ThreadPoolExecutor参数格式问题
+
+### 问题背景
+启动FastAPI应用时出现错误：`ERROR-任务调度器启动失败: 'ThreadPoolExecutor' object has no attribute 'items'`
+
+### 错误分析
+**根本原因**: APScheduler 3.x的`AsyncIOScheduler`构造函数期望`jobstores`和`executors`参数都是字典类型，但代码直接传递了实例对象。
+
+**具体问题位置** (@app/schedule/scheduler.py:89-93):
+```python
+# 错误的配置方式
+self.scheduler = AsyncIOScheduler(
+    jobstores=SQLAlchemyJobStore(url=self.settings.job_store_url, tablename=self.settings.job_store_table_name),
+    executors=ThreadPoolExecutor(self.settings.max_workers),
+    timezone=self.settings.timezone
+)
+```
+
+**错误原因**:
+1. `executors=ThreadPoolExecutor(...)` - 直接传递了ThreadPoolExecutor实例，APScheduler期望字典格式
+2. `jobstores=SQLAlchemyJobStore(...)` - 直接传递了SQLAlchemyJobStore实例，APScheduler期望字典格式
+3. APScheduler内部会对这些参数调用`.items()`方法，因为期望收到字典，但收到了对象实例
+
+### 解决方案
+修复AsyncIOScheduler的配置，将`jobstores`和`executors`参数改为字典格式：
+
+```python
+# 正确的配置方式
+self.scheduler = AsyncIOScheduler(
+    jobstores={
+        'default': SQLAlchemyJobStore(
+            url=self.settings.job_store_url, 
+            tablename=self.settings.job_store_table_name
+        )
+    },
+    executors={
+        'default': ThreadPoolExecutor(self.settings.max_workers)
+    },
+    timezone=self.settings.timezone
+)
+```
+
+### 技术细节
+- **APScheduler 3.x规范**: 构造函数中jobstores和executors必须是字典类型
+- **字典key命名**: 使用'default'作为默认的jobstore和executor名称
+- **向后兼容**: 修复不影响其他功能，纯配置问题
+
+### 实施结果
+✅ **配置修复**: 成功修复AsyncIOScheduler构造参数格式错误  
+✅ **启动验证**: 任务调度器成功启动，无错误信息  
+✅ **功能验证**: 调度器基本功能正常，可以添加和执行任务
+
+### 时间记录
+- **开始时间**: 2025-08-14
+- **完成时间**: 2025-08-14
+- **总耗时**: 约10分钟
+- **主要工作**: 错误分析、Context7研究、配置修复、启动验证
+
+### 经验总结
+1. **API文档重要性**: 仔细阅读第三方库的构造函数参数要求
+2. **错误信息分析**: `'object has no attribute 'items'` 通常表示期望字典但收到了其他类型
+3. **Context7价值**: 通过Context7快速获取准确的APScheduler配置示例
+4. **配置验证**: 大型项目中的配置错误可能在启动时才暴露，需要系统性测试
