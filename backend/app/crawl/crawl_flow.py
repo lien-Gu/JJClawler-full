@@ -25,6 +25,8 @@ from .parser import NovelPageParser, PageParser, RankingParser
 from ..models.base import BaseResult
 from ..utils import generate_batch_id
 
+logger = get_logger(__name__)
+
 
 @dataclass
 class PagesResult(BaseResult[PageParser]):
@@ -55,9 +57,6 @@ class NovelsResult(BaseResult[NovelPageParser]):
             "total_novels_num": self.total_num,
             "failed_novels": self.failed_ids
         }
-
-
-logger = get_logger(__name__)
 
 
 class CrawlFlow:
@@ -157,7 +156,8 @@ class CrawlFlow:
 
     @retry(stop=stop_after_attempt(5),
            wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
+           retry=retry_if_exception_type(
+               (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_page(self, page_id: str) -> PageParser | Exception:
         async with self.request_semaphore:
@@ -226,7 +226,8 @@ class CrawlFlow:
 
     @retry(stop=stop_after_attempt(5),
            wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
+           retry=retry_if_exception_type(
+               (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_book(self, novel_id: str) -> NovelPageParser | Exception:
         """
@@ -359,3 +360,15 @@ class CrawlFlow:
     async def close(self) -> None:
         """关闭资源"""
         await self.client.close()
+
+
+# 全局调度器实例
+_craw_flow: CrawlFlow | None = None
+
+
+def get_crawl_flow() -> CrawlFlow:
+    """获取爬虫程序实例（单例模式）"""
+    global _craw_flow
+    if _craw_flow is None:
+        _scheduler = CrawlFlow()
+    return _craw_flow

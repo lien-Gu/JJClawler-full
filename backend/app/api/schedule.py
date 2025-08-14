@@ -12,6 +12,7 @@ from app.utils import generate_job_id
 from ..models.base import DataResponse
 from ..models.schedule import Job, JobBasic, JobType, SchedulerInfo
 from ..schedule import get_scheduler
+from ..crawl.crawl_flow import get_crawl_flow
 
 router = APIRouter()
 scheduler = get_scheduler()
@@ -41,7 +42,7 @@ async def create_crawl_job(
             page_ids=page_ids
         )
 
-        created_job = await scheduler.add_schedule_job(job)
+        created_job = await scheduler.add_schedule_job(job, exe_func=get_crawl_flow().execute_crawl_task(page_ids))
 
         return DataResponse(
             success=True,
@@ -59,8 +60,6 @@ async def create_crawl_job(
             message=f"任务创建失败: {str(e)}",
             data=None
         )
-
-
 
 
 @router.get("/status", response_model=DataResponse[SchedulerInfo])

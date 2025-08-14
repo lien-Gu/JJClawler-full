@@ -29,8 +29,7 @@ class TestJobSchedulerMocked:
         assert scheduler.scheduler is None
         assert scheduler.start_time is None
         assert scheduler.listener is None
-        assert scheduler.job_func_mapping is not None
-        assert JobType.CRAWL in scheduler.job_func_mapping
+
 
     @pytest.mark.asyncio
     async def test_start_scheduler_success(self, mocker: MockerFixture, sample_job, sample_system_job):

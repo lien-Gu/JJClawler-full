@@ -21,26 +21,23 @@ from app.models.schedule import (Job, JobType, SchedulerInfo, get_clean_up_job, 
 from app.schedule.listener import JobListener
 
 
-def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
+def cleanup_old_jobs_wrapper() -> Dict[str, Any]:
     """
-    爬取任务包装函数 - 独立函数可被APScheduler正确序列化
+    清理任务包装函数 - 避免序列化问题
     
-    Args:
-        page_ids: 页面ID列表
-        
     Returns:
-        爬取结果
+        清理结果
+    
+    设计原理：
+    1. 独立函数 - 不包含调度器实例引用
+    2. 延迟获取 - 只有在执行时才获取调度器实例
+    3. 序列化安全 - 不持有不可序列化对象
     """
-    from app.crawl import CrawlFlow
-    import asyncio
-
-    # 每次调用时创建新的CrawlFlow实例，避免序列化问题
-    crawl_flow = CrawlFlow()
-    try:
-        return asyncio.run(crawl_flow.execute_crawl_task(page_ids))
-    finally:
-        # 确保资源清理
-        asyncio.run(crawl_flow.close())
+    scheduler = get_scheduler()
+    if scheduler and scheduler.scheduler:
+        return scheduler._cleanup_old_jobs()
+    else:
+        return {"cleaned": 0, "error": "调度器未运行"}
 
 
 class JobScheduler:
@@ -54,36 +51,21 @@ class JobScheduler:
         """初始化调度器"""
         self.settings: SchedulerSettings = get_settings().scheduler
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.job_func_mapping: Dict = None
         self.logger = get_logger(__name__)
         self.start_time: Optional[datetime] = None
         self.listener: Optional[JobListener] = None
 
-        # 使用独立函数映射，避免序列化问题
-        self.job_func_mapping = {
-            JobType.CRAWL: crawl_task_wrapper
-        }
 
-    def _get_job_func(self, job_type: JobType) -> Optional[Callable]:
-        """获取任务执行函数 - 延迟初始化避免代理配置问题"""
-        func = self.job_func_mapping.get(job_type, None)
-        if func is None:
-            raise ValueError(f"job type {job_type} is not supported")
-        return func
 
-    async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
+    async def add_schedule_job(self, job: Job, exe_func) -> Job:
         """
         添加调度任务
         :param job:
         :param exe_func: 指定函数
         :return:
         """
-        if not exe_func:
-            func = self._get_job_func(job.job_type)
-        else:
-            func = exe_func
-        if func is None:
-            raise ValueError(f"cannot found execute function for {job.job_type}")
+
+        func = exe_func
 
         # 为不同任务类型准备参数
         if job.job_type == JobType.CRAWL:
@@ -141,10 +123,10 @@ class JobScheduler:
         self.logger.info("检查并添加预定义任务")
         await self._ensure_predefined_jobs()
 
-        # 设置任务清理定时任务
+        # 设置任务清理定时任务 - 使用独立函数避免序列化问题
         if self.settings.job_cleanup_enabled:
             self.logger.info("添加清理任务")
-            await self.add_schedule_job(get_clean_up_job(), exe_func=self._cleanup_old_jobs)
+            await self.add_schedule_job(get_clean_up_job(), exe_func=cleanup_old_jobs_wrapper)
 
         self.logger.info("任务调度器启动成功")
 
