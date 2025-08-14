@@ -42,7 +42,7 @@ async def create_crawl_job(
             page_ids=page_ids
         )
 
-        created_job = await scheduler.add_schedule_job(job, exe_func=get_crawl_flow().execute_crawl_task(page_ids))
+        created_job = await scheduler.add_schedule_job(job)
 
         return DataResponse(
             success=True,

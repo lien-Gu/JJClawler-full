@@ -55,28 +55,26 @@ class JobScheduler:
         self.start_time: Optional[datetime] = None
         self.listener: Optional[JobListener] = None
 
-
-
-    async def add_schedule_job(self, job: Job, exe_func) -> Job:
+    async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
         """
         添加调度任务
         :param job:
         :param exe_func: 指定函数
         :return:
         """
-
-        func = exe_func
-
+        job_args = []
         # 为不同任务类型准备参数
         if job.job_type == JobType.CRAWL:
-            # crawl_task_wrapper函数期望page_ids作为第一个参数
+            from ..crawl.crawl_flow import get_crawl_flow
+            exe_func = get_crawl_flow().execute_crawl_task
             job_args = [job.page_ids]
-        else:
-            job_args = []
+
+        if exe_func is None:
+            self.logger.error(f"{job.job_id}未给定调度函数")
 
         # 添加任务到调度器 - 不使用metadata
         self.scheduler.add_job(
-            func=func,
+            func=exe_func,
             trigger=job.trigger,
             id=job.job_id,
             args=job_args,
@@ -175,7 +173,6 @@ class JobScheduler:
                     self.logger.error(f"添加任务失败 {job.job_id}: {e}")
 
         self.logger.info(f"预定义任务检查完成: 新增{added_count}个, 跳过{skipped_count}个")
-
 
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
         """清理过期任务 - 简化版本，仅清理DateTrigger的已完成任务"""

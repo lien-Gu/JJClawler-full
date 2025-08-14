@@ -370,5 +370,5 @@ def get_crawl_flow() -> CrawlFlow:
     """获取爬虫程序实例（单例模式）"""
     global _craw_flow
     if _craw_flow is None:
-        _scheduler = CrawlFlow()
+        _craw_flow = CrawlFlow()
     return _craw_flow
