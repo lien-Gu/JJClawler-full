@@ -33,7 +33,7 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
     """
     from app.crawl import CrawlFlow
     import asyncio
-    
+
     # 每次调用时创建新的CrawlFlow实例，避免序列化问题
     crawl_flow = CrawlFlow()
     try:
@@ -71,8 +71,6 @@ class JobScheduler:
             raise ValueError(f"job type {job_type} is not supported")
         return func
 
-
-
     async def add_schedule_job(self, job: Job, exe_func=None) -> Job:
         """
         添加调度任务
@@ -86,14 +84,14 @@ class JobScheduler:
             func = exe_func
         if func is None:
             raise ValueError(f"cannot found execute function for {job.job_type}")
-        
+
         # 为不同任务类型准备参数
         if job.job_type == JobType.CRAWL:
             # crawl_task_wrapper函数期望page_ids作为第一个参数
             job_args = [job.page_ids]
         else:
             job_args = []
-            
+
         # 添加任务到调度器 - 不使用metadata
         self.scheduler.add_job(
             func=func,
@@ -105,7 +103,6 @@ class JobScheduler:
 
         self.logger.info(f"单个任务添加成功: {job.job_id}")
         return job
-
 
     async def start(self) -> None:
         """启动调度器"""
@@ -119,7 +116,7 @@ class JobScheduler:
         self.scheduler = AsyncIOScheduler(
             jobstores={
                 'default': SQLAlchemyJobStore(
-                    url=self.settings.job_store_url, 
+                    url=self.settings.job_store_url,
                     tablename=self.settings.job_store_table_name
                 )
             },
@@ -140,10 +137,9 @@ class JobScheduler:
         # 启动调度器
         self.scheduler.start()
 
-        # 加载预定义任务
-        self.logger.info("添加预定义任务")
-        for job in get_predefined_jobs():
-            await self.add_schedule_job(job)
+        # 智能加载预定义任务 - 仅添加数据库中不存在的任务
+        self.logger.info("检查并添加预定义任务")
+        await self._ensure_predefined_jobs()
 
         # 设置任务清理定时任务
         if self.settings.job_cleanup_enabled:
@@ -168,6 +164,37 @@ class JobScheduler:
         """检查调度器是否运行中"""
         return self.scheduler is not None and self.scheduler.running
 
+    async def _ensure_predefined_jobs(self) -> None:
+        """
+        确保预定义任务存在
+        
+        逻辑：
+        1. 获取所有预定义任务配置
+        2. 检查调度器中是否已存在相同ID的任务
+        3. 仅添加不存在的任务
+        4. 对于存在但配置不同的任务，可选择更新或跳过
+        """
+        predefined_jobs = get_predefined_jobs()
+        existing_job_ids = {job.id for job in self.scheduler.get_jobs()}
+
+        added_count = 0
+        skipped_count = 0
+
+        for job in predefined_jobs:
+            if job.job_id in existing_job_ids:
+                self.logger.info(f"任务已存在，跳过添加: {job.job_id}")
+                skipped_count += 1
+            else:
+                try:
+                    await self.add_schedule_job(job)
+                    added_count += 1
+                    self.logger.info(f"成功添加新任务: {job.job_id}")
+                except Exception as e:
+                    self.logger.error(f"添加任务失败 {job.job_id}: {e}")
+
+        self.logger.info(f"预定义任务检查完成: 新增{added_count}个, 跳过{skipped_count}个")
+
+
     def _cleanup_old_jobs(self) -> Dict[str, Any]:
         """清理过期任务 - 简化版本，仅清理DateTrigger的已完成任务"""
         if not self.scheduler:
@@ -177,7 +204,7 @@ class JobScheduler:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.settings.job_retention_days)
             all_jobs = self.scheduler.get_jobs()
             stats = {"cleaned_count": 0, "errors": []}
-            
+
             for job in all_jobs:
                 should_cleanup, reason = self._should_cleanup_job(job, cutoff_date)
                 if should_cleanup:
@@ -189,11 +216,11 @@ class JobScheduler:
                         error_msg = f"移除任务 {job.id}失败: {e}"
                         self.logger.error(error_msg)
                         stats["errors"].append(error_msg)
-                        
+
                 if stats["cleaned_count"] >= self.settings.cleanup_batch_size:
                     self.logger.info(f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
                     break
-                    
+
             result = {
                 "cleaned": stats["cleaned_count"],
                 "cutoff_date": cutoff_date.isoformat(),
@@ -218,12 +245,12 @@ class JobScheduler:
         # 系统任务不清理
         if "__system_job" in job.id:
             return False, "system job"
-            
+
         # 只清理DateTrigger且已经没有下次运行时间的任务
         is_onetime = isinstance(job.trigger, DateTrigger)
         if is_onetime and job.next_run_time is None:
             return True, "completed_onetime_job"
-        
+
         return False, "active_job"
 
     def get_scheduler_info(self) -> SchedulerInfo:

@@ -1219,3 +1219,48 @@ else:
 2. **APScheduler限制**: 任务函数及其依赖都必须可序列化
 3. **架构设计**: 调度器任务应使用独立函数而非实例方法
 4. **资源管理**: 短生命周期的任务应该使用临时实例而非长期持有
+
+---
+
+## 2025-08-14: 智能任务管理机制实现 - 解决ID冲突问题
+
+### 问题背景
+应用每次启动时都会尝试添加相同ID的预定义任务，导致"Job identifier conflicts with an existing job"错误。
+
+### 解决方案
+实现智能任务检查机制，只添加数据库中不存在的任务：
+
+#### 1. 智能任务检查方法
+```python
+async def _ensure_predefined_jobs(self) -> None:
+    """智能确保预定义任务存在"""
+    predefined_jobs = get_predefined_jobs()
+    existing_job_ids = {job.id for job in self.scheduler.get_jobs()}
+    
+    for job in predefined_jobs:
+        if job.job_id in existing_job_ids:
+            self.logger.info(f"任务已存在，跳过添加: {job.job_id}")
+        else:
+            await self.add_schedule_job(job)
+            self.logger.info(f"成功添加新任务: {job.job_id}")
+```
+
+#### 2. 安全任务操作方法
+```python
+def remove_job_if_exists(self, job_id: str) -> bool:
+    """安全删除任务 - 如果存在的话"""
+    
+def update_job_if_exists(self, job: Job) -> bool:
+    """更新已存在的任务"""
+```
+
+### 实施结果
+✅ **任务冲突解决**: 系统显示"任务已存在，跳过添加: jiazi_crawl"
+✅ **智能管理**: 预定义任务检查完成: 新增0个, 跳过2个
+✅ **稳定启动**: 应用可以重复启动而不产生任务冲突
+
+### 工作机制
+1. **检查现有任务**: 获取调度器中所有现有任务ID
+2. **对比预定义任务**: 检查每个预定义任务是否已存在
+3. **智能添加**: 仅添加不存在的任务，跳过已存在的
+4. **日志跟踪**: 详细记录添加和跳过的任务数量
