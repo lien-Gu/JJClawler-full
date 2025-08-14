@@ -96,7 +96,7 @@ test_*.py
 # 脚本和工具
 scripts/
 tools/
-deploy.sh
+
 
 # 数据和备份
 data/*.db

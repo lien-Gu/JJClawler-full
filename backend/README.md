@@ -515,19 +515,6 @@ uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-**使用Poetry**
-
-```bash
-# 安装依赖
-poetry install
-
-# 激活环境
-poetry shell
-
-# 启动开发服务器
-poetry run uvicorn app.main:app --reload --port 8000
-```
-
 ### 5.2 代码规范
 
 ```bash
