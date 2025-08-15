@@ -65,9 +65,9 @@ class JobScheduler:
         job_args = []
         # 为不同任务类型准备参数
         if job.job_type == JobType.CRAWL:
-            # 现在CrawlFlow可以序列化了，直接使用实例方法
-            from ..crawl.crawl_flow import get_crawl_flow
-            exe_func = get_crawl_flow().execute_crawl_task
+            # 使用包装函数解决异步调用问题
+            from ..crawl.crawl_flow import crawl_task_wrapper
+            exe_func = crawl_task_wrapper
             job_args = [job.page_ids]
         elif job.job_type == JobType.CLEAN:
             exe_func = cleanup_old_jobs_wrapper
