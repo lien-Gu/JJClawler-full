@@ -38,6 +38,7 @@ class BaseSchema(BaseModel):
 
 
 
+@dataclass
 class BaseResult(ABC, Generic[T]):
     success_items: List[T] = field(default_factory=list)
     failed_items: Dict[str, Exception] = field(default_factory=dict)

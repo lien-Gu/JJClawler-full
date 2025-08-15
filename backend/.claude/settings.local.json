@@ -19,7 +19,9 @@
       "Bash(timeout:*)",
       "Bash(echo:*)",
       "Bash(chcp:*)",
-      "Bash(set PYTHONIOENCODING=utf-8)"
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(env)",
+      "Bash(unset:*)"
     ],
     "deny": []
   }
