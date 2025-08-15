@@ -49,7 +49,7 @@ def drop_tables():
     Base.metadata.drop_all(bind=engine)
 
 
-async def check_db() -> bool:
+def check_db() -> bool:
     """检查数据库连接状态"""
     try:
         with SessionLocal() as db:
