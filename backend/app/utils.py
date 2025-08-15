@@ -95,11 +95,15 @@ def delta_to_str(delta: timedelta | int = None) -> str:
 def generate_job_id(job_type: str, run_time: datetime, page_id: str = None) -> str:
     """
     根据任务类型、运行时间和页面ID生成job_id
-    :param job_type:
-    :param run_time:
-    :param page_id:
-    :return:
+    :param job_type: 任务类型，可以是字符串或枚举
+    :param run_time: 运行时间
+    :param page_id: 页面ID (可选)
+    :return: 生成的job_id
     """
+    # 处理枚举类型，获取其值
+    if hasattr(job_type, 'value'):
+        job_type = job_type.value
+    
     base_id = f"{job_type}_{run_time.strftime('%Y%m%d_%H%M%S')}"
     if page_id:
         return f"{base_id}_{page_id}"

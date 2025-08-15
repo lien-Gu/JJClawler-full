@@ -13,8 +13,9 @@ from ..models.base import DataResponse
 from ..models.schedule import Job, JobBasic, JobType, SchedulerInfo
 from ..schedule import get_scheduler
 
+from ..logger import get_logger
+logger = get_logger(__name__)
 router = APIRouter()
-scheduler = get_scheduler()
 
 
 @router.post("/task/create", response_model=DataResponse[JobBasic])
@@ -32,16 +33,25 @@ async def create_crawl_job(
     """
     try:
         run_time = run_time if run_time else datetime.now()
+        
+        # 调试信息
+        generated_job_id = generate_job_id(JobType.CRAWL, run_time)
+        logger.info(f"生成的job_id: {generated_job_id}")
 
         job = Job(
-            job_id=generate_job_id(JobType.CRAWL, run_time),
+            job_id=generated_job_id,
             job_type=JobType.CRAWL,
             trigger=DateTrigger(run_date=run_time),
             desc=f"手动创建的爬取任务",
             page_ids=page_ids
         )
+        
+        logger.info(f"创建的job对象job_id: {job.job_id}")
 
+        # 延迟获取调度器实例，确保调度器已经在lifespan中初始化
+        scheduler = get_scheduler()
         created_job = await scheduler.add_schedule_job(job)
+        logger.info(f"成功添加任务{created_job.job_id}，运行时间：{run_time}")
 
         return DataResponse(
             success=True,
@@ -70,7 +80,10 @@ async def get_scheduler_status():
         DataResponse: 调度器状态和任务统计信息
     """
     try:
+        # 延迟获取调度器实例，确保调度器已经在lifespan中初始化
+        scheduler = get_scheduler()
         scheduler_info = scheduler.get_scheduler_info()
+        logger.info(f"成功获取调度去信息：{scheduler_info.model_dump_json()}")
         return DataResponse(message="获取调度器状态成功", data=scheduler_info)
     except Exception as e:
         return DataResponse(success=False, message=f"获取调度器状态失败: {str(e)}", data=None)

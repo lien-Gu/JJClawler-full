@@ -37,12 +37,22 @@ async def get_rankings(
     :param db: 数据库会话对象
     :return: 榜单列表
     """
-    data_list = None
+    data_list = []
     total_pages = 0
+    
+    # 首先尝试根据page_id查询
     if page_id:
         data_list, total_pages = ranking_service.get_ranges_by_page_with_pagination(db, page_id, page, size)
+    
+    # 如果根据page_id没有查到结果，且提供了name参数，则按name查询
     if not data_list and name is not None:
         data_list, total_pages = ranking_service.get_rankings_by_name_with_pagination(db, name, page, size)
+    
+    # 确保data_list始终是列表，即使查询无结果
+    if data_list is None:
+        data_list = []
+        total_pages = 0
+    
     return DataResponse(
         data=PaginationData(
             data_list=data_list, page=page, size=size, total_pages=total_pages

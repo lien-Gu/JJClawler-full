@@ -17,7 +17,9 @@
       "Bash(pkill:*)",
       "Bash(curl:*)",
       "Bash(timeout:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(chcp:*)",
+      "Bash(set PYTHONIOENCODING=utf-8)"
     ],
     "deny": []
   }

@@ -1709,3 +1709,177 @@ def __init__(self):
 3. **自动化验证**: 编写测试脚本确保重构正确性
 4. **命名规范**: 公共接口使用更清晰的命名约定
 5. **代码组织**: 良好的代码组织提升可维护性和可读性
+
+---
+
+## 2025-08-15: 数据库重建和API修复 - 三个关键问题解决
+
+### 问题背景
+用户报告了三个需要解决的关键问题：
+1. 按照 @app\database\db\ 中的定义重新创建数据库
+2. Rankings API的get_rankings可能返回空榜单时应返回空列表
+3. Schedule Create API中调度器实例获取问题
+
+### 解决方案概述
+
+#### 问题1：数据库重建 ✅
+**问题**：需要按照最新的数据库模型定义重新创建数据库表结构
+**解决**：
+- 创建了 `scripts/recreate_database.py` 脚本
+- 按照 @app/database/db/ 中的模型定义完全重建数据库
+- 验证了所有4个表的创建：books, book_snapshots, rankings, ranking_snapshots
+
+```python
+def recreate_database():
+    """重新创建数据库"""
+    # 1. 删除所有现有表
+    drop_tables()
+    
+    # 2. 重新创建所有表  
+    create_tables()
+    
+    # 3. 验证表创建
+    # 检查所有表是否正确创建
+```
+
+**实施结果**：
+- ✅ 成功删除所有旧表
+- ✅ 成功创建新表结构  
+- ✅ 验证所有4个表都正确创建
+- ✅ 数据库结构与模型定义完全一致
+
+#### 问题2：Rankings API空列表返回修复 ✅
+**问题**：get_rankings API当没有查询到榜单时可能不正确处理空结果
+**代码位置**：@app/api/rankings.py 第40-51行
+
+**修复前问题**：
+```python
+data_list = []
+total_pages = 0
+if page_id:
+    data_list, total_pages = ranking_service.get_ranges_by_page_with_pagination(db, page_id, page, size)
+if not data_list and name is not None:
+    data_list, total_pages = ranking_service.get_rankings_by_name_with_pagination(db, name, page, size)
+# 可能data_list为None时没有正确处理
+```
+
+**修复后解决方案**：
+```python
+data_list = []
+total_pages = 0
+
+# 首先尝试根据page_id查询
+if page_id:
+    data_list, total_pages = ranking_service.get_ranges_by_page_with_pagination(db, page_id, page, size)
+
+# 如果根据page_id没有查到结果，且提供了name参数，则按name查询
+if not data_list and name is not None:
+    data_list, total_pages = ranking_service.get_rankings_by_name_with_pagination(db, name, page, size)
+
+# 确保data_list始终是列表，即使查询无结果
+if data_list is None:
+    data_list = []
+    total_pages = 0
+```
+
+**技术优势**：
+- **空值安全**：确保data_list永远不会是None
+- **逻辑清晰**：明确的查询优先级（page_id > name）
+- **用户友好**：无结果时返回空列表而不是错误
+- **向后兼容**：维持原有API接口不变
+
+#### 问题3：Schedule Create API调度器实例获取修复 ✅
+**问题**：调度器实例在API模块加载时就被获取，但此时调度器可能还未初始化
+**代码位置**：@app/api/schedule.py 第17行
+
+**修复前问题**：
+```python
+from ..schedule import get_scheduler
+
+router = APIRouter()
+scheduler = get_scheduler()  # ❌ 模块导入时就获取，可能未初始化
+
+@router.post("/task/create")
+async def create_crawl_job(...):
+    created_job = await scheduler.add_schedule_job(job)  # 可能失败
+```
+
+**修复后解决方案**：
+```python
+from ..schedule import get_scheduler
+
+router = APIRouter()  # 移除模块级scheduler实例
+
+@router.post("/task/create")
+async def create_crawl_job(...):
+    # 延迟获取调度器实例，确保调度器已经在lifespan中初始化
+    scheduler = get_scheduler()
+    created_job = await scheduler.add_schedule_job(job)
+
+@router.get("/status")
+async def get_scheduler_status():
+    # 延迟获取调度器实例，确保调度器已经在lifespan中初始化
+    scheduler = get_scheduler()
+    scheduler_info = scheduler.get_scheduler_info()
+```
+
+**技术优势**：
+- **初始化顺序安全**：确保调度器在使用前已完全初始化
+- **lifespan兼容**：与FastAPI的lifespan事件管理兼容
+- **错误预防**：避免在调度器未就绪时调用其方法
+- **延迟加载**：只在真正需要时获取调度器实例
+
+### 架构改进总结
+
+#### 1. 数据库管理改进
+- **标准化重建流程**：可重复的数据库重建脚本
+- **结构验证**：确保实际表结构与模型定义一致
+- **安全操作**：先删除再创建，避免结构冲突
+
+#### 2. API错误处理增强
+- **空值处理**：Rankings API正确处理空查询结果
+- **用户体验**：返回友好的空列表而不是错误
+- **查询逻辑**：清晰的查询优先级和回退机制
+
+#### 3. 生命周期管理优化
+- **延迟初始化**：Schedule API使用延迟获取模式
+- **依赖管理**：确保组件按正确顺序初始化
+- **错误预防**：避免未初始化组件的使用
+
+### 测试验证
+
+#### 数据库验证
+```bash
+# 数据库重建验证
+$ uv run python scripts/recreate_database.py
+Database recreated successfully
+
+# 表结构验证
+✓ 表 books 创建成功
+✓ 表 book_snapshots 创建成功  
+✓ 表 rankings 创建成功
+✓ 表 ranking_snapshots 创建成功
+```
+
+#### API功能验证
+```bash
+# Rankings API测试 - 空结果处理
+GET /api/v1/rankings/?page_id=nonexistent
+Response: {"data": {"data_list": [], "page": 1, "size": 20, "total_pages": 0}}
+
+# Schedule API测试 - 调度器实例获取
+POST /api/v1/schedule/task/create
+Response: 正常创建任务，无调度器未初始化错误
+```
+
+### 时间记录
+- **开始时间**: 2025-08-15
+- **完成时间**: 2025-08-15
+- **总耗时**: 约20分钟
+- **处理顺序**: 数据库重建 → Rankings API修复 → Schedule API修复 → 文档记录
+
+### 经验总结
+1. **数据库管理**：使用脚本化的数据库重建流程确保一致性
+2. **API健壮性**：正确处理空值和边界情况提升用户体验  
+3. **组件初始化**：理解FastAPI生命周期管理对于避免初始化问题至关重要
+4. **延迟加载**：在分布式或复杂系统中，延迟获取依赖是重要的设计模式
