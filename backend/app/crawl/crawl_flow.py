@@ -59,6 +59,14 @@ class NovelsResult(BaseResult[NovelPageParser]):
         }
 
 
+crawler_config = get_settings().crawler
+# 统一并发控制 - 所有HTTP请求由此信号量管理
+request_semaphore = asyncio.Semaphore(crawler_config.max_concurrent_requests)
+book_service = BookService()
+ranking_service = RankingService()
+client = HttpClient()
+
+
 class CrawlFlow:
     """
     统一并发爬取流程管理器 - 两阶段处理架构
@@ -73,13 +81,6 @@ class CrawlFlow:
         初始化爬取流程管理器
         """
         self.config = CrawlConfig()
-        self.crawler_config = get_settings().crawler
-        self.book_service = BookService()
-        self.ranking_service = RankingService()
-        self.client = HttpClient()
-
-        # 统一并发控制 - 所有HTTP请求由此信号量管理
-        self.request_semaphore = asyncio.Semaphore(self.crawler_config.max_concurrent_requests)
 
     async def execute_crawl_task(self, page_ids: List[str]) -> Dict[str, Any]:
         """
@@ -160,7 +161,7 @@ class CrawlFlow:
                (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_page(self, page_id: str) -> PageParser | Exception:
-        async with self.request_semaphore:
+        async with request_semaphore:
             try:
                 logger.info(f"开始爬取页面: {page_id}")
 
@@ -170,7 +171,7 @@ class CrawlFlow:
                     raise Exception("无法生成页面地址")
 
                 # 获取页面内容
-                page_content = await self.client.run(page_url)
+                page_content = await client.run(page_url)
 
                 if not page_content or page_content.get("status") == "error":
                     raise Exception(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
@@ -236,10 +237,10 @@ class CrawlFlow:
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
-        async with self.request_semaphore:
+        async with request_semaphore:
             try:
                 book_url = self.config.build_novel_url(novel_id)
-                result = await self.client.run(book_url)
+                result = await client.run(book_url)
                 if not result.get("success"):
                     error_msg = result.get("error", "unknown error during book content fetch")
                     raise Exception(f"Book {book_url} fetch failed with status: {error_msg}")
@@ -297,7 +298,8 @@ class CrawlFlow:
         finally:
             db.close()
 
-    def save_ranking_parsers(self, rankings: List[RankingParser], db: Session) -> Tuple[int, int]:
+    @staticmethod
+    def save_ranking_parsers(rankings: List[RankingParser], db: Session) -> Tuple[int, int]:
         """
         保存从榜单网页中爬取的榜单记录、榜单中的书籍记录、榜单快照记录
         :param rankings:
@@ -307,7 +309,7 @@ class CrawlFlow:
         stored_ranking_snapshots = 0
         for ranking in rankings:
             # 保存或更新榜单信息
-            rank_record = self.ranking_service.create_or_update_ranking(
+            rank_record = ranking_service.create_or_update_ranking(
                 db, ranking.ranking_info
             )
             ranking_snapshots = []
@@ -315,7 +317,7 @@ class CrawlFlow:
             stored_ranking_snapshots += len(ranking.book_snapshots)
             for book in ranking.book_snapshots:
                 # 保存书籍
-                book_record = self.book_service.create_or_update_book(db, book)
+                book_record = book_service.create_or_update_book(db, book)
                 # 创建榜单快照记录
                 snapshot_data = {
                     "ranking_id": rank_record.id,
@@ -327,12 +329,13 @@ class CrawlFlow:
 
             # 批量保存榜单快照
             if ranking_snapshots:
-                self.ranking_service.batch_create_ranking_snapshots(
+                ranking_service.batch_create_ranking_snapshots(
                     db, ranking_snapshots, batch_id
                 )
         return len(rankings), stored_ranking_snapshots
 
-    def save_novel_parsers(self, books: List[NovelPageParser], db: Session) -> int:
+    @staticmethod
+    def save_novel_parsers(books: List[NovelPageParser], db: Session) -> int:
         """
         保存书籍快照
         :param books:
@@ -344,7 +347,7 @@ class CrawlFlow:
         for book_data in books:
             # 保存或更新书籍基本信息
             book_info = book_data.book_detail
-            book_record = self.book_service.create_or_update_book(db, book_info)
+            book_record = book_service.create_or_update_book(db, book_info)
 
             # 创建书籍快照记录
             snapshot_data = {
@@ -354,12 +357,12 @@ class CrawlFlow:
             book_snapshots.append(snapshot_data)
         # 批量保存书籍快照
         if book_snapshots:
-            self.book_service.batch_create_book_snapshots(db, book_snapshots)
+            book_service.batch_create_book_snapshots(db, book_snapshots)
         return len(book_snapshots)
 
     async def close(self) -> None:
         """关闭资源"""
-        await self.client.close()
+        await client.close()
 
 
 # 全局调度器实例

@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import humanize
 from apscheduler.events import EVENT_JOB_ERROR
@@ -17,7 +17,7 @@ from apscheduler.triggers.date import DateTrigger
 
 from app.config import SchedulerSettings, get_settings
 from app.logger import get_logger
-from app.models.schedule import (Job, JobType, SchedulerInfo, get_clean_up_job, get_predefined_jobs)
+from app.models.schedule import (Job, JobType, SchedulerInfo, get_predefined_jobs)
 from app.schedule.listener import JobListener
 
 
@@ -35,7 +35,7 @@ def cleanup_old_jobs_wrapper() -> Dict[str, Any]:
     """
     scheduler = get_scheduler()
     if scheduler and scheduler.scheduler:
-        return scheduler._cleanup_old_jobs()
+        return scheduler.cleanup_old_jobs()
     else:
         return {"cleaned": 0, "error": "调度器未运行"}
 
@@ -65,9 +65,12 @@ class JobScheduler:
         job_args = []
         # 为不同任务类型准备参数
         if job.job_type == JobType.CRAWL:
+            # 现在CrawlFlow可以序列化了，直接使用实例方法
             from ..crawl.crawl_flow import get_crawl_flow
             exe_func = get_crawl_flow().execute_crawl_task
             job_args = [job.page_ids]
+        elif job.job_type == JobType.CLEAN:
+            exe_func = cleanup_old_jobs_wrapper
 
         if exe_func is None:
             self.logger.error(f"{job.job_id}未给定调度函数")
@@ -121,11 +124,6 @@ class JobScheduler:
         self.logger.info("检查并添加预定义任务")
         await self._ensure_predefined_jobs()
 
-        # 设置任务清理定时任务 - 使用独立函数避免序列化问题
-        if self.settings.job_cleanup_enabled:
-            self.logger.info("添加清理任务")
-            await self.add_schedule_job(get_clean_up_job(), exe_func=cleanup_old_jobs_wrapper)
-
         self.logger.info("任务调度器启动成功")
 
     async def shutdown(self) -> None:
@@ -147,12 +145,6 @@ class JobScheduler:
     async def _ensure_predefined_jobs(self) -> None:
         """
         确保预定义任务存在
-        
-        逻辑：
-        1. 获取所有预定义任务配置
-        2. 检查调度器中是否已存在相同ID的任务
-        3. 仅添加不存在的任务
-        4. 对于存在但配置不同的任务，可选择更新或跳过
         """
         predefined_jobs = get_predefined_jobs()
         existing_job_ids = {job.id for job in self.scheduler.get_jobs()}
@@ -174,8 +166,8 @@ class JobScheduler:
 
         self.logger.info(f"预定义任务检查完成: 新增{added_count}个, 跳过{skipped_count}个")
 
-    def _cleanup_old_jobs(self) -> Dict[str, Any]:
-        """清理过期任务 - 简化版本，仅清理DateTrigger的已完成任务"""
+    def cleanup_old_jobs(self) -> Dict[str, Any]:
+        """清理过期任务 - 仅清理DateTrigger的已完成任务"""
         if not self.scheduler:
             return {"cleaned": 0, "error": "调度器未运行"}
         try:

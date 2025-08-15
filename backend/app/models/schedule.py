@@ -21,7 +21,7 @@ class JobType(str, Enum):
 
     CRAWL = "crawl"  # 爬虫任务
     REPORT = "report"  # 报告任务
-    SYSTEM = "system"  # 系统任务
+    CLEAN = "clean"  # 系统任务
 
 
 class SchedulerInfo(BaseModel):
@@ -53,6 +53,9 @@ class Job(JobBasic):
 # 预定义任务配置 - 使用Job模型
 def get_predefined_jobs() -> List[Job]:
     """获取预定义的调度任务列表"""
+    from app.config import get_settings
+    settings = get_settings()
+    interval_hour = settings.scheduler.cleanup_interval_hours
 
     return [
         Job(
@@ -68,19 +71,14 @@ def get_predefined_jobs() -> List[Job]:
             trigger=CronTrigger(hour=1),  # 每天执行一次
             desc="分类页面定时爬取任务",
             page_ids=["category"]
+        ),
+        Job(
+            job_id="__system_job_cleanup__",
+            job_type=JobType.CLEAN,
+            trigger=IntervalTrigger(hours=interval_hour),
+            desc="自动清理过期任务",
+            is_system_job=True
         )
     ]
 
 
-def get_clean_up_job() -> Job:
-    """获取清理任务配置"""
-    from app.config import get_settings
-    settings = get_settings()
-    interval_hour = settings.scheduler.cleanup_interval_hours
-    return Job(
-        job_id="__system_job_cleanup__",
-        job_type=JobType.SYSTEM,
-        trigger=IntervalTrigger(hours=interval_hour),
-        desc="自动清理过期任务",
-        is_system_job=True
-    )

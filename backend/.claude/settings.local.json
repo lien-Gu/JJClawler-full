@@ -16,7 +16,8 @@
       "Bash(del teststest_crawltest_crawl_flow_fixed.py)",
       "Bash(pkill:*)",
       "Bash(curl:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

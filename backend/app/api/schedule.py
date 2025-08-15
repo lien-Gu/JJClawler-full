@@ -12,7 +12,6 @@ from app.utils import generate_job_id
 from ..models.base import DataResponse
 from ..models.schedule import Job, JobBasic, JobType, SchedulerInfo
 from ..schedule import get_scheduler
-from ..crawl.crawl_flow import get_crawl_flow
 
 router = APIRouter()
 scheduler = get_scheduler()
