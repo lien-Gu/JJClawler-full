@@ -161,7 +161,7 @@ class PageParser:
     def get_novel_ids(self) -> List[str]:
         res = set()
         for ranking in self.rankings:
-            res |= ranking.get_novel_ids()
+            res.update(ranking.get_novel_ids())
         return list(res)
 
 

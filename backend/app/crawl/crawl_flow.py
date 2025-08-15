@@ -200,7 +200,7 @@ class CrawlFlow:
         # 收集所有成功页面的书籍ID
         all_novel_ids = set()
         for page_result in pages_result.success_items:
-            all_novel_ids.add(page_result.get_novel_ids())
+            all_novel_ids.update(page_result.get_novel_ids())
         all_novel_ids = list(all_novel_ids)
         if not all_novel_ids:
             logger.info("阶段 2: 无书籍ID需要获取")
@@ -365,7 +365,7 @@ class CrawlFlow:
         await client.close()
 
 
-# 全局调度器实例
+# 全局爬虫实例管理
 _craw_flow: CrawlFlow | None = None
 
 
@@ -375,3 +375,42 @@ def get_crawl_flow() -> CrawlFlow:
     if _craw_flow is None:
         _craw_flow = CrawlFlow()
     return _craw_flow
+
+
+def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
+    """
+    APScheduler任务包装函数 - 在同步上下文中运行异步任务
+    
+    这个函数解决了APScheduler无法直接调用异步方法的问题：
+    1. APScheduler运行在同步上下文中
+    2. execute_crawl_task是异步方法
+    3. 使用asyncio.run()在同步上下文中运行异步任务
+    
+    Args:
+        page_ids: 页面ID列表
+        
+    Returns:
+        爬取结果字典
+    """
+    import asyncio
+    
+    logger.info(f"开始执行爬取任务包装函数，页面IDs: {page_ids}")
+    
+    try:
+        # 获取单例CrawlFlow实例
+        crawl_flow = get_crawl_flow()
+        
+        # 在同步上下文中运行异步任务
+        result = asyncio.run(crawl_flow.execute_crawl_task(page_ids))
+        
+        logger.info(f"爬取任务包装函数执行完成：成功={result.get('success', False)}")
+        return result
+        
+    except Exception as e:
+        error_msg = f"爬取任务包装函数执行失败: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg,
+            "exception_type": type(e).__name__
+        }
