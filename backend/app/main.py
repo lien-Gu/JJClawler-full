@@ -2,6 +2,7 @@
 FastAPI应用程序入口
 """
 
+import sys
 import time
 from contextlib import asynccontextmanager
 from typing import Dict
@@ -16,6 +17,11 @@ from .config import get_settings
 from .logger import get_logger, setup_logging
 from .middleware import ExceptionMiddleware
 from .models.base import BaseResponse, DataResponse
+
+# 修复中文编码显示问题
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 
 # 初始化日志系统
 setup_logging()
@@ -126,7 +132,7 @@ async def health_check():
     
     # 检查各个组件状态（简化为布尔值）
     from .database.connection import check_db
-    db_ok = await check_db()
+    db_ok = check_db()
     from .schedule.scheduler import get_scheduler
     scheduler_ok = get_scheduler().is_running()
     
