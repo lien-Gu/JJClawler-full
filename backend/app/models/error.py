@@ -8,6 +8,7 @@
 '''
 from httpx import Request
 from pydantic import BaseModel
+from starlette.responses import JSONResponse
 
 from .base import BaseResponse
 
@@ -38,4 +39,14 @@ class ErrorResponse(BaseResponse):
                 path=str(request.url.path),
                 method=request.method
             )
+        )
+
+    def to_json_obj(self):
+        return JSONResponse(
+            status_code=self.code,
+            content={
+                "message": self.message,
+                "error": self.error.model_dump_json()
+            }
+
         )

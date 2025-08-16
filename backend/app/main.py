@@ -92,7 +92,7 @@ app.add_middleware(
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """FastAPI HTTP异常处理器 - 使用统一的响应格式"""
-    return ErrorResponse.generate_error_response(request, exc.status_code, exc.detail)
+    return ErrorResponse.generate_error_response(request, exc.status_code, exc.detail).to_json_obj()
 
 
 # 添加Starlette HTTP异常处理器（路由未找到等）
@@ -100,7 +100,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Starlette HTTP异常处理器 - 使用统一的响应格式"""
     detail = exc.detail if hasattr(exc, 'detail') else "页面未找到"
-    return ErrorResponse.generate_error_response(request, exc.status_code, detail)
+    return ErrorResponse.generate_error_response(request, exc.status_code, detail).to_json_obj()
 
 
 # 注册路由
