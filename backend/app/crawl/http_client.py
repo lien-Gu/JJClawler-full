@@ -38,7 +38,7 @@ class HttpClient:
         初始化HTTP客户端
         """
         self._config = settings.crawler
-        self._client = self._create_http_client()
+        self._client = None  # 延迟创建，避免事件循环绑定问题
 
     async def run(self, urls: Union[str, List[str]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
@@ -58,7 +58,10 @@ class HttpClient:
 
     async def close(self):
         """关闭HTTP客户端连接池"""
-        await self._client.aclose()
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+            logger.debug("AsyncClient已关闭")
 
     # ==================== 私有方法 ====================
 
@@ -89,6 +92,14 @@ class HttpClient:
 
         return client
 
+    async def _ensure_client(self):
+        """
+        确保客户端已创建（延迟创建模式）
+        """
+        if self._client is None:
+            self._client = self._create_http_client()
+            logger.debug("创建新的AsyncClient实例")
+
     async def _request_single(self, url: str) -> Dict[str, Any]:
         """
         执行单个HTTP请求
@@ -96,6 +107,8 @@ class HttpClient:
         :return: 响应数据字典或错误信息
         """
         try:
+            # 延迟创建客户端，确保在正确的事件循环上下文中
+            await self._ensure_client()
             response = await self._client.get(url)
             response.raise_for_status()
             return json.loads(response.content)

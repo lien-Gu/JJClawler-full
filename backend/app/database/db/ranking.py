@@ -40,7 +40,7 @@ class Ranking(Base):
     )
     channel_name: Mapped[str] = mapped_column(
         String(100),
-        index=True,
+        nullable=True,
         comment="榜单中文名称，如：夹子相关、总收藏榜、总推荐榜等",
     )
     rank_group_type: Mapped[str | None] = mapped_column(

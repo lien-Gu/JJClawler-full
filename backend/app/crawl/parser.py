@@ -82,15 +82,18 @@ class RankingParser:
 
     def _parse_ranking_info(self, raw_ranking_data: Dict, is_sub_ranking: bool = False) -> Dict[str, Any]:
         res = self._jiazi_info() if self.page_id == "jiazi" else {
-            "rank_id": str(raw_ranking_data.get("rankid", None)),
-            "rank_group_type": str(raw_ranking_data.get("rank_group_type", None)),
+            "rank_id": str(raw_ranking_data.get("rankid", "未知榜单")),
+            "rank_group_type": str(raw_ranking_data.get("rank_group_type", "其他")),
             "channel_id": raw_ranking_data.get("channelMoreId", None),
             "page_id": self.page_id,
         }
         if is_sub_ranking:
-            res["sub_channel_name"] = raw_ranking_data.get("channelName", None)
+            res["sub_channel_name"] = raw_ranking_data.get("channelName", "未知子榜单")
         else:
-            res["channel_name"] = raw_ranking_data.get("channelName", None)
+            # 确保channel_name始终有值，避免数据库NOT NULL约束错误
+            # 对于jiazi页面，不覆盖_jiazi_info()中已设置的channel_name
+            if self.page_id != "jiazi" or not res.get("channel_name"):
+                res["channel_name"] = raw_ranking_data.get("channelName", f"{self.page_id}页面榜单")
         return res
 
     @staticmethod
@@ -117,8 +120,8 @@ class RankingParser:
         """
         return {
             "rank_id": "jiazi",
-            "rank_name": "夹子榜单",
-            "rank_group_type": None,
+            "channel_name": "夹子相关",  # 修复缺失的channel_name字段
+            "rank_group_type": "热门",   # 设置合理的默认值
             "page_id": "jiazi"
         }
 
@@ -182,6 +185,13 @@ class NovelPageParser:
         :param raw_detail_data:
         :return:
         """
+        # 安全处理clicks字段，避免None对象切片错误
+        novip_clicks = raw_detail_data.get("novip_clicks", "0")
+        if novip_clicks and len(str(novip_clicks)) > 4:
+            clicks_value = str(novip_clicks)[:-4]
+        else:
+            clicks_value = str(novip_clicks) if novip_clicks else "0"
+            
         self.book_detail = {
             "novel_id": raw_detail_data.get("novelId", None),
             "title": raw_detail_data.get("novelName", None),
@@ -191,7 +201,7 @@ class NovelPageParser:
             "chapter_counts": raw_detail_data.get("novelChapterCount", None),
             "vip_chapter_id": extract_number(raw_detail_data.get("vipChapterid", "0")),
             "favorites": raw_detail_data.get("novelbefavoritedcount", None),
-            "clicks": raw_detail_data.get("novip_clicks", None),
+            "clicks": clicks_value,
             "comments": raw_detail_data.get("comment_count", None),
             "nutrition": raw_detail_data.get("nutrition_novel", None),
             "snapshot_time": datetime.now()

@@ -252,7 +252,7 @@ class TestRealCrawlFlow:
     @pytest.mark.asyncio  
     async def test_real_novel_detail_crawl(self):
         """测试真实的书籍详情爬取"""
-        from app.crawl.http import HttpClient
+        from app.crawl.http_client import HttpClient
         from app.crawl.crawl_config import CrawlConfig
         from app.crawl.parser import NovelPageParser
         

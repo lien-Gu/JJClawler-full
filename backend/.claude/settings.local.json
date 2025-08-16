@@ -21,7 +21,11 @@
       "Bash(chcp:*)",
       "Bash(set PYTHONIOENCODING=utf-8)",
       "Bash(env)",
-      "Bash(unset:*)"
+      "Bash(unset:*)",
+      "Bash(grep:*)",
+      "Bash(set HTTP_PROXY=)",
+      "Bash(set HTTPS_PROXY=)",
+      "Bash(set ALL_PROXY=)"
     ],
     "deny": []
   }

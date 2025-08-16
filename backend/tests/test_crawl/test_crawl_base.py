@@ -9,7 +9,7 @@ from unittest.mock import Mock, mock_open
 import httpx
 
 from app.crawl.crawl_config import CrawlConfig
-from app.crawl.http import HttpClient
+from app.crawl.http_client import HttpClient
 from app.crawl.parser import RankingParser, PageParser, NovelPageParser
 
 

@@ -20,10 +20,10 @@ from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
 from app.logger import get_logger
-from .http import HttpClient
-from .parser import NovelPageParser, PageParser, RankingParser
-from ..models.base import BaseResult
-from ..utils import generate_batch_id
+from app.crawl.http_client import HttpClient
+from app.crawl.parser import NovelPageParser, PageParser, RankingParser
+from app.models.base import BaseResult
+from app.utils import generate_batch_id
 
 logger = get_logger(__name__)
 
@@ -60,11 +60,8 @@ class NovelsResult(BaseResult[NovelPageParser]):
 
 
 crawler_config = get_settings().crawler
-# 统一并发控制 - 所有HTTP请求由此信号量管理
-request_semaphore = asyncio.Semaphore(crawler_config.max_concurrent_requests)
 book_service = BookService()
 ranking_service = RankingService()
-client = HttpClient()
 
 
 class CrawlFlow:
@@ -81,6 +78,9 @@ class CrawlFlow:
         初始化爬取流程管理器
         """
         self.config = CrawlConfig()
+        # 每个实例创建独立的HTTP客户端和并发控制
+        self.client = HttpClient()
+        self.request_semaphore = asyncio.Semaphore(crawler_config.max_concurrent_requests)
 
     async def execute_crawl_task(self, page_ids: List[str]) -> Dict[str, Any]:
         """
@@ -161,7 +161,7 @@ class CrawlFlow:
                (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
     async def _fetch_and_parse_page(self, page_id: str) -> PageParser | Exception:
-        async with request_semaphore:
+        async with self.request_semaphore:
             try:
                 logger.info(f"开始爬取页面: {page_id}")
 
@@ -171,7 +171,7 @@ class CrawlFlow:
                     raise Exception("无法生成页面地址")
 
                 # 获取页面内容
-                page_content = await client.run(page_url)
+                page_content = await self.client.run(page_url)
 
                 if not page_content or page_content.get("status") == "error":
                     raise Exception(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
@@ -217,9 +217,10 @@ class CrawlFlow:
         for novel_id, result in zip(all_novel_ids, book_results):
             if isinstance(result, Exception):
                 books_result.failed_items[novel_id] = result
-            else:
                 logger.error(f"书籍 {novel_id} 获取失败: {result}")
+            else:
                 books_result.success_items.append(result)
+                logger.info(f"书籍 {novel_id} 获取成功")
 
         logger.info(f"阶段 2 完成: 成功 {len(books_result.success_items)}/{books_result.total_num} 个书籍")
 
@@ -237,13 +238,19 @@ class CrawlFlow:
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
-        async with request_semaphore:
+        async with self.request_semaphore:
             try:
                 book_url = self.config.build_novel_url(novel_id)
-                result = await client.run(book_url)
-                if not result.get("success"):
-                    error_msg = result.get("error", "unknown error during book content fetch")
+                result = await self.client.run(book_url)
+                # 检查HTTP请求是否有错误
+                if result.get("status") == "error":
+                    error_msg = result.get("error", "HTTP request failed")
                     raise Exception(f"Book {book_url} fetch failed with status: {error_msg}")
+                
+                # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
+                if not result.get("novelId"):
+                    raise Exception(f"Invalid book data: missing novelId in response")
+                
                 novel_parser = NovelPageParser(result)
                 return novel_parser
             except Exception as e:
@@ -276,14 +283,24 @@ class CrawlFlow:
             # 使用现有的Service方法保存数据
             if all_rankings:
                 _, ranking_snapshots_num = self.save_ranking_parsers(all_rankings, db)
-                logger.info(f"保存了 {len(all_rankings)} 个榜单")
+                logger.info(f"保存了 {len(all_rankings)} 个榜单，{ranking_snapshots_num} 个榜单快照")
+            else:
+                logger.info("没有榜单数据需要保存")
 
             if books:
                 books_snapshots_num = self.save_novel_parsers(books, db)
-                logger.info(f"保存了 {len(books)} 个书籍")
+                logger.info(f"保存了 {len(books)} 个书籍，{books_snapshots_num} 个书籍快照")
+            else:
+                logger.info("没有书籍数据需要保存")
 
             db.commit()
-            logger.info("阶段 3 完成: 所有数据保存成功")
+            
+            # 更准确的完成日志
+            total_saved = len(all_rankings) + len(books) + ranking_snapshots_num + books_snapshots_num
+            if total_saved > 0:
+                logger.info(f"阶段 3 完成: 成功保存 {total_saved} 条数据记录")
+            else:
+                logger.warning("阶段 3 完成: 没有数据被保存到数据库")
 
             return {
                 "rankings": len(all_rankings),
@@ -362,7 +379,7 @@ class CrawlFlow:
 
     async def close(self) -> None:
         """关闭资源"""
-        await client.close()
+        await self.client.close()
 
 
 # 全局爬虫实例管理
@@ -381,10 +398,7 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
     """
     APScheduler任务包装函数 - 在同步上下文中运行异步任务
     
-    这个函数解决了APScheduler无法直接调用异步方法的问题：
-    1. APScheduler运行在同步上下文中
-    2. execute_crawl_task是异步方法
-    3. 使用asyncio.run()在同步上下文中运行异步任务
+    修复Event loop问题：每次任务执行时创建新的CrawlFlow实例
     
     Args:
         page_ids: 页面ID列表
@@ -396,12 +410,19 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
     
     logger.info(f"开始执行爬取任务包装函数，页面IDs: {page_ids}")
     
+    async def async_crawl_task():
+        # 每次任务执行时创建新的CrawlFlow实例，避免事件循环冲突
+        crawl_flow = CrawlFlow()
+        try:
+            result = await crawl_flow.execute_crawl_task(page_ids)
+            return result
+        finally:
+            # 确保资源清理
+            await crawl_flow.close()
+    
     try:
-        # 获取单例CrawlFlow实例
-        crawl_flow = get_crawl_flow()
-        
         # 在同步上下文中运行异步任务
-        result = asyncio.run(crawl_flow.execute_crawl_task(page_ids))
+        result = asyncio.run(async_crawl_task())
         
         logger.info(f"爬取任务包装函数执行完成：成功={result.get('success', False)}")
         return result
@@ -414,3 +435,20 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
             "error": error_msg,
             "exception_type": type(e).__name__
         }
+
+
+if __name__ == '__main__':
+    import asyncio
+    
+    async def debug_book_fetch():
+        c = get_crawl_flow()
+        result = await c._fetch_and_parse_book("3980442")
+        print(f"调试结果: {result}")
+        
+        # 如果获取成功，显示解析的书籍信息
+        if hasattr(result, 'book_detail'):
+            print(f"书籍详情: {result.book_detail}")
+        
+        await c.close()
+    
+    asyncio.run(debug_book_fetch())

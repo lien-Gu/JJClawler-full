@@ -12,7 +12,7 @@ import pytest
 import pytest_asyncio
 
 from app.config import settings
-from app.crawl.http import HttpClient
+from app.crawl.http_client import HttpClient
 
 default_config = settings.crawler
 

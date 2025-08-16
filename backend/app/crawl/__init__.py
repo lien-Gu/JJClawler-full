@@ -3,7 +3,7 @@
 """
 
 from app.crawl.crawl_config import CrawlConfig
-from .http import HttpClient
+from .http_client import HttpClient
 from .crawl_flow import CrawlFlow
 from .parser import RankingParser, PageParser, NovelPageParser
 
