@@ -78,7 +78,7 @@ class TestCrawlFlow:
         flow = crawl_flow_with_mocks
         
         # 模拟build_url返回None
-        flow.config.build_url.return_value = None
+        flow.config.build_page_url.return_value = None
         
         result = await flow.execute_crawl_task(["invalid_page"])
         
@@ -253,12 +253,12 @@ class TestRealCrawlFlow:
     async def test_real_novel_detail_crawl(self):
         """测试真实的书籍详情爬取"""
         from app.crawl.http_client import HttpClient
-        from app.crawl.crawl_config import CrawlConfig
+        from app.crawl.crawl_task import CrawlTask
         from app.crawl.parser import NovelPageParser
         
         try:
             # 使用真实配置和HTTP客户端
-            config = CrawlConfig()
+            config = CrawlTask()
             client = HttpClient()
             
             # 使用一个已知存在的书籍ID进行测试

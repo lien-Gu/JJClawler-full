@@ -372,78 +372,6 @@
       }
     },
     {
-      "id": "ys.nocp",
-      "name": "无CP(衍生)",
-      "type": "page",
-      "template": "page_ranking",
-      "params": {
-        "channel": "=nocp_plus,yw"
-      },
-      "schedule": {
-        "frequency": "hourly",
-        "interval": 4
-      },
-      "category": {
-        "parent": "ys",
-        "level": 2,
-        "display_order": 1
-      }
-    },
-    {
-      "id": "ys.ca",
-      "name": "纯爱(衍生)",
-      "type": "page",
-      "template": "page_ranking",
-      "params": {
-        "channel": "=ca,ysca"
-      },
-      "schedule": {
-        "frequency": "hourly",
-        "interval": 3
-      },
-      "category": {
-        "parent": "ys",
-        "level": 2,
-        "display_order": 2
-      }
-    },
-    {
-      "id": "ys.yq",
-      "name": "言情(衍生)",
-      "type": "page",
-      "template": "page_ranking",
-      "params": {
-        "channel": "=yq,ysyq"
-      },
-      "schedule": {
-        "frequency": "hourly",
-        "interval": 3
-      },
-      "category": {
-        "parent": "ys",
-        "level": 2,
-        "display_order": 3
-      }
-    },
-    {
-      "id": "ys.ecy",
-      "name": "二次元(衍生)",
-      "type": "page",
-      "template": "page_ranking",
-      "params": {
-        "channel": "=yq,ecy"
-      },
-      "schedule": {
-        "frequency": "hourly",
-        "interval": 4
-      },
-      "category": {
-        "parent": "ys",
-        "level": 2,
-        "display_order": 4
-      }
-    },
-    {
       "id": "nocp_plus.nocp",
       "name": "无CP",
       "type": "page",
@@ -531,6 +459,79 @@
         "parent": "nocp_plus",
         "level": 2,
         "display_order": 5
+      }
+    }
+    ,
+    {
+      "id": "ys.nocp",
+      "name": "无CP(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=nocp_plus.yw"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 1
+      }
+    },
+    {
+      "id": "ys.ca",
+      "name": "纯爱(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=ca.ysca"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 2
+      }
+    },
+    {
+      "id": "ys.yq",
+      "name": "言情(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=yq.ysyq"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 3
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 3
+      }
+    },
+    {
+      "id": "ys.ecy",
+      "name": "二次元(衍生)",
+      "type": "page",
+      "template": "page_ranking",
+      "params": {
+        "channel": "=yq.ecy"
+      },
+      "schedule": {
+        "frequency": "hourly",
+        "interval": 4
+      },
+      "category": {
+        "parent": "ys",
+        "level": 2,
+        "display_order": 4
       }
     }
   ]

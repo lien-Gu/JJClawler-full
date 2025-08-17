@@ -8,7 +8,7 @@ import json
 from unittest.mock import Mock, mock_open
 import httpx
 
-from app.crawl.crawl_config import CrawlConfig
+from app.crawl.crawl_task import CrawlTask
 from app.crawl.http_client import HttpClient
 from app.crawl.parser import RankingParser, PageParser, NovelPageParser
 
@@ -21,7 +21,7 @@ class TestCrawlConfig:
         # Mock文件读取
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
         
-        config = CrawlConfig()
+        config = CrawlTask()
         
         assert config.params == sample_config_data["global"]["base_params"]
         assert config.templates == sample_config_data["global"]["templates"]
@@ -32,40 +32,40 @@ class TestCrawlConfig:
         mocker.patch("builtins.open", side_effect=FileNotFoundError("File not found"))
         
         with pytest.raises(Exception, match="配置文件加载失败"):
-            CrawlConfig()
+            CrawlTask()
 
     def test_get_task_config(self, mocker, sample_config_data):
         """测试获取任务配置"""
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         # 测试存在的任务
-        jiazi_task = config.get_task_config("jiazi")
+        jiazi_task = config.get_task("jiazi")
         assert jiazi_task["id"] == "jiazi"
         assert jiazi_task["template"] == "jiazi_ranking"
         
         # 测试不存在的任务
-        assert config.get_task_config("nonexistent") is None
+        assert config.get_task("nonexistent") is None
 
     def test_build_url(self, mocker, sample_config_data):
         """测试URL构建"""
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         # 测试夹子榜URL构建
-        jiazi_url = config.build_url("jiazi") 
+        jiazi_url = config.build_page_url("jiazi")
         expected_url = "https://app-cdn.jjwxc.com/bookstore/favObservationByDate?day=today&use_cdn=1&version=20"
         assert jiazi_url == expected_url
         
         # 测试页面URL构建
-        index_url = config.build_url("index")
+        index_url = config.build_page_url("index")
         expected_index_url = "https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel=index&version=20&use_cdn=1"
         assert index_url == expected_index_url
 
     def test_build_novel_url(self, mocker, sample_config_data):
         """测试书籍详情URL构建"""
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         novel_url = config.build_novel_url("123456")
         expected_url = "https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId=123456"
@@ -74,7 +74,7 @@ class TestCrawlConfig:
     def test_determine_page_ids(self, mocker, sample_config_data):
         """测试页面ID确定逻辑"""
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         # 测试单个页面ID
         assert config.get_page_ids(["jiazi"]) == ["jiazi"]
@@ -93,7 +93,7 @@ class TestCrawlConfig:
     def test_validate_page_id(self, mocker, sample_config_data):
         """测试页面ID验证"""
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         assert config.validate_page_id("jiazi") is True
         assert config.validate_page_id("index") is True
@@ -247,10 +247,10 @@ class TestIntegration:
         """测试配置和解析器集成"""
         # Mock配置
         mocker.patch("builtins.open", mock_open(read_data=json.dumps(sample_config_data)))
-        config = CrawlConfig()
+        config = CrawlTask()
         
         # 构建URL
-        url = config.build_url("jiazi")
+        url = config.build_page_url("jiazi")
         assert "favObservationByDate" in url
         
         # 解析数据  

@@ -66,18 +66,11 @@ def get_predefined_jobs() -> List[Job]:
             page_ids=["jiazi"]
         ),
         Job(
-            job_id="category_crawl",
+            job_id="page_crawl",
             job_type=JobType.CRAWL,
             trigger=CronTrigger(hour=1),  # 每天执行一次
             desc="分类页面定时爬取任务",
-            page_ids=["category"]
-        ),
-        Job(
-            job_id="__system_job_cleanup__",
-            job_type=JobType.CLEAN,
-            trigger=IntervalTrigger(hours=interval_hour),
-            desc="自动清理过期任务",
-            is_system_job=True
+            page_ids=["page"]
         )
     ]
 

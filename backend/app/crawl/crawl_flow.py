@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
-from app.crawl.crawl_config import CrawlConfig
+from app.crawl.crawl_task import get_crawl_task, PageTask
 from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
@@ -62,7 +62,7 @@ class NovelsResult(BaseResult[NovelPageParser]):
 crawler_config = get_settings().crawler
 book_service = BookService()
 ranking_service = RankingService()
-
+crawl_task = get_crawl_task()
 
 class CrawlFlow:
     """
@@ -77,7 +77,6 @@ class CrawlFlow:
         """
         初始化爬取流程管理器
         """
-        self.config = CrawlConfig()
         # 每个实例创建独立的HTTP客户端和并发控制
         self.client = HttpClient()
         self.request_semaphore = asyncio.Semaphore(crawler_config.max_concurrent_requests)
@@ -92,15 +91,13 @@ class CrawlFlow:
         Returns:
             爬取结果
         """
-        # 兼容性处理：支持单页面字符串输入
-        if isinstance(page_ids, str):
-            page_ids = [page_ids]
+        page_tasks = crawl_task.get_tasks_by_words(page_ids)
 
         start_time = time.time()
         logger.info(f"开始统一并发爬取 {len(page_ids)} 个页面: {page_ids}")
         try:
             # 阶段 1: 获取所有页面内容
-            page_data = await self._fetch_pages(page_ids)
+            page_data = await self._fetch_pages(page_tasks)
 
             # 阶段 2: 获取所有书籍内容
             book_data = await self._fetch_books(page_data)
@@ -127,28 +124,28 @@ class CrawlFlow:
                 "exception": e
             }
 
-    async def _fetch_pages(self, page_ids: List[str]) -> PagesResult:
+    async def _fetch_pages(self, page_tasks: List[PageTask]) -> PagesResult:
         """
         阶段 1: 并发获取所有页面内容
         
         Args:
-            page_ids: 页面ID列表
+            page_tasks: 页面ID列表
             
         Returns:
             类型安全的页面结果
         """
-        logger.info(f"阶段 1: 开始获取 {len(page_ids)} 个页面内容")
+        logger.info(f"阶段 1: 开始获取 {len(page_tasks)} 个页面内容")
 
         # 创建所有页面的获取任务
-        tasks = [self._fetch_and_parse_page(page_id) for page_id in page_ids]
+        tasks = [self._fetch_and_parse_page(t) for t in page_tasks]
         pages = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 使用类型安全的结果类
         pages_result = PagesResult()
 
-        for page_id, result in zip(page_ids, pages):
+        for t, result in zip(page_tasks, pages):
             if isinstance(result, Exception):
-                pages_result.failed_items[page_id] = result
+                pages_result.failed_items[t.id] = result
             else:
                 pages_result.success_items.append(result)
 
@@ -160,31 +157,26 @@ class CrawlFlow:
            retry=retry_if_exception_type(
                (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
            before_sleep=before_sleep_log(logger, logging.WARN), )
-    async def _fetch_and_parse_page(self, page_id: str) -> PageParser | Exception:
+    async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser | Exception:
         async with self.request_semaphore:
             try:
-                logger.info(f"开始爬取页面: {page_id}")
-
-                # 生成页面URL
-                page_url = self.config.build_url(page_id)
-                if not page_url:
-                    raise Exception("无法生成页面地址")
+                logger.info(f"开始爬取页面: {page_task.name}")
 
                 # 获取页面内容
-                page_content = await self.client.run(page_url)
+                page_content = await self.client.run(page_task.url)
 
                 if not page_content or page_content.get("status") == "error":
                     raise Exception(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
 
                 # 解析榜单信息
-                page_parser = PageParser(page_content, page_id=page_id)
+                page_parser = PageParser(page_content, page_id=page_task.id)
 
                 logger.info(
-                    f"页面 {page_id} 内容获取完成: 解析榜单 {len(page_parser.rankings)}个")
+                    f"页面 {page_task} 内容获取完成: 解析榜单 {len(page_parser.rankings)}个")
 
                 return page_parser
             except Exception as e:
-                logger.error(f"页面 {page_id} 内容获取异常: {e}")
+                logger.error(f"页面 {page_task} 内容获取异常: {e}")
                 return e
 
     async def _fetch_books(self, pages_result: PagesResult) -> NovelsResult:
@@ -220,7 +212,6 @@ class CrawlFlow:
                 logger.error(f"书籍 {novel_id} 获取失败: {result}")
             else:
                 books_result.success_items.append(result)
-                logger.info(f"书籍 {novel_id} 获取成功")
 
         logger.info(f"阶段 2 完成: 成功 {len(books_result.success_items)}/{books_result.total_num} 个书籍")
 
@@ -407,9 +398,7 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
         爬取结果字典
     """
     import asyncio
-    
-    logger.info(f"开始执行爬取任务包装函数，页面IDs: {page_ids}")
-    
+
     async def async_crawl_task():
         # 每次任务执行时创建新的CrawlFlow实例，避免事件循环冲突
         crawl_flow = CrawlFlow()
