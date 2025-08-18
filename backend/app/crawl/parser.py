@@ -60,6 +60,9 @@ class RankingParser:
         """
 
         data_list = raw_data.get("data", [])
+
+        if not data_list or data_list == []:
+            data_list = raw_data.get("list", [])
         
         # 处理嵌套结构（如夹子榜的 data.list 格式）
         if isinstance(data_list, dict) and "list" in data_list:
@@ -69,8 +72,8 @@ class RankingParser:
         if not data_list:
             data_list = raw_data.get("list", [])
             
-        if not data_list:
-            raise ValueError("该榜单中内容为空")
+        if data_list == []:
+            return data_list
             
         if not isinstance(data_list, list) or not isinstance(data_list[0], dict):
             raise TypeError("响应体data结构错误")
@@ -106,9 +109,9 @@ class RankingParser:
         """
         return {
             "position": index,
-            "novel_id": raw_basic_data.get("novelId"),
-            "title": raw_basic_data.get("novelName"),
-            "author_id": raw_basic_data.get("authorid") or 0,  # 修复：None值设为0
+            "novel_id": raw_basic_data.get("novelId") or raw_basic_data.get("novelid"),
+            "title": raw_basic_data.get("novelName") or raw_basic_data.get("novelname"),
+            "author_id": raw_basic_data.get("authorId") or raw_basic_data.get("authorid") or 0,  # 修复：None值设为0
             "snapshot_time": datetime.now()
         }
 

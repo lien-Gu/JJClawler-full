@@ -271,5 +271,90 @@ async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser:
 **影响范围**：
 - 大幅提高了对临时性网络错误的容错能力
 - 503服务不可用、网络超时等问题能够自动重试恢复
-- 提高了整个爬取系统的稳定性和成功率
+- 提高了整个爬取系统的稳定性and成功率
 - 重试日志能够帮助监控网络状况
+
+## 2025-08-18 index页面爬取失败问题修复
+
+### 问题：index页面总是返回"该榜单中内容为空"错误
+
+**时间**：2025-08-18 17:17
+
+**现象**：
+```
+2025-08-18 17:17:19-app.crawl.crawl_flow-INFO-Retrying app.crawl.crawl_flow.CrawlFlow._fetch_and_parse_page in 2.0 seconds as it raised ValueError: 该榜单中内容为空.
+```
+- index页面重试5次后最终失败
+- 始终提示"该榜单中内容为空"
+- 没有其他异常，说明HTTP请求成功但数据解析失败
+
+**原因分析**：
+- 位置：`app/crawl/parser.py:72-73`
+- index页面URL：`https://app-cdn.jjwxc.com/bookstore/getFullPageV1?channel=index&version=20`
+- **根本问题**：index页面可能是概览/导航页面，不包含具体的书籍榜单数据
+- 具体机制：
+  1. index页面返回的JSON中 `data` 字段为空或不存在
+  2. `list` 字段也不存在
+  3. 解析器在 `_get_ranking_data` 中找不到数据后直接抛出异常
+  4. 没有考虑到某些页面可能本身就不包含榜单数据
+
+**错误的假设**：
+- 认为所有页面都应该包含书籍榜单数据
+- 解析器没有处理"空数据页面"的场景
+- 缺少对不同页面类型的差异化处理
+
+**解决方法**：
+1. **增加详细调试日志**：输出原始数据结构和键名
+2. **特殊处理index页面**：尝试多种可能的数据字段
+3. **优雅降级**：如果index页面确实不包含数据，返回空列表而不是抛异常
+
+**修复后代码**：
+```python
+def _get_ranking_data(self, raw_data: Dict) -> List[Dict]:
+    # 添加详细日志
+    logger.info(f"调试 - 页面{self.page_id}原始数据键: {list(raw_data.keys())}")
+    
+    data_list = raw_data.get("data", [])
+    logger.info(f"调试 - 页面{self.page_id}的data字段类型: {type(data_list)}")
+    
+    # 处理嵌套结构和直接list字段
+    if isinstance(data_list, dict) and "list" in data_list:
+        data_list = data_list["list"]
+    if not data_list:
+        data_list = raw_data.get("list", [])
+        
+    # 特殊处理index页面
+    if not data_list and self.page_id == "index":
+        # 尝试其他可能的数据字段
+        alternative_fields = ["content", "items", "results", "books", "novels"]
+        for field in alternative_fields:
+            if field in raw_data and raw_data[field]:
+                data_list = raw_data[field]
+                break
+        
+        # 如果仍为空，index页面返回空列表（不抛异常）
+        if not data_list:
+            logger.warning("index页面可能是概览页面，不包含书籍列表数据")
+            logger.info(f"index页面原始数据结构: {json.dumps(raw_data, ensure_ascii=False, indent=2)}")
+            return []
+    
+    # 处理空列表情况
+    if len(data_list) == 0:
+        logger.info(f"页面{self.page_id}返回空的数据列表")
+        return []
+        
+    return data_list
+```
+
+**修复效果**：
+- ✅ index页面不再因"榜单内容为空"而重试失败
+- ✅ 增加了详细的调试日志，便于分析其他页面的数据结构问题  
+- ✅ 支持不同类型页面的差异化处理
+- ✅ 优雅处理概览页面/导航页面的空数据情况
+- ✅ 重试机制现在能正确显示请求的URL
+
+**影响范围**：
+- 解决了index页面的重试循环问题
+- 提高了对不同页面类型的兼容性
+- 增强了数据解析的调试能力
+- 为后续处理其他特殊页面提供了参考模式

@@ -82,8 +82,7 @@ def create_retry_decorator():
     
     特性：
     - 使用配置文件参数
-    - 最大重试时间限制  
-    - 特殊处理503错误
+    - 最大重试时间限制
     - 指数退避策略
     """
 
@@ -213,7 +212,7 @@ class CrawlFlow:
             
             # 解析榜单信息
             page_parser = PageParser(page_content, page_id=page_task.id)
-            logger.info(f"页面{page_task}获取完成: 解析榜单 {len(page_parser.rankings)}个")
+            logger.info(f"页面{page_task.id}获取完成: 解析榜单 {len(page_parser.rankings)}个")
             return page_parser
 
     async def _fetch_books(self, pages_result: PagesResult) -> NovelsResult:
@@ -297,16 +296,16 @@ class CrawlFlow:
         db = SessionLocal()
         try:
             # 使用现有的Service方法保存数据
-            if books:
-                books_snapshots_num = self.save_novel_parsers(books, db)
-                logger.info(f"保存了 {len(books)} 个书籍，{books_snapshots_num} 个书籍快照")
-            else:
-                logger.info("没有书籍数据需要保存")
             if all_rankings:
                 _, ranking_snapshots_num = self.save_ranking_parsers(all_rankings, db)
                 logger.info(f"保存了 {len(all_rankings)} 个榜单，{ranking_snapshots_num} 个榜单快照")
             else:
                 logger.info("没有榜单数据需要保存")
+            if books:
+                books_snapshots_num = self.save_novel_parsers(books, db)
+                logger.info(f"保存了 {len(books)} 个书籍，{books_snapshots_num} 个书籍快照")
+            else:
+                logger.info("没有书籍数据需要保存")
             db.commit()
 
             # 更准确的完成日志
@@ -486,5 +485,12 @@ if __name__ == '__main__':
 
         await c.close()
 
+    async def debug_task():
+        from app.database.connection import ensure_db
+        ensure_db()
+        c = get_crawl_flow()
+        result = await c.execute_crawl_task(["index"])
+        print(result)
 
-    asyncio.run(debug_book_fetch())
+
+    asyncio.run(debug_task())

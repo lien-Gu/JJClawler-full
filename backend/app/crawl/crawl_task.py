@@ -147,5 +147,5 @@ def get_crawl_task() -> CrawlTask:
 
 if __name__ == '__main__':
     crawl_task = get_crawl_task()
-    a = crawl_task.get_tasks_by_words(["all"])
+    a = crawl_task.get_tasks_by_words(["index"])
     print(a)
