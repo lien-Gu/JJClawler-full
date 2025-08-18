@@ -292,16 +292,16 @@ class CrawlFlow:
                 logger.error(f"书籍页面 {novel_id} 内容获取异常: {e}")
                 return e
 
-    async def _save_data(self, pages_result: PagesResult, novels_result: NovelsResult) -> Dict[str, int] | Exception:
+    async def _save_data(self, pages_result: PagesResult, novels_result: NovelsResult) -> Dict[str, int]:
         """
-        阶段 3: 保存所有数据
+        阶段 3: 保存所有数据 - 容错保存机制
         
         Args:
             pages_result: 类型安全的页面结果
             novels_result: 类型安全的书籍结果
             
         Returns:
-            类型安全的保存结果
+            保存结果统计
         """
         logger.info("阶段 3: 开始保存所有数据")
 

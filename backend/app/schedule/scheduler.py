@@ -5,39 +5,19 @@
 移除metadata存储，仅保留基本的任务调度功能。
 """
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from datetime import datetime
+from typing import Optional
 
 import humanize
 from apscheduler.events import EVENT_JOB_ERROR
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.date import DateTrigger
 
 from app.config import SchedulerSettings, get_settings
 from app.logger import get_logger
 from app.models.schedule import (Job, JobType, SchedulerInfo, get_predefined_jobs)
 from app.schedule.listener import JobListener
-
-
-def cleanup_old_jobs_wrapper() -> Dict[str, Any]:
-    """
-    清理任务包装函数 - 避免序列化问题
-    
-    Returns:
-        清理结果
-    
-    设计原理：
-    1. 独立函数 - 不包含调度器实例引用
-    2. 延迟获取 - 只有在执行时才获取调度器实例
-    3. 序列化安全 - 不持有不可序列化对象
-    """
-    scheduler = get_scheduler()
-    if scheduler and scheduler.scheduler:
-        return scheduler.cleanup_old_jobs()
-    else:
-        return {"cleaned": 0, "error": "调度器未运行"}
 
 
 class JobScheduler:
@@ -69,8 +49,6 @@ class JobScheduler:
             from ..crawl.crawl_flow import crawl_task_wrapper
             exe_func = crawl_task_wrapper
             job_args = [job.page_ids]
-        elif job.job_type == JobType.CLEAN:
-            exe_func = cleanup_old_jobs_wrapper
 
         if exe_func is None:
             self.logger.error(f"{job.job_id}未给定调度函数")
@@ -166,64 +144,6 @@ class JobScheduler:
 
         self.logger.info(f"预定义任务检查完成: 新增{added_count}个, 跳过{skipped_count}个")
 
-    def cleanup_old_jobs(self) -> Dict[str, Any]:
-        """清理过期任务 - 仅清理DateTrigger的已完成任务"""
-        if not self.scheduler:
-            return {"cleaned": 0, "error": "调度器未运行"}
-        try:
-            from datetime import timezone
-            cutoff_date = datetime.now(timezone.utc) - timedelta(days=self.settings.job_retention_days)
-            all_jobs = self.scheduler.get_jobs()
-            stats = {"cleaned_count": 0, "errors": []}
-
-            for job in all_jobs:
-                should_cleanup, reason = self._should_cleanup_job(job, cutoff_date)
-                if should_cleanup:
-                    try:
-                        self.scheduler.remove_job(job.id)
-                        stats["cleaned_count"] += 1
-                        self.logger.info(f"清理过期任务: {job.id} (原因: {reason})")
-                    except Exception as e:
-                        error_msg = f"移除任务 {job.id}失败: {e}"
-                        self.logger.error(error_msg)
-                        stats["errors"].append(error_msg)
-
-                if stats["cleaned_count"] >= self.settings.cleanup_batch_size:
-                    self.logger.info(f"达到单次清理限制({self.settings.cleanup_batch_size})，下次清理将继续处理剩余任务")
-                    break
-
-            result = {
-                "cleaned": stats["cleaned_count"],
-                "cutoff_date": cutoff_date.isoformat(),
-                "batch_size_reached": stats["cleaned_count"] >= self.settings.cleanup_batch_size,
-                "errors": stats["errors"],
-            }
-            self.logger.info(f"任务清理完成: 清理了{stats['cleaned_count']}个任务")
-            return result
-        except Exception as e:
-            error_msg = f"任务清理过程发生意外错误: {e}"
-            self.logger.error(error_msg)
-            return {"cleaned": 0, "error": error_msg}
-
-    @staticmethod
-    def _should_cleanup_job(job, cutoff_date: datetime) -> Tuple[bool, str]:
-        """
-        简化的任务清理判断 - 不依赖metadata
-        :param job: 任务
-        :param cutoff_date: 清理时间
-        :return:
-        """
-        # 系统任务不清理
-        if "__system_job" in job.id:
-            return False, "system job"
-
-        # 只清理DateTrigger且已经没有下次运行时间的任务
-        is_onetime = isinstance(job.trigger, DateTrigger)
-        if is_onetime and job.next_run_time is None:
-            return True, "completed_onetime_job"
-
-        return False, "active_job"
-
     def get_scheduler_info(self) -> SchedulerInfo:
         """获取调度器状态信息 - 简化版本，不依赖metadata"""
         if not self.scheduler:
@@ -308,3 +228,9 @@ async def stop_scheduler() -> None:
     """停止调度器"""
     scheduler = get_scheduler()
     await scheduler.shutdown()
+
+
+async def check_scheduler() -> bool:
+    """检查调度器状态"""
+    scheduler = get_scheduler()
+    return scheduler.is_running()

@@ -11,17 +11,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .models.error import ErrorResponse
 from .api import api_router
 from .config import get_settings
 from .logger import get_logger, setup_logging
 from .middleware import ExceptionMiddleware
-from .models.base import BaseResponse, DataResponse
+from .models.base import DataResponse
+from .models.error import ErrorResponse
 
 # 修复中文编码显示问题
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
-
 
 # 初始化日志系统
 setup_logging()
@@ -129,20 +128,20 @@ async def root():
 async def health_check():
     """健康检查 - 简洁的系统状态检查"""
     settings = get_settings()
-    
+
     # 检查各个组件状态（简化为布尔值）
     from .database.connection import check_db
     db_ok = check_db()
-    from .schedule.scheduler import get_scheduler
-    scheduler_ok = get_scheduler().is_running()
-    
+    from .schedule.scheduler import check_scheduler
+    scheduler_ok = check_scheduler()
+
     # 计算运行时间
     uptime = time.time() - APP_START_TIME
-    
+
     # 确定整体状态
     all_ok = db_ok and scheduler_ok
     health_status = "healthy" if all_ok else "unhealthy"
-    
+
     health_data = {
         "status": health_status,
         "version": settings.project_version,
@@ -152,7 +151,7 @@ async def health_check():
             "scheduler": "ok" if scheduler_ok else "error"
         }
     }
-    
+
     return DataResponse(
         success=all_ok,
         code=200 if all_ok else 503,
@@ -163,15 +162,8 @@ async def health_check():
 
 
 
-async def _check_scheduler() -> bool:
-    """检查调度器状态 - 简化版本"""
-    try:
-        from .schedule.scheduler import scheduler
-        return scheduler and scheduler.running
-    except Exception:
-        return False
-
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

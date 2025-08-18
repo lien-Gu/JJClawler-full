@@ -53,10 +53,6 @@ class Job(JobBasic):
 # 预定义任务配置 - 使用Job模型
 def get_predefined_jobs() -> List[Job]:
     """获取预定义的调度任务列表"""
-    from app.config import get_settings
-    settings = get_settings()
-    interval_hour = settings.scheduler.cleanup_interval_hours
-
     return [
         Job(
             job_id="jiazi_crawl",
