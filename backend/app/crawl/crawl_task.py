@@ -121,13 +121,15 @@ class CrawlTask:
         # 格式化URL
         return template.format(**params)
 
-    def build_novel_url(self, novel_id: str) -> str:
+    def build_novel_url(self, novel_id: str or int) -> str:
         """
         根据小说id构建url
 
         :param novel_id:
         :return:
         """
+        if isinstance(novel_id,int):
+            novel_id = str(novel_id)
         template = self.templates.get("novel_detail")
         return template.format(novel_id=novel_id)
 

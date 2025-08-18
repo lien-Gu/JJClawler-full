@@ -12,7 +12,8 @@ from typing import Tuple
 
 import httpx
 from sqlalchemy.orm import Session
-from tenacity import before_sleep_log, retry, retry_if_exception_type, retry_if_exception, stop_after_attempt, stop_after_delay, wait_exponential
+from tenacity import before_sleep_log, retry, retry_if_exception_type, retry_if_exception, stop_after_attempt, \
+    stop_after_delay, wait_exponential
 
 from app.config import get_settings
 from app.crawl.crawl_task import get_crawl_task, PageTask
@@ -45,6 +46,16 @@ class PagesResult(BaseResult[PageParser]):
             "failed_pages": self.failed_ids
         }
 
+    def get_novel_ids(self) -> List[int]:
+        # 收集所有成功页面的书籍ID
+        all_novel_ids = set()
+        for page_result in self.success_items:
+            novel_ids = page_result.get_novel_ids()
+            # 过滤掉空值和无效ID
+            valid_ids = [nid for nid in novel_ids if nid and str(nid).strip() and str(nid) != '0']
+            all_novel_ids.update(valid_ids)
+        return list(all_novel_ids)
+
 
 @dataclass
 class NovelsResult(BaseResult[NovelPageParser]):
@@ -65,7 +76,7 @@ ranking_service = RankingService()
 crawl_task = get_crawl_task()
 
 
-def create_smart_retry_decorator():
+def create_retry_decorator():
     """
     创建基于配置的智能重试装饰器
     
@@ -75,45 +86,34 @@ def create_smart_retry_decorator():
     - 特殊处理503错误
     - 指数退避策略
     """
-    def is_503_error(exception):
-        """检查是否为503错误 - 增强版本"""
-        error_str = str(exception).lower()
-        is_503 = ("503" in error_str or 
-                  "service temporarily unavailable" in error_str or
-                  "service unavailable" in error_str)
-        
-        # 添加调试日志来确认检测是否生效
-        if is_503:
-            logger.warning(f"检测到503错误，将进行重试: {str(exception)[:100]}...")
-        
-        return is_503
-    
-    # 针对503错误使用更宽松的重试策略
+
     retry_attempts = max(5, crawler_config.retry_times)  # 至少5次重试
     max_time = max(60.0, crawler_config.max_retry_time)  # 调整为60秒，更合理
-    
+
     return retry(
         # 停止条件：达到最大重试次数 OR 超过最大重试时间
         stop=stop_after_attempt(retry_attempts) | stop_after_delay(max_time),
-        
-        # 等待策略：指数退避，针对503错误优化
+
+        # 等待策略：指数退避
         wait=wait_exponential(
             multiplier=1.5,  # 更温和的倍数，避免等待时间过长
-            min=2.0,         # 503错误需要更长的基础等待时间
-            max=15.0         # 降低单次等待上限，平衡总时间
+            min=2.0,  # 503错误需要更长的基础等待时间
+            max=15.0  # 降低单次等待上限，平衡总时间
         ),
-        
-        # 重试条件：HTTP异常 OR 503错误
+
+        # 重试条件：HTTP异常
         retry=(
-            retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)) |
-            retry_if_exception(is_503_error)
+            retry_if_exception_type((ValueError, KeyError,
+                                     httpx.RequestError,
+                                     httpx.HTTPStatusError,
+                                     httpx.TimeoutException,
+                                     json.JSONDecodeError))
         ),
-        
+
         # 日志记录 - 使用INFO级别确保能看到重试日志
         before_sleep=before_sleep_log(logger, logging.INFO),
         reraise=True
     )
-
 
 
 class CrawlFlow:
@@ -204,27 +204,21 @@ class CrawlFlow:
         logger.info(f"阶段 1 完成: 成功 {len(pages_result.success_items)}/{pages_result.total_num} 个页面")
         return pages_result
 
-    @create_smart_retry_decorator()
+    @create_retry_decorator()
     async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser | Exception:
         async with self.request_semaphore:
             try:
-                logger.info(f"开始爬取页面: {page_task.name}")
-
                 # 获取页面内容
                 page_content = await self.client.run(page_task.url)
-
                 if not page_content or page_content.get("status") == "error":
-                    raise Exception(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
-
+                    raise ValueError(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
                 # 解析榜单信息
                 page_parser = PageParser(page_content, page_id=page_task.id)
-
                 logger.info(
-                    f"页面 {page_task} 内容获取完成: 解析榜单 {len(page_parser.rankings)}个")
-
+                    f"页面{page_task}获取完成: 解析榜单 {len(page_parser.rankings)}个")
                 return page_parser
             except Exception as e:
-                logger.error(f"页面 {page_task} 内容获取异常: {e}")
+                logger.error(f"页面{page_task}获取异常: {e}")
                 return e
 
     async def _fetch_books(self, pages_result: PagesResult) -> NovelsResult:
@@ -238,25 +232,22 @@ class CrawlFlow:
             类型安全的书籍结果
         """
         # 收集所有成功页面的书籍ID
-        all_novel_ids = set()
-        for page_result in pages_result.success_items:
-            all_novel_ids.update(page_result.get_novel_ids())
-        all_novel_ids = list(all_novel_ids)
+        all_novel_ids = pages_result.get_novel_ids()
         if not all_novel_ids:
-            logger.info("阶段 2: 无书籍ID需要获取")
+            logger.info("阶段 2: 无有效书籍ID需要获取")
             return NovelsResult()
 
         logger.info(f"阶段 2: 开始获取 {len(all_novel_ids)} 个书籍内容")
 
         # 并发获取所有书籍内容
-        book_tasks = [self._fetch_and_parse_book(book_id) for book_id in all_novel_ids]
+        book_tasks = [self._fetch_and_parse_book(novel_id) for novel_id in all_novel_ids]
         book_results = await asyncio.gather(*book_tasks, return_exceptions=True)
 
         # 使用类型安全的结果类
         books_result = NovelsResult()
         for novel_id, result in zip(all_novel_ids, book_results):
             if isinstance(result, Exception):
-                books_result.failed_items[novel_id] = result
+                books_result.failed_items[str(novel_id)] = result
                 logger.error(f"书籍 {novel_id} 获取失败: {result}")
             else:
                 books_result.success_items.append(result)
@@ -265,8 +256,8 @@ class CrawlFlow:
 
         return books_result
 
-    @create_smart_retry_decorator()
-    async def _fetch_and_parse_book(self, novel_id: str) -> NovelPageParser | Exception:
+    @create_retry_decorator()
+    async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser | Exception:
         """
         书籍获取
 
@@ -275,24 +266,23 @@ class CrawlFlow:
         """
         async with self.request_semaphore:
             try:
-                book_url = crawl_task.build_novel_url(novel_id)
+                # 参数验证
+                if not novel_id:
+                    raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
+
+                book_url = crawl_task.build_novel_url(str(novel_id))
                 result = await self.client.run(book_url)
-                # 检查HTTP请求是否有错误
-                if result.get("status") == "error":
-                    error_msg = result.get("error", "HTTP request failed")
-                    raise Exception(f"Book {book_url} fetch failed with status: {error_msg}")
-                
                 # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
                 if not result.get("novelId"):
-                    raise Exception(f"Invalid book data: missing novelId in response")
-                
+                    raise KeyError(f"Invalid book data: missing novelId in response")
+
                 novel_parser = NovelPageParser(result)
                 return novel_parser
             except Exception as e:
                 logger.error(f"书籍页面 {novel_id} 内容获取异常: {e}")
                 return e
 
-    async def _save_data(self, pages_result: PagesResult, novels_result: NovelsResult) -> Dict[str, int]:
+    async def _save_data(self, pages_result: PagesResult, novels_result: NovelsResult) -> Dict[str, int] | Exception:
         """
         阶段 3: 保存所有数据 - 容错保存机制
         
@@ -316,20 +306,18 @@ class CrawlFlow:
         db = SessionLocal()
         try:
             # 使用现有的Service方法保存数据
-            if all_rankings:
-                _, ranking_snapshots_num = self.save_ranking_parsers(all_rankings, db)
-                logger.info(f"保存了 {len(all_rankings)} 个榜单，{ranking_snapshots_num} 个榜单快照")
-            else:
-                logger.info("没有榜单数据需要保存")
-
             if books:
                 books_snapshots_num = self.save_novel_parsers(books, db)
                 logger.info(f"保存了 {len(books)} 个书籍，{books_snapshots_num} 个书籍快照")
             else:
                 logger.info("没有书籍数据需要保存")
-
+            if all_rankings:
+                _, ranking_snapshots_num = self.save_ranking_parsers(all_rankings, db)
+                logger.info(f"保存了 {len(all_rankings)} 个榜单，{ranking_snapshots_num} 个榜单快照")
+            else:
+                logger.info("没有榜单数据需要保存")
             db.commit()
-            
+
             # 更准确的完成日志
             total_saved = len(all_rankings) + len(books) + ranking_snapshots_num + books_snapshots_num
             if total_saved > 0:
@@ -380,6 +368,11 @@ class CrawlFlow:
                     }
                     ranking_snapshots.append(snapshot_data)
                 except Exception as e:
+                    # 回滚当前事务，重新开始
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass  # 忽略回滚失败
                     logger.error(f"书籍保存异常，跳过该记录: {book.get('novel_id', 'unknown')}, 错误: {e}")
                     continue
 
@@ -405,7 +398,7 @@ class CrawlFlow:
                 # 保存或更新书籍基本信息
                 book_info = book_data.book_detail
                 book_record = book_service.create_or_update_book(db, book_info)
-                
+
                 if book_record is None:
                     logger.warning(f"书籍保存失败，跳过该记录: {book_info.get('novel_id', 'unknown')}")
                     continue
@@ -418,7 +411,10 @@ class CrawlFlow:
                 book_snapshots.append(snapshot_data)
             except Exception as e:
                 # 回滚当前事务，重新开始
-                db.rollback()
+                try:
+                    db.rollback()
+                except Exception:
+                    pass  # 忽略回滚失败
                 logger.error(f"书籍保存异常，跳过该记录: {book_info.get('novel_id', 'unknown')}, 错误: {e}")
                 continue
         # 批量保存书籍快照
@@ -466,14 +462,14 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
         finally:
             # 确保资源清理
             await crawl_flow.close()
-    
+
     try:
         # 在同步上下文中运行异步任务
         result = asyncio.run(async_crawl_task())
-        
+
         logger.info(f"爬取任务包装函数执行完成：成功={result.get('success', False)}")
         return result
-        
+
     except Exception as e:
         error_msg = f"爬取任务包装函数执行失败: {str(e)}"
         logger.error(error_msg)
@@ -486,16 +482,18 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
 
 if __name__ == '__main__':
     import asyncio
-    
+
+
     async def debug_book_fetch():
         c = get_crawl_flow()
         result = await c._fetch_and_parse_book("3980442")
         print(f"调试结果: {result}")
-        
+
         # 如果获取成功，显示解析的书籍信息
         if hasattr(result, 'book_detail'):
             print(f"书籍详情: {result.book_detail}")
-        
+
         await c.close()
-    
+
+
     asyncio.run(debug_book_fetch())

@@ -164,3 +164,38 @@ except Exception as e:
 - 解决了author_id约束问题，提高数据保存成功率
 - 修复了事务回滚循环，确保单个失败不影响后续操作
 - 提高了爬取系统的整体稳定性和容错性
+
+### 问题4：数据库会话获取方式错误
+
+**时间**：2025-08-18 12:02
+
+**错误描述**：
+在 `crawl_flow.py` 中使用 `get_db()` 直接调用，但 `get_db()` 是一个 yield 生成器函数，用于 FastAPI 依赖注入。
+
+**错误代码**：
+```python
+db = get_db()  # 错误：返回的是生成器对象，不是 Session
+```
+
+**原因分析**：
+- `get_db()` 是设计用于 FastAPI 依赖注入的生成器函数
+- 直接调用返回的是生成器对象，不是数据库会话
+- 导致 `db.commit()` 和 `db.rollback()` 调用失败
+
+**解决方法**：
+- 在爬虫模块中直接使用 `SessionLocal()` 创建数据库会话
+- 修改导入语句和会话创建方式
+
+**修复代码**：
+```python
+# 修改导入
+from app.database.connection import SessionLocal
+
+# 修改会话创建
+db = SessionLocal()
+```
+
+**影响范围**：
+- 修复了数据库事务操作的根本问题
+- 确保 `commit()` 和 `rollback()` 调用正常工作
+- 提高了数据库操作的可靠性

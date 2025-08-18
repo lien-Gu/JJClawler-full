@@ -113,8 +113,8 @@ class HttpClient:
             response.raise_for_status()
             return json.loads(response.content)
         except (RequestError, json.JSONDecodeError, HTTPStatusError) as e:
-            logger.debug(f"HTTP请求失败 {url}: {e}")
-            return {"status": "error", "url": url, "error": str(e)}
+            logger.error(f"HTTP请求失败 {url}: {e}")
+            raise e
 
     async def _request_sequential(self, urls: List[str]) -> List[Dict[str, Any]]:
         """
