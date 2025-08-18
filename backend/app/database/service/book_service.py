@@ -81,10 +81,33 @@ class BookService:
         novel_id = book_data.get("novel_id")
         if not novel_id:
             raise ValueError("novel_id is required")
+        
+        # 确保novel_id是整数类型
+        try:
+            novel_id = int(novel_id)
+            book_data["novel_id"] = novel_id
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid novel_id format: {novel_id}")
+        
+        # 尝试获取已存在的书籍
         book = self.get_book_by_novel_id(db, novel_id)
         if book:
             return self.update_book(db, book, book_data)
-        return self.create_book(db, book_data)
+        
+        # 如果不存在，尝试创建新书籍
+        try:
+            return self.create_book(db, book_data)
+        except Exception as e:
+            # 如果创建失败（可能是并发导致的重复插入），再次尝试获取并更新
+            error_str = str(e).lower()
+            if "unique constraint failed" in error_str or "duplicate" in error_str:
+                # 刷新会话，重新获取可能已经被其他事务创建的记录
+                db.rollback()
+                book = self.get_book_by_novel_id(db, novel_id)
+                if book:
+                    return self.update_book(db, book, book_data)
+            # 如果仍然失败，重新抛出异常
+            raise e
 
     @staticmethod
     def batch_create_book_snapshots(db: Session, snapshots: list[dict[str, Any]]) -> list[BookSnapshot]:

@@ -23,17 +23,28 @@ class RankingService:
     ) -> Ranking:
         """
         根据ranking_data中的信息创建或更新榜单。
+        查找逻辑：
+        1. 如果有rank_id，优先根据rank_id查找
+        2. 如果rank_id为空或查找不到，则根据channel_name查找
+        3. 如果都查找不到，创建新榜单
+        
         :param db:
         :param ranking_data:
         :return:
         """
         rank_id = ranking_data.get("rank_id")
-        if not rank_id:
-            raise ValueError("ranking_data中必须包含rank_id")
-
-        # 1. 根据rank_id查找所有可能的榜单
-        candidate_rankings = self.get_rankings_by_rank_id(db, rank_id)
-        # 2. 根据查找结果进行逻辑判断
+        channel_name = ranking_data.get("channel_name")
+        candidate_rankings = []
+        
+        # 1. 优先根据rank_id查找（如果rank_id不为空）
+        if rank_id and rank_id.strip():
+            candidate_rankings = self.get_rankings_by_rank_id(db, rank_id)
+        
+        # 2. 如果rank_id为空或未找到，且有channel_name，则根据channel_name查找
+        if not candidate_rankings and channel_name and channel_name.strip():
+            candidate_rankings = self.get_rankings_by_channel_name(db, channel_name)
+        
+        # 3. 根据查找结果进行逻辑判断
         if not candidate_rankings:
             # 榜单不存在，直接创建
             return self.create_ranking(db, ranking_data)
@@ -41,28 +52,30 @@ class RankingService:
             # 列表只有一个元素，直接更新
             return self.update_ranking(db, candidate_rankings[0], ranking_data)
         else:
-            # 列表有多个元素，channel_id进行二次筛选
+            # 列表有多个元素，需要进一步筛选
             channel_id = ranking_data.get("channel_id")
-            if not channel_id:
-                raise ValueError(
-                    f"rank_id '{rank_id}' 对应多个榜单，必须提供channel_id进行区分"
-                )
-
-            # 进行二次筛选
-            filtered_rankings = [
-                r for r in candidate_rankings if r.channel_id == channel_id
-            ]
-
-            if len(filtered_rankings) == 1:
-                # 精准匹配到一个，更新它
-                return self.update_ranking(db, filtered_rankings[0], ranking_data)
-            elif len(filtered_rankings) == 0:
-                return self.create_ranking(db, ranking_data)
+            
+            # 如果有channel_id，进行二次筛选
+            if channel_id:
+                filtered_rankings = [
+                    r for r in candidate_rankings if r.channel_id == channel_id
+                ]
+                
+                if len(filtered_rankings) == 1:
+                    # 精准匹配到一个，更新它
+                    return self.update_ranking(db, filtered_rankings[0], ranking_data)
+                elif len(filtered_rankings) == 0:
+                    # 没有匹配的，创建新榜单
+                    return self.create_ranking(db, ranking_data)
+                else:
+                    # 理论上不应该发生，除非(rank_id, channel_id)组合在数据库中不唯一
+                    raise SystemError(
+                        f"数据库中存在重复的榜单组合，无法确定更新目标"
+                    )
             else:
-                # 理论上不应该发生，除非(rank_id, channel_id)组合在数据库中不唯一
-                raise SystemError(
-                    f"数据库中存在重复的(rank_id, channel_id)组合: ('{rank_id}', '{channel_id}')"
-                )
+                # 没有channel_id进行区分，选择第一个进行更新（或者可以创建新的）
+                # 这里选择更新第一个找到的榜单
+                return self.update_ranking(db, candidate_rankings[0], ranking_data)
 
     @staticmethod
     def batch_create_ranking_snapshots(
@@ -473,6 +486,16 @@ class RankingService:
         :return: 一个榜单对象的列表
         """
         return list(db.execute(select(Ranking).where(Ranking.rank_id == rank_id)).scalars())
+    
+    @staticmethod
+    def get_rankings_by_channel_name(db: Session, channel_name: str) -> List[Ranking]:
+        """
+        根据channel_name获取所有匹配的榜单列表
+        :param db:
+        :param channel_name:
+        :return: 一个榜单对象的列表
+        """
+        return list(db.execute(select(Ranking).where(Ranking.channel_name == channel_name)).scalars())
 
     @staticmethod
     def create_ranking(db: Session, ranking_data: dict[str, Any]) -> Ranking:

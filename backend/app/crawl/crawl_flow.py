@@ -368,16 +368,20 @@ class CrawlFlow:
             batch_id = generate_batch_id()
             stored_ranking_snapshots += len(ranking.book_snapshots)
             for book in ranking.book_snapshots:
-                # 保存书籍
-                book_record = book_service.create_or_update_book(db, book)
-                # 创建榜单快照记录
-                snapshot_data = {
-                    "ranking_id": rank_record.id,
-                    "book_id": book_record.id,
-                    "batch_id": batch_id,
-                    **book
-                }
-                ranking_snapshots.append(snapshot_data)
+                try:
+                    # 保存书籍
+                    book_record = book_service.create_or_update_book(db, book)
+                    # 创建榜单快照记录
+                    snapshot_data = {
+                        "ranking_id": rank_record.id,
+                        "book_id": book_record.id,
+                        "batch_id": batch_id,
+                        **book
+                    }
+                    ranking_snapshots.append(snapshot_data)
+                except Exception as e:
+                    logger.error(f"书籍保存异常，跳过该记录: {book.get('novel_id', 'unknown')}, 错误: {e}")
+                    continue
 
             # 批量保存榜单快照
             if ranking_snapshots:
@@ -397,16 +401,24 @@ class CrawlFlow:
         # 保存书籍快照
         book_snapshots = []
         for book_data in books:
-            # 保存或更新书籍基本信息
-            book_info = book_data.book_detail
-            book_record = book_service.create_or_update_book(db, book_info)
+            try:
+                # 保存或更新书籍基本信息
+                book_info = book_data.book_detail
+                book_record = book_service.create_or_update_book(db, book_info)
+                
+                if book_record is None:
+                    logger.warning(f"书籍保存失败，跳过该记录: {book_info.get('novel_id', 'unknown')}")
+                    continue
 
-            # 创建书籍快照记录
-            snapshot_data = {
-                "book_id": book_record.id,
-                **book_info
-            }
-            book_snapshots.append(snapshot_data)
+                # 创建书籍快照记录
+                snapshot_data = {
+                    "book_id": book_record.id,
+                    **book_info
+                }
+                book_snapshots.append(snapshot_data)
+            except Exception as e:
+                logger.error(f"书籍保存异常，跳过该记录: {book_info.get('novel_id', 'unknown')}, 错误: {e}")
+                continue
         # 批量保存书籍快照
         if book_snapshots:
             book_service.batch_create_book_snapshots(db, book_snapshots)
