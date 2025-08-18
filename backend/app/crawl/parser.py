@@ -108,7 +108,7 @@ class RankingParser:
             "position": index,
             "novel_id": raw_basic_data.get("novelId", ""),
             "title": raw_basic_data.get("novelName", ""),
-            "author_id": raw_basic_data.get("authorid", None),
+            "author_id": raw_basic_data.get("authorid") or 0,  # 修复：None值设为0
             "snapshot_time": datetime.now()
         }
 

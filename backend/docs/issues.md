@@ -82,3 +82,85 @@ except Exception as e:
 **测试建议**：
 - 进行并发爬取测试，验证修复效果
 - 监控后续日志，确认错误不再出现
+
+## 2025-08-18 日志和数据库问题修复
+
+### 问题1：httpx日志冲刷有效信息
+
+**时间**：2025-08-18 12:02
+
+**现象**：
+```
+2025-08-18 12:02:00-httpx-INFO-HTTP Request: GET https://app-cdn.jjwxc.com/androidapi/novelbasicinfo?novelId=9195883 "HTTP/1.1 200 OK"
+```
+大量httpx请求日志在INFO级别输出，冲刷了业务日志
+
+**解决方法**：
+- 在 `app/logger.py` 中添加httpx日志级别控制
+- 将httpx日志级别设置为WARNING，只记录错误和警告
+
+**修复代码**：
+```python
+# 禁用httpx的INFO级别日志，只保留WARNING及以上
+logging.getLogger("httpx").setLevel(logging.WARNING)
+```
+
+### 问题2：author_id NOT NULL约束错误
+
+**时间**：2025-08-18 12:02
+
+**错误信息**：
+```
+NOT NULL constraint failed: books.author_id
+[parameters: (9615662, '选秀出道失败后', None, '2025-08-18 12:02:07.625259', '2025-08-18 12:02:07.625259')]
+```
+
+**原因分析**：
+- 虽然数据库字段设置了 `nullable=True`，但解析器仍返回 `None` 值
+- `_parse_book_basic_info` 方法中 `author_id` 处理不一致
+
+**解决方法**：
+- 修改 `parser.py` 中的 `_parse_book_basic_info` 方法
+- 确保 `author_id` 为 `None` 时设置为 `0`
+
+**修复代码**：
+```python
+"author_id": raw_basic_data.get("authorid") or 0,  # 修复：None值设为0
+```
+
+### 问题3：数据库事务回滚循环错误
+
+**时间**：2025-08-18 12:02
+
+**错误信息**：
+```
+This Session's transaction has been rolled back due to a previous exception during flush. To begin a new transaction with this Session, first issue Session.rollback().
+```
+
+**原因分析**：
+- 一旦数据库操作失败，事务被标记为回滚状态
+- 后续操作继续使用相同session会失败
+- 导致相同错误在不同书籍记录中重复出现
+
+**解决方法**：
+- 在异常处理中显式调用 `db.rollback()`
+- 确保每次错误后重新开始新事务
+- 在 `save_ranking_parsers` 和 `save_novel_parsers` 中都添加回滚处理
+
+**修复代码**：
+```python
+except Exception as e:
+    # 回滚当前事务，重新开始
+    try:
+        db.rollback()
+    except Exception:
+        pass  # 忽略回滚失败
+    logger.error(f"书籍保存异常，跳过该记录: {book.get('novel_id', 'unknown')}, 错误: {e}")
+    continue
+```
+
+**影响范围**：
+- 消除了httpx日志干扰，提高日志可读性
+- 解决了author_id约束问题，提高数据保存成功率
+- 修复了事务回滚循环，确保单个失败不影响后续操作
+- 提高了爬取系统的整体稳定性和容错性

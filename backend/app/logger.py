@@ -41,6 +41,9 @@ class LoggerSetup:
         # 清除已有的处理器
         root_logger.handlers.clear()
         
+        # 禁用httpx的INFO级别日志，只保留WARNING及以上
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        
         # 创建格式化器
         formatter = logging.Formatter(
             fmt=log_config.log_format,

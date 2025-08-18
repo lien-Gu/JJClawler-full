@@ -2,7 +2,7 @@
 name = "jjcrawler"
 version = "0.1.0"
 description = "晋江文学城爬虫后端项目"
-requires-python = "==3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.116.1",
     "uvicorn[standard]>=0.35.0",

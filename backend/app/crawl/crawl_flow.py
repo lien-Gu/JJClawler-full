@@ -380,6 +380,8 @@ class CrawlFlow:
                     }
                     ranking_snapshots.append(snapshot_data)
                 except Exception as e:
+                    # 回滚当前事务，重新开始
+                    db.rollback()
                     logger.error(f"书籍保存异常，跳过该记录: {book.get('novel_id', 'unknown')}, 错误: {e}")
                     continue
 
@@ -417,6 +419,11 @@ class CrawlFlow:
                 }
                 book_snapshots.append(snapshot_data)
             except Exception as e:
+                # 回滚当前事务，重新开始
+                try:
+                    db.rollback()
+                except Exception:
+                    pass  # 忽略回滚失败
                 logger.error(f"书籍保存异常，跳过该记录: {book_info.get('novel_id', 'unknown')}, 错误: {e}")
                 continue
         # 批量保存书籍快照
