@@ -468,7 +468,7 @@
       "type": "page",
       "template": "page_ranking",
       "params": {
-        "channel": "=nocp_plus.yw"
+        "channel": "ysnocp"
       },
       "schedule": {
         "frequency": "hourly",
@@ -486,7 +486,7 @@
       "type": "page",
       "template": "page_ranking",
       "params": {
-        "channel": "=ca.ysca"
+        "channel": "trdm"
       },
       "schedule": {
         "frequency": "hourly",
@@ -504,7 +504,7 @@
       "type": "page",
       "template": "page_ranking",
       "params": {
-        "channel": "=yq.ysyq"
+        "channel": "trys"
       },
       "schedule": {
         "frequency": "hourly",
@@ -522,7 +522,7 @@
       "type": "page",
       "template": "page_ranking",
       "params": {
-        "channel": "=yq.ecy"
+        "channel": "trmd"
       },
       "schedule": {
         "frequency": "hourly",

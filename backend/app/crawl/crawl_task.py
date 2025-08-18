@@ -20,6 +20,9 @@ class PageTask:
             return NotImplemented
         return self.url == other.url
 
+    def __hash__(self):
+        return hash(self.url)
+
 
 class CrawlTask:
     """爬取配置类"""
@@ -109,12 +112,6 @@ class CrawlTask:
         template = self.templates.get(template_name)
         if not template:
             raise ValueError(f"模板不存在: {template_name}")
-
-        # 相同的任务url
-        channel_name = task_config.get("params", {}).get("channel_name")
-        if channel_name and channel_name.startswith("="):
-            eq_task_id = channel_name.replace("=", "")
-            return self.tasks.get(eq_task_id).url
         # 合并参数
         params = {**self.params, **task_config.get("params", {})}
 
@@ -128,7 +125,7 @@ class CrawlTask:
         :param novel_id:
         :return:
         """
-        if isinstance(novel_id,int):
+        if isinstance(novel_id, int):
             novel_id = str(novel_id)
         template = self.templates.get("novel_detail")
         return template.format(novel_id=novel_id)
@@ -150,5 +147,5 @@ def get_crawl_task() -> CrawlTask:
 
 if __name__ == '__main__':
     crawl_task = get_crawl_task()
-    a = crawl_task.get_tasks_by_words(["yq.ysyq", "page"])
+    a = crawl_task.get_tasks_by_words(["all"])
     print(a)

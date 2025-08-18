@@ -199,3 +199,77 @@ db = SessionLocal()
 - 修复了数据库事务操作的根本问题
 - 确保 `commit()` 和 `rollback()` 调用正常工作
 - 提高了数据库操作的可靠性
+
+## 2025-08-18 重试机制失效问题修复
+
+### 问题：503错误和其他异常不触发重试机制
+
+**时间**：2025-08-18 16:32
+
+**现象**：
+```
+2025-08-18 16:32:22-app.crawl.http_client-ERROR-HTTP请求失败: Server error '503 Service Temporarily Unavailable'
+2025-08-18 16:32:22-app.crawl.crawl_flow-ERROR-书籍页面 8748356 内容获取异常: Server error '503 Service Temporarily Unavailable'
+```
+- HTTP 503错误没有触发重试机制
+- 页面解析错误"该榜单中内容为空"也没有重试
+- 没有看到重试装饰器的重试日志
+
+**原因分析**：
+- 位置：`app/crawl/crawl_flow.py:220-222` 和 `app/crawl/crawl_flow.py:281-283`
+- 根本问题：**异常处理阻止了异常传播到重试装饰器**
+- 具体机制：
+  1. 函数内部捕获所有异常：`except Exception as e:`
+  2. 记录错误日志后**返回异常对象**：`return e`
+  3. 重试装饰器看到"成功返回"，不会触发重试
+  4. `asyncio.gather(*tasks, return_exceptions=True)` 接收到异常对象，认为是正常结果
+
+**错误的异常处理模式**：
+```python
+@create_retry_decorator()
+async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser | Exception:
+    try:
+        # HTTP请求和数据处理
+        result = await self.client.run(book_url)
+        return novel_parser
+    except Exception as e:
+        logger.error(f"书籍页面 {novel_id} 内容获取异常: {e}")
+        return e  # ❌ 返回异常对象，装饰器看不到异常
+```
+
+**解决方法**：
+- 移除函数内部的 `try-except` 块
+- 让异常直接传播给重试装饰器
+- 保持 `asyncio.gather(..., return_exceptions=True)` 处理最终失败的异常
+
+**修复后代码**：
+```python
+@create_retry_decorator()
+async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser:
+    async with self.request_semaphore:
+        # 移除try-except，让异常直接传播给重试装饰器
+        if not novel_id:
+            raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
+        
+        book_url = crawl_task.build_novel_url(str(novel_id))
+        result = await self.client.run(book_url)  # 503错误会直接抛出
+        
+        if not result.get("novelId"):
+            raise KeyError(f"Invalid book data: missing novelId in response")
+        
+        novel_parser = NovelPageParser(result)
+        return novel_parser
+```
+
+**修复效果**：
+- ✅ HTTP 503错误会触发重试机制（配置了 `httpx.HTTPStatusError`）
+- ✅ 页面解析错误会触发重试机制（配置了 `ValueError`）  
+- ✅ 会看到重试装饰器的 `before_sleep_log` 日志
+- ✅ 批量处理的容错性保持不变（`asyncio.gather` 处理最终异常）
+- ✅ 临时性网络问题能够自动恢复
+
+**影响范围**：
+- 大幅提高了对临时性网络错误的容错能力
+- 503服务不可用、网络超时等问题能够自动重试恢复
+- 提高了整个爬取系统的稳定性和成功率
+- 重试日志能够帮助监控网络状况

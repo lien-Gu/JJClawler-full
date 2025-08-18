@@ -205,21 +205,16 @@ class CrawlFlow:
         return pages_result
 
     @create_retry_decorator()
-    async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser | Exception:
+    async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser:
         async with self.request_semaphore:
-            try:
-                # 获取页面内容
-                page_content = await self.client.run(page_task.url)
-                if not page_content or page_content.get("status") == "error":
-                    raise ValueError(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
-                # 解析榜单信息
-                page_parser = PageParser(page_content, page_id=page_task.id)
-                logger.info(
-                    f"页面{page_task}获取完成: 解析榜单 {len(page_parser.rankings)}个")
-                return page_parser
-            except Exception as e:
-                logger.error(f"页面{page_task}获取异常: {e}")
-                return e
+            page_content = await self.client.run(page_task.url)
+            if not page_content or page_content.get("status") == "error":
+                raise ValueError(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
+            
+            # 解析榜单信息
+            page_parser = PageParser(page_content, page_id=page_task.id)
+            logger.info(f"页面{page_task}获取完成: 解析榜单 {len(page_parser.rankings)}个")
+            return page_parser
 
     async def _fetch_books(self, pages_result: PagesResult) -> NovelsResult:
         """
@@ -257,7 +252,7 @@ class CrawlFlow:
         return books_result
 
     @create_retry_decorator()
-    async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser | Exception:
+    async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser:
         """
         书籍获取
 
@@ -265,22 +260,18 @@ class CrawlFlow:
         :return: 书籍响应数据
         """
         async with self.request_semaphore:
-            try:
-                # 参数验证
-                if not novel_id:
-                    raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
+            # 参数验证
+            if not novel_id:
+                raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
 
-                book_url = crawl_task.build_novel_url(str(novel_id))
-                result = await self.client.run(book_url)
-                # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
-                if not result.get("novelId"):
-                    raise KeyError(f"Invalid book data: missing novelId in response")
+            book_url = crawl_task.build_novel_url(str(novel_id))
+            result = await self.client.run(book_url)
+            # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
+            if not result.get("novelId"):
+                raise KeyError(f"Invalid book data: missing novelId in response")
 
-                novel_parser = NovelPageParser(result)
-                return novel_parser
-            except Exception as e:
-                logger.error(f"书籍页面 {novel_id} 内容获取异常: {e}")
-                return e
+            novel_parser = NovelPageParser(result)
+            return novel_parser
 
     async def _save_data(self, pages_result: PagesResult, novels_result: NovelsResult) -> Dict[str, int] | Exception:
         """
