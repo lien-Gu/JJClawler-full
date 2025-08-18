@@ -33,7 +33,7 @@ class Book(Base):
         String(200), index=True, comment="书籍标题，中文名称"
     )
     author_id: Mapped[int] = mapped_column(
-        Integer, index=True, comment="作者唯一标识ID，来源于晋江文学城的作者ID"
+        Integer, nullable=True, comment="作者唯一标识ID，来源于晋江文学城的作者ID"
     )
 
     # 索引优化

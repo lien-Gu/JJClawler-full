@@ -195,7 +195,7 @@ class NovelPageParser:
         self.book_detail = {
             "novel_id": raw_detail_data.get("novelId", None),
             "title": raw_detail_data.get("novelName", None),
-            "author_id": raw_detail_data.get("authorId", None),
+            "author_id": raw_detail_data.get("authorId") or 0,  # 修复：None值设为0
             "status": raw_detail_data.get("series", None),
             "word_counts": raw_detail_data.get("novelSize", None),
             "chapter_counts": raw_detail_data.get("novelChapterCount", None),

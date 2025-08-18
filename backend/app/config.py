@@ -68,13 +68,19 @@ class CrawlerSettings(BaseSettings):
     )
     timeout: int = Field(default=30, ge=5, le=300, description="请求超时时间（秒）")
 
-    # 统一并发控制配置
-    request_delay: float = Field(default=1.0, ge=0.1, le=60.0, description="请求间隔延迟（秒）")
-    max_concurrent_requests: int = Field(default=8, ge=1, le=20, description="全局最大并发请求数")
+    # 统一并发控制配置 - 针对503错误优化
+    request_delay: float = Field(default=2.0, ge=0.1, le=60.0, description="请求间隔延迟（秒）")
+    max_concurrent_requests: int = Field(default=5, ge=1, le=20, description="全局最大并发请求数")
     
     # 重试配置
     retry_times: int = Field(default=2, ge=0, le=5, description="页面级重试次数")
     retry_delay: float = Field(default=2.0, ge=0.5, le=10.0, description="页面重试延迟（秒）")
+    
+    # 指数退避重试配置
+    max_retry_time: float = Field(default=60.0, ge=10.0, le=300.0, description="最大重试时间（秒）")
+    retry_multiplier: float = Field(default=2.0, ge=1.0, le=5.0, description="指数退避倍数")
+    retry_min_wait: float = Field(default=1.0, ge=0.1, le=5.0, description="最小等待时间（秒）")
+    retry_max_wait: float = Field(default=30.0, ge=5.0, le=120.0, description="最大等待时间（秒）")
 
     class Config:
         env_prefix = "CRAWLER_"

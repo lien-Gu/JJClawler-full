@@ -61,14 +61,14 @@ def get_predefined_jobs() -> List[Job]:
         Job(
             job_id="jiazi_crawl",
             job_type=JobType.CRAWL,
-            trigger=CronTrigger(hour=1),  # 每小时执行一次
+            trigger=CronTrigger(minute=30),  # 修复：每小时30分执行
             desc="夹子榜单定时爬取任务",
             page_ids=["jiazi"]
         ),
         Job(
             job_id="page_crawl",
             job_type=JobType.CRAWL,
-            trigger=CronTrigger(hour=1),  # 每天执行一次
+            trigger=CronTrigger(hour="*/4", minute=0),  # 修复：每4小时执行，从0点开始
             desc="分类页面定时爬取任务",
             page_ids=["page"]
         )

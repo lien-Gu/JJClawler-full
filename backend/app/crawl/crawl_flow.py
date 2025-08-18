@@ -12,7 +12,7 @@ from typing import Tuple
 
 import httpx
 from sqlalchemy.orm import Session
-from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import before_sleep_log, retry, retry_if_exception_type, retry_if_exception, stop_after_attempt, stop_after_delay, wait_exponential
 
 from app.config import get_settings
 from app.crawl.crawl_task import get_crawl_task, PageTask
@@ -63,6 +63,58 @@ crawler_config = get_settings().crawler
 book_service = BookService()
 ranking_service = RankingService()
 crawl_task = get_crawl_task()
+
+
+def create_smart_retry_decorator():
+    """
+    创建基于配置的智能重试装饰器
+    
+    特性：
+    - 使用配置文件参数
+    - 最大重试时间限制  
+    - 特殊处理503错误
+    - 指数退避策略
+    """
+    def is_503_error(exception):
+        """检查是否为503错误 - 增强版本"""
+        error_str = str(exception).lower()
+        is_503 = ("503" in error_str or 
+                  "service temporarily unavailable" in error_str or
+                  "service unavailable" in error_str)
+        
+        # 添加调试日志来确认检测是否生效
+        if is_503:
+            logger.warning(f"检测到503错误，将进行重试: {str(exception)[:100]}...")
+        
+        return is_503
+    
+    # 针对503错误使用更宽松的重试策略
+    retry_attempts = max(5, crawler_config.retry_times)  # 至少5次重试
+    max_time = max(60.0, crawler_config.max_retry_time)  # 调整为60秒，更合理
+    
+    return retry(
+        # 停止条件：达到最大重试次数 OR 超过最大重试时间
+        stop=stop_after_attempt(retry_attempts) | stop_after_delay(max_time),
+        
+        # 等待策略：指数退避，针对503错误优化
+        wait=wait_exponential(
+            multiplier=1.5,  # 更温和的倍数，避免等待时间过长
+            min=2.0,         # 503错误需要更长的基础等待时间
+            max=15.0         # 降低单次等待上限，平衡总时间
+        ),
+        
+        # 重试条件：HTTP异常 OR 503错误
+        retry=(
+            retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)) |
+            retry_if_exception(is_503_error)
+        ),
+        
+        # 日志记录 - 使用INFO级别确保能看到重试日志
+        before_sleep=before_sleep_log(logger, logging.INFO),
+        reraise=True
+    )
+
+
 
 class CrawlFlow:
     """
@@ -152,11 +204,7 @@ class CrawlFlow:
         logger.info(f"阶段 1 完成: 成功 {len(pages_result.success_items)}/{pages_result.total_num} 个页面")
         return pages_result
 
-    @retry(stop=stop_after_attempt(5),
-           wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception_type(
-               (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
-           before_sleep=before_sleep_log(logger, logging.WARN), )
+    @create_smart_retry_decorator()
     async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser | Exception:
         async with self.request_semaphore:
             try:
@@ -217,11 +265,7 @@ class CrawlFlow:
 
         return books_result
 
-    @retry(stop=stop_after_attempt(5),
-           wait=wait_exponential(multiplier=5, min=1, max=10),
-           retry=retry_if_exception_type(
-               (httpx.RequestError, httpx.HTTPStatusError, httpx.TimeoutException, json.JSONDecodeError)),
-           before_sleep=before_sleep_log(logger, logging.WARN), )
+    @create_smart_retry_decorator()
     async def _fetch_and_parse_book(self, novel_id: str) -> NovelPageParser | Exception:
         """
         书籍获取
@@ -231,7 +275,7 @@ class CrawlFlow:
         """
         async with self.request_semaphore:
             try:
-                book_url = self.config.build_novel_url(novel_id)
+                book_url = crawl_task.build_novel_url(novel_id)
                 result = await self.client.run(book_url)
                 # 检查HTTP请求是否有错误
                 if result.get("status") == "error":
