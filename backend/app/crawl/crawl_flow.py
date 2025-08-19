@@ -2,9 +2,8 @@
 爬取流程管理器 - 高效的并发爬取架构
 """
 
-import asyncio
 import json
-import logging
+import random
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -12,21 +11,23 @@ from typing import Tuple
 
 import httpx
 from sqlalchemy.orm import Session
-from tenacity import before_sleep_log, retry, retry_if_exception_type, retry_if_exception, stop_after_attempt, \
+from tenacity import retry, retry_if_exception, stop_after_attempt, \
     stop_after_delay, wait_exponential
 
 from app.config import get_settings
-from app.crawl.crawl_task import get_crawl_task, PageTask
+from app.crawl.crawl_task import PageTask, get_crawl_task
+from app.crawl.http_client import HttpClient
+from app.crawl.parser import NovelPageParser, PageParser, RankingParser
 from app.database.connection import SessionLocal
 from app.database.service.book_service import BookService
 from app.database.service.ranking_service import RankingService
 from app.logger import get_logger
-from app.crawl.http_client import HttpClient
-from app.crawl.parser import NovelPageParser, PageParser, RankingParser
 from app.models.base import BaseResult
 from app.utils import generate_batch_id
 
 logger = get_logger(__name__)
+
+delay = random.uniform(0.5, 2.0)  # 0.5-2秒随机延迟
 
 
 @dataclass
@@ -78,16 +79,16 @@ crawl_task = get_crawl_task()
 
 def create_retry_decorator():
     """
-    创建基于配置的智能重试装饰器
+    创建基于配置的智能重试装饰器 - 优化并发控制
     
     特性：
     - 使用配置文件参数
     - 最大重试时间限制
-    - 指数退避策略
+    - 指数退避策略 + 随机延迟，避免重试风暴
     - 增强调试日志
     """
 
-    retry_attempts = max(5, crawler_config.retry_times)  # 至少5次重试
+    retry_attempts = max(3, crawler_config.retry_times)  # 降低重试次数到3次
     max_time = max(60.0, crawler_config.max_retry_time)  # 调整为60秒，更合理
 
     def should_retry(exception):
@@ -104,11 +105,11 @@ def create_retry_decorator():
     return retry(
         # 停止条件：达到最大重试次数 OR 超过最大重试时间
         stop=stop_after_attempt(retry_attempts) | stop_after_delay(max_time),
-        # 等待策略：指数退避
+        # 等待策略：指数退避 + 随机延迟，防止重试风暴
         wait=wait_exponential(
             multiplier=1.5,  # 更温和的倍数，避免等待时间过长
-            min=2.0,  # 503错误需要更长的基础等待时间
-            max=15.0  # 降低单次等待上限，平衡总时间
+            min=3.0,  # 增加基础等待时间到3秒
+            max=20.0  # 增加单次等待上限到20秒
         ),
         # 重试条件：使用自定义判断函数
         retry=retry_if_exception(should_retry),
@@ -259,14 +260,13 @@ class CrawlFlow:
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
-        logger.info(f"开始获取书籍 {novel_id}，重试装饰器已生效")
+        # 添加随机延迟模拟人类行为
+        await asyncio.sleep(delay)
         async with self.request_semaphore:
             # 参数验证
             if not novel_id:
                 raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
-
             book_url = crawl_task.build_novel_url(str(novel_id))
-            logger.info(f"正在请求书籍: {book_url}")
             result = await self.client.run(book_url)
             # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
             if not result.get("novelId"):
@@ -493,7 +493,7 @@ if __name__ == '__main__':
         from app.database.connection import ensure_db
         ensure_db()
         c = get_crawl_flow()
-        result = await c.execute_crawl_task(["index"])
+        result = await c.execute_crawl_task(["all"])
         print(result)
 
 

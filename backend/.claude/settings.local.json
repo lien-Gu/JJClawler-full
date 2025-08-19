@@ -27,6 +27,9 @@
       "Bash(set HTTPS_PROXY=)",
       "Bash(set ALL_PROXY=)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "D:\\d D:\\code\\Python\\JJClawler-full"
+    ]
   }
 }
