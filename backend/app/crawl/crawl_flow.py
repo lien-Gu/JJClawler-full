@@ -84,33 +84,34 @@ def create_retry_decorator():
     - 使用配置文件参数
     - 最大重试时间限制
     - 指数退避策略
+    - 增强调试日志
     """
 
     retry_attempts = max(5, crawler_config.retry_times)  # 至少5次重试
     max_time = max(60.0, crawler_config.max_retry_time)  # 调整为60秒，更合理
 
+    def should_retry(exception):
+        """增强的重试条件判断"""
+        retry_types = (ValueError, KeyError,
+                       httpx.RequestError, httpx.HTTPStatusError,
+                       httpx.TimeoutException, json.JSONDecodeError)
+
+        should_retry_result = isinstance(exception, retry_types)
+        logger.info(
+            f"重试判断 - 异常类型: {type(exception).__name__}, 异常消息: {str(exception)}, 是否重试: {should_retry_result}")
+        return should_retry_result
+
     return retry(
         # 停止条件：达到最大重试次数 OR 超过最大重试时间
         stop=stop_after_attempt(retry_attempts) | stop_after_delay(max_time),
-
         # 等待策略：指数退避
         wait=wait_exponential(
             multiplier=1.5,  # 更温和的倍数，避免等待时间过长
             min=2.0,  # 503错误需要更长的基础等待时间
             max=15.0  # 降低单次等待上限，平衡总时间
         ),
-
-        # 重试条件：HTTP异常
-        retry=(
-            retry_if_exception_type((ValueError, KeyError,
-                                     httpx.RequestError,
-                                     httpx.HTTPStatusError,
-                                     httpx.TimeoutException,
-                                     json.JSONDecodeError))
-        ),
-
-        # 日志记录 - 使用INFO级别确保能看到重试日志
-        before_sleep=before_sleep_log(logger, logging.INFO),
+        # 重试条件：使用自定义判断函数
+        retry=retry_if_exception(should_retry),
         reraise=True
     )
 
@@ -209,7 +210,7 @@ class CrawlFlow:
             page_content = await self.client.run(page_task.url)
             if not page_content or page_content.get("status") == "error":
                 raise ValueError(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
-            
+
             # 解析榜单信息
             page_parser = PageParser(page_content, page_id=page_task.id)
             logger.info(f"页面{page_task.id}获取完成: 解析榜单 {len(page_parser.rankings)}个")
@@ -258,12 +259,14 @@ class CrawlFlow:
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
+        logger.info(f"开始获取书籍 {novel_id}，重试装饰器已生效")
         async with self.request_semaphore:
             # 参数验证
             if not novel_id:
                 raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
 
             book_url = crawl_task.build_novel_url(str(novel_id))
+            logger.info(f"正在请求书籍: {book_url}")
             result = await self.client.run(book_url)
             # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
             if not result.get("novelId"):
@@ -484,6 +487,7 @@ if __name__ == '__main__':
             print(f"书籍详情: {result.book_detail}")
 
         await c.close()
+
 
     async def debug_task():
         from app.database.connection import ensure_db
