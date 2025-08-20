@@ -2,18 +2,12 @@
 爬取流程管理器 - 高效的并发爬取架构
 """
 
-import asyncio
-import json
-import random
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
 from typing import Tuple
 
-import httpx
 from sqlalchemy.orm import Session
-from tenacity import retry, retry_if_exception, stop_after_attempt, \
-    stop_after_delay, wait_exponential, wait_random
 
 from app.config import get_settings
 from app.crawl.crawl_task import PageTask, get_crawl_task
@@ -28,49 +22,8 @@ from app.utils import generate_batch_id
 
 logger = get_logger(__name__)
 
-# 全局503错误暂停控制机制
-_pause_duration = 10  # 暂停时间10秒
-_pause_end_time = None  # 暂停结束时间
-_pause_lock = None  # 全局暂停锁
 
-
-def get_pause_lock():
-    """获取全局暂停锁"""
-    global _pause_lock
-    if _pause_lock is None:
-        _pause_lock = asyncio.Lock()
-    return _pause_lock
-
-
-async def check_and_pause_if_needed():
-    """检查全局暂停状态，如果需要则暂停"""
-    global _pause_end_time
-    
-    # 检查是否在暂停期间
-    current_time = time.time()
-    if _pause_end_time and current_time < _pause_end_time:
-        remaining_time = _pause_end_time - current_time
-        logger.warning(f"⏸️ 全局暂停中，等待 {remaining_time:.1f} 秒后继续")
-        await asyncio.sleep(remaining_time)
-        logger.info("✅ 暂停结束，继续爬取")
-
-
-async def mark_server_need_pause():
-    """标记服务器需要暂停 - 503错误触发"""
-    global _pause_end_time
-    
-    # 使用锁确保暂停状态的原子性设置
-    async with get_pause_lock():
-        current_time = time.time()
-        # 如果已经在暂停期间，不重复设置
-        if _pause_end_time and current_time < _pause_end_time:
-            return
-            
-        # 设置暂停结束时间
-        _pause_end_time = current_time + _pause_duration
-        logger.error(f"🚨 [503 ERROR] 检测到503错误，设置全局暂停 {_pause_duration} 秒，"f"所有后续请求将等待到 {time.strftime('%H:%M:%S', time.localtime(_pause_end_time))}")
-
-
+# 重试和熔断机制已移动到HTTP客户端层，业务层专注于业务逻辑
 
 
 @dataclass
@@ -120,63 +73,6 @@ ranking_service = RankingService()
 crawl_task = get_crawl_task()
 
 
-def create_retry_decorator():
-    """
-    创建基于配置的智能重试装饰器 - 优化并发控制 + 503暂停机制
-    
-    特性：
-    - 使用配置文件参数
-    - 最大重试时间限制
-    - 指数退避策略 + 随机延迟，避免重试风暴
-    - 503错误自动触发全局暂停机制
-    - 增强调试日志
-    """
-
-    retry_attempts = max(3, crawler_config.retry_times)  # 降低重试次数到3次
-    max_time = max(60.0, crawler_config.max_retry_time)  # 调整为60秒，更合理
-
-    def should_retry(exception):
-        """增强的重试条件判断 - 包含503错误处理"""
-        retry_types = (ValueError, KeyError,
-                       httpx.RequestError, httpx.HTTPStatusError,
-                       httpx.TimeoutException, json.JSONDecodeError)
-
-        should_retry_result = isinstance(exception, retry_types)
-
-        # 特殊处理503错误：触发全局暂停
-        if isinstance(exception, httpx.HTTPStatusError) and exception.response.status_code == 503:
-            logger.warning(f"🚨 重试装饰器检测到503错误，即将触发全局暂停: {str(exception)}")
-            # 创建异步任务来设置暂停状态（在同步上下文中）
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 如果事件循环正在运行，创建任务
-                    loop.create_task(mark_server_need_pause())
-                else:
-                    # 如果没有运行的事件循环，直接运行
-                    asyncio.run(mark_server_need_pause())
-            except Exception as e:
-                logger.error(f"设置503暂停状态失败: {e}")
-
-        logger.info(
-            f"重试判断 - 异常类型: {type(exception).__name__}, 异常消息: {str(exception)}, 是否重试: {should_retry_result}")
-        return should_retry_result
-
-    return retry(
-        # 停止条件：达到最大重试次数 OR 超过最大重试时间
-        stop=stop_after_attempt(retry_attempts) | stop_after_delay(max_time),
-        # 等待策略：指数退避 + 随机延迟，防止重试风暴
-        wait=wait_exponential(
-            multiplier=1.5,  # 更温和的倍数，避免等待时间过长
-            min=3.0,  # 增加基础等待时间到3秒
-            max=20.0  # 增加单次等待上限到20秒
-        ),
-        # 重试条件：使用自定义判断函数
-        retry=retry_if_exception(should_retry),
-        reraise=True
-    )
-
-
 class CrawlFlow:
     """
     统一并发爬取流程管理器 - 两阶段处理架构
@@ -190,12 +86,8 @@ class CrawlFlow:
         """
         初始化爬取流程管理器 - 包含503暂停机制
         """
-        # 每个实例创建独立的HTTP客户端和并发控制
         self.client = HttpClient()
-        # 进一步降低并发数，避免503错误
-        actual_concurrent = min(3, crawler_config.max_concurrent_requests)
-        self.request_semaphore = asyncio.Semaphore(actual_concurrent)
-        logger.info(f"初始化爬虫实例，实际并发数: {actual_concurrent}，包含503暂停机制")
+        self.request_semaphore = asyncio.Semaphore(crawler_config.max_concurrent_requests)
 
     async def execute_crawl_task(self, page_ids: List[str]) -> Dict[str, Any]:
         """
@@ -208,7 +100,6 @@ class CrawlFlow:
             爬取结果
         """
         page_tasks = crawl_task.get_tasks_by_words(page_ids)
-
         start_time = time.time()
         logger.info(f"开始统一并发爬取 {len(page_ids)} 个页面: {page_ids}")
         try:
@@ -251,14 +142,11 @@ class CrawlFlow:
             类型安全的页面结果
         """
         logger.info(f"阶段 1: 开始获取 {len(page_tasks)} 个页面内容")
-
         # 创建所有页面的获取任务
         tasks = [self._fetch_and_parse_page(t) for t in page_tasks]
         pages = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 使用类型安全的结果类
         pages_result = PagesResult()
-
         for t, result in zip(page_tasks, pages):
             if isinstance(result, Exception):
                 pages_result.failed_items[t.id] = result
@@ -268,13 +156,11 @@ class CrawlFlow:
         logger.info(f"阶段 1 完成: 成功 {len(pages_result.success_items)}/{pages_result.total_num} 个页面")
         return pages_result
 
-    @create_retry_decorator()
     async def _fetch_and_parse_page(self, page_task: PageTask) -> PageParser:
         async with self.request_semaphore:
             page_content = await self.client.run(page_task.url)
             if not page_content or page_content.get("status") == "error":
                 raise ValueError(f"页面内容获取失败: {page_content.get('error', '未知错误')}")
-
             # 解析榜单信息
             page_parser = PageParser(page_content, page_id=page_task.id)
             logger.info(f"页面{page_task.id}获取完成: 解析榜单 {len(page_parser.rankings)}个")
@@ -295,9 +181,7 @@ class CrawlFlow:
         if not all_novel_ids:
             logger.info("阶段 2: 无有效书籍ID需要获取")
             return NovelsResult()
-
         logger.info(f"阶段 2: 开始获取 {len(all_novel_ids)} 个书籍内容")
-
         # 并发获取所有书籍内容
         book_tasks = [self._fetch_and_parse_book(novel_id) for novel_id in all_novel_ids]
         book_results = await asyncio.gather(*book_tasks, return_exceptions=True)
@@ -315,38 +199,23 @@ class CrawlFlow:
 
         return books_result
 
-    @create_retry_decorator()
     async def _fetch_and_parse_book(self, novel_id: int) -> NovelPageParser:
         """
-        书籍获取 - 包含503暂停检查机制
+        书籍获取 - 集成熔断器机制
 
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
-        # 在开始前检查暂停状态（第一层保护）
-        await check_and_pause_if_needed()
-        
-        # # 添加随机延迟模拟人类行为
-        # delay = random.uniform(0.5, 2.0)  # 0.5-2秒随机延迟
-        # await asyncio.sleep(delay)
-        
-        logger.info(f"开始获取书籍 {novel_id}，重试装饰器已生效")
+        # logger.info(f"开始获取书籍 {novel_id}")
         async with self.request_semaphore:
-            # 在获取信号量后，再次检查暂停状态（双重保护）
-            await check_and_pause_if_needed()
-            
             # 参数验证
             if not novel_id:
                 raise ValueError(f"Invalid novel_id parameter: '{novel_id}'")
-            
             book_url = crawl_task.build_novel_url(str(novel_id))
-            logger.info(f"正在请求书籍: {book_url}")
             result = await self.client.run(book_url)
-            
-            # 检查是否是有效的书籍数据（晋江API返回包含novelId的JSON数据）
+            # 检查是否是有效的书籍数据
             if not result.get("novelId"):
                 raise KeyError(f"Invalid book data: missing novelId in response")
-
             novel_parser = NovelPageParser(result)
             return novel_parser
 

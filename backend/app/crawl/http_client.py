@@ -1,36 +1,69 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-HTTP客户端模块 - 优化的异步HTTP请求客户端
+HTTP客户端模块 - 集成熔断器和重试机制的HTTP客户端
 
-提供高性能的HTTP请求功能，支持并发和顺序两种模式。
-重试逻辑由上层CrawlFlow处理，本模块专注于基础HTTP请求。
+提供高性能的HTTP请求功能，内置熔断器保护和网络错误重试机制。
+所有网络请求都会经过熔断器判断和重试保护。
 
 Author: Leeby Gu
 Date: 2025/7/23 23:46
+Updated: 2025/8/20 - 集成熔断器和重试机制
 """
 
 import asyncio
 import json
 from typing import Any, Dict, List, Union
 
-from httpx import AsyncClient, RequestError, Limits, Timeout, HTTPStatusError
+from httpx import AsyncClient, HTTPError, HTTPStatusError, Limits, Timeout
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.crawl.circuit_breaker import CircuitBreakerOpenException, get_global_circuit_breaker, record_error
 from app.logger import get_logger
 
 logger = get_logger(__name__)
 
 
+def should_retry_network_error(exception):
+    """重试条件：只有网络错误才重试"""
+    # 然后判断是否为网络错误
+    if isinstance(exception, (HTTPError, TimeoutError, json.JSONDecodeError)):
+        # 如果是503错误需要触发熔断器
+        if isinstance(exception, HTTPStatusError) and exception.response.status_code == 503:
+            logger.error("HTTP客户端检测到503错误，触发熔断器")
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(record_error())
+            else:
+                asyncio.run(record_error())
+        logger.info(f"网络错误，将进行重试: {type(exception).__name__}: {str(exception)}")
+        return True
+
+    # 其他错误不重试
+    logger.warning(f"非网络错误，不进行重试: {type(exception).__name__}: {str(exception)}")
+    return False
+
+
+# 创建网络层重试装饰器
+network_retry = retry(
+    retry=retry_if_exception(should_retry_network_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    reraise=True
+)
+
+
 class HttpClient:
     """
-    统一HTTP客户端 - 专注基础HTTP请求功能
+    统一HTTP客户端 - 集成熔断器和重试机制
     
     特性:
     - 连接池优化，支持keep-alive
+    - 内置熔断器保护，自动处理503错误
+    - 网络错误自动重试机制
     - 统一的错误处理和结果格式
     - 自动JSON解析
-    - 并发控制由上层CrawlFlow统一管理
     """
 
     def __init__(self):
@@ -116,25 +149,34 @@ class HttpClient:
             self._client = self._create_http_client()
             logger.debug("创建新的AsyncClient实例")
 
+    @network_retry
     async def _request_single(self, url: str) -> Dict[str, Any]:
         """
-        执行单个HTTP请求
+        执行单个HTTP请求 - 集成熔断器和重试机制
         :param url: 目标URL
         :return: 响应数据字典或错误信息
         """
-        try:
-            # 延迟创建客户端，确保在正确的事件循环上下文中
-            await self._ensure_client()
-            response = await self._client.get(url)
-            response.raise_for_status()
-            return json.loads(response.content)
-        except (RequestError, json.JSONDecodeError, HTTPStatusError) as e:
-            logger.error(f"HTTP请求失败 {url}: {e}")
-            raise e
+        # 首先检查熔断器状态
+        circuit_breaker = await get_global_circuit_breaker()
+        if circuit_breaker.is_open:
+            stats = circuit_breaker.get_stats()
+            remaining_time = stats.get('remaining_recovery_time', 0)
+            logger.warning(f"熔断器开启中，跳过HTTP请求，剩余恢复时间: {remaining_time:.1f}秒")
+            raise CircuitBreakerOpenException(f"熔断器开启中，剩余恢复时间: {remaining_time:.1f}秒")
+
+        # 延迟创建客户端，确保在正确的事件循环上下文中
+        await self._ensure_client()
+
+        # 执行HTTP请求
+        response = await self._client.get(url)
+        response.raise_for_status()
+
+        # 解析JSON响应
+        return json.loads(response.content)
 
     async def _request_sequential(self, urls: List[str]) -> List[Dict[str, Any]]:
         """
-        顺序执行多个HTTP请求
+        顺序执行多个HTTP请求 - 每个请求都经过熔断器和重试机制
         :param urls: URL列表
         :return: 响应数据列表
         """
@@ -142,6 +184,8 @@ class HttpClient:
         for i, url in enumerate(urls):
             if i > 0:  # 第一个请求不需要延迟
                 await asyncio.sleep(self._config.request_delay)
+
+            # 每个请求都会经过_request_single的熔断器和重试保护
             result = await self._request_single(url)
             results.append(result)
         return results
