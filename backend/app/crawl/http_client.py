@@ -60,15 +60,6 @@ def should_retry_request(exception) -> bool:
     return False
 
 
-# HTTP请求重试装饰器
-request_retry = retry(
-    retry=retry_if_exception(should_retry_request),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=5),
-    reraise=True
-)
-
-
 class HttpClient:
     """
     统一HTTP客户端 - 集成熔断器和重试机制
@@ -130,32 +121,17 @@ class HttpClient:
             pool=5.0
         )
 
-        # 模拟Chrome浏览器的完整HTTP头部
-        browser_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "Sec-Ch-Ua": '"Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site",
-            "Connection": "keep-alive"
-        }
-
         client = AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            headers=browser_headers,
+            headers=self._config.user_agent,
             trust_env=False,
         )
 
         return client
 
+    @staticmethod
     def _parse_json_response(self, response) -> Dict[str, Any]:
         """解析JSON响应内容"""
         return json.loads(response.content)
@@ -164,9 +140,13 @@ class HttpClient:
         """确保 HTTP 客户端已初始化并准备就绪"""
         if self._client is None:
             self._client = self._create_http_client()
-            logger.debug("创建新的AsyncClient实例")
 
-    @request_retry
+    @retry(
+        retry=retry_if_exception(should_retry_request),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        reraise=True
+    )
     async def _execute_single_request(self, url: str) -> Dict[str, Any]:
         """
         执行单个HTTP请求
