@@ -2,6 +2,7 @@
 爬取流程管理器 - 高效的并发爬取架构
 """
 
+import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -206,7 +207,7 @@ class CrawlFlow:
         :param novel_id: 书籍ID
         :return: 书籍响应数据
         """
-        # logger.info(f"开始获取书籍 {novel_id}")
+        logger.info(f"开始获取书籍 {novel_id}")
         async with self.request_semaphore:
             # 参数验证
             if not novel_id:
@@ -388,7 +389,6 @@ def crawl_task_wrapper(page_ids: List[str]) -> Dict[str, Any]:
     Returns:
         爬取结果字典
     """
-    import asyncio
 
     async def async_crawl_task():
         # 每次任务执行时创建新的CrawlFlow实例，避免事件循环冲突

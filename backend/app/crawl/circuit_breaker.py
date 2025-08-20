@@ -33,7 +33,9 @@ class CircuitBreakerConfig:
     """熔断器配置"""
     # 熔断触发配置
     failure_threshold: int = 1  # 失败次数阈值（503错误1次即触发）
-    recovery_timeout: float = 10.0  # 熔断恢复时间（秒）
+    base_recovery_timeout: float = 10.0  # 基础熔断恢复时间（秒）
+    max_recovery_timeout: float = 300.0  # 最大恢复时间（秒）
+    backoff_multiplier: float = 2.0  # 指数退避倍数
 
     # 半开状态配置
     half_open_max_calls: int = 3  # 半开状态最大测试请求数
@@ -73,47 +75,67 @@ class CircuitBreaker:
 
         logger.info(f"熔断器初始化完成 - 状态: {self._state.value}, 配置: {self.config}")
 
-    async def call(self, func, *args, **kwargs):
-        """
-        通过熔断器调用函数
+    def _get_current_recovery_timeout(self) -> float:
+        """计算当前恢复超时时间（指数退避）"""
+        if self._failure_count <= 1:
+            return self.config.base_recovery_timeout
         
-        Args:
-            func: 要调用的异步函数
-            *args, **kwargs: 函数参数
-            
-        Returns:
-            函数执行结果
-            
-        Raises:
-            CircuitBreakerOpenException: 熔断器开启时
-            原函数的异常: 其他情况
+        # 指数退避：base_timeout * (multiplier ^ (failure_count - 1))
+        timeout = self.config.base_recovery_timeout * (
+            self.config.backoff_multiplier ** (self._failure_count - 1)
+        )
+        
+        # 限制最大超时时间
+        return min(timeout, self.config.max_recovery_timeout)
+
+    async def wait_for_recovery(self):
         """
+        等待熔断器恢复 - 提供给外部调用的统一接口
+        
+        这个方法封装了完整的等待恢复逻辑，包括状态检查和主动转换
+        """
+        # 先主动检查状态转换（关键修复）
         async with self._lock:
-            # 检查熔断器状态
             await self._check_state_transition()
-
-            if self._state == CircuitState.OPEN:
-                raise CircuitBreakerOpenException(
-                    f"熔断器开启中，距离恢复还有 {self._get_remaining_recovery_time():.1f} 秒"
-                )
-
-            # 半开状态下限制请求数量
-            if self._state == CircuitState.HALF_OPEN:
+        
+        if self.is_open:
+            stats = self.get_stats()
+            remaining_time = stats.get('remaining_recovery_time', 0)
+            
+            if remaining_time > 0.1:  # 如果剩余时间很少（<0.1秒），直接跳过等待
+                logger.warning(f"熔断器开启中，等待 {remaining_time:.1f} 秒后恢复...")
+                
+                # 等待剩余恢复时间
+                await asyncio.sleep(remaining_time)
+                
+                # 等待后主动触发状态转换检查
+                async with self._lock:
+                    await self._check_state_transition()
+                
+                # 再次检查熔断器状态
+                if self.is_open:
+                    # 如果仍未恢复，说明可能有其他问题
+                    remaining = self.get_stats().get('remaining_recovery_time', 0)
+                    logger.error(f"熔断器等待后仍未恢复，剩余时间: {remaining:.1f}秒")
+                    raise CircuitBreakerOpenException(f"熔断器开启中，剩余恢复时间: {remaining:.1f}秒")
+                else:
+                    logger.info("熔断器已恢复，继续执行HTTP请求")
+            else:
+                # 剩余时间很少，再次检查状态转换
+                async with self._lock:
+                    await self._check_state_transition()
+                if self.is_open:
+                    logger.error("熔断器检查后仍开启，可能需要手动干预")
+                    raise CircuitBreakerOpenException("熔断器开启中")
+        
+        elif self._state == CircuitState.HALF_OPEN:
+            # 半开状态下限制并发请求数量
+            async with self._lock:
                 if self._half_open_attempts >= self.config.half_open_max_calls:
+                    logger.warning(f"半开状态已达到最大请求数量限制({self.config.half_open_max_calls})")
                     raise CircuitBreakerOpenException("半开状态请求数量已达上限，等待状态转换")
                 self._half_open_attempts += 1
-
-        # 执行实际函数调用
-        try:
-            result = await func(*args, **kwargs)
-            # 记录成功
-            await self._record_success()
-            return result
-
-        except Exception as e:
-            # 记录失败
-            await self._record_failure(e)
-            raise e
+                logger.info(f"半开状态请求计数: {self._half_open_attempts}/{self.config.half_open_max_calls}")
 
     async def record_error(self):
         """
@@ -123,7 +145,7 @@ class CircuitBreaker:
             self._failure_count += 1
             self._last_failure_time = time.time()
 
-            logger.error(f"🚨 检测到503错误 - 失败计数: {self._failure_count}/{self.config.failure_threshold}")
+            logger.error(f"检测到503错误 - 失败计数: {self._failure_count}/{self.config.failure_threshold}")
 
             # 检查是否需要触发熔断
             if (self._state == CircuitState.CLOSED and
@@ -170,9 +192,10 @@ class CircuitBreaker:
         current_time = time.time()
 
         if self._state == CircuitState.OPEN:
-            # 检查是否可以转换到半开状态
+            # 检查是否可以转换到半开状态（使用指数退避时间）
             time_since_open = current_time - self._state_changed_time
-            if time_since_open >= self.config.recovery_timeout:
+            recovery_timeout = self._get_current_recovery_timeout()
+            if time_since_open >= recovery_timeout:
                 await self._transition_to_half_open()
 
         elif self._state == CircuitState.CLOSED:
@@ -190,14 +213,16 @@ class CircuitBreaker:
             self._state = CircuitState.OPEN
             self._state_changed_time = time.time()
 
+            # 使用指数退避计算恢复时间
+            recovery_timeout = self._get_current_recovery_timeout()
             recovery_time = time.strftime(
                 '%H:%M:%S',
-                time.localtime(self._state_changed_time + self.config.recovery_timeout)
+                time.localtime(self._state_changed_time + recovery_timeout)
             )
 
             logger.error(
-                f"🔴 熔断器开启! 失败次数: {self._failure_count}, "
-                f"将在 {self.config.recovery_timeout} 秒后尝试恢复 (预计 {recovery_time})"
+                f"熔断器开启! 失败次数: {self._failure_count}, "
+                f"将在 {recovery_timeout} 秒后尝试恢复 (预计 {recovery_time})"
             )
 
     async def _transition_to_half_open(self):
@@ -208,7 +233,8 @@ class CircuitBreaker:
         self._half_open_successes = 0
 
         logger.warning(
-            f"🟡 熔断器进入半开状态 - 将尝试 {self.config.half_open_max_calls} 次请求测试恢复"
+            f"熔断器进入半开状态 - 将尝试 {self.config.half_open_max_calls} 次请求测试恢复"
+            f" (失败次数: {self._failure_count})"
         )
 
     async def _transition_to_closed(self):
@@ -220,7 +246,7 @@ class CircuitBreaker:
         self._half_open_attempts = 0
         self._half_open_successes = 0
 
-        logger.info("🟢 熔断器恢复正常状态 - 所有请求已允许")
+        logger.info("熔断器恢复正常状态 - 所有请求已允许")
 
     def _is_503_error(self, exception: Exception) -> bool:
         """检查是否是503错误"""
@@ -233,12 +259,13 @@ class CircuitBreaker:
         return '503' in error_msg or 'service unavailable' in error_msg
 
     def _get_remaining_recovery_time(self) -> float:
-        """获取剩余恢复时间"""
+        """获取剩余恢复时间（使用指数退避）"""
         if self._state != CircuitState.OPEN:
             return 0.0
 
         elapsed = time.time() - self._state_changed_time
-        remaining = max(0, self.config.recovery_timeout - elapsed)
+        recovery_timeout = self._get_current_recovery_timeout()
+        remaining = max(0, recovery_timeout - elapsed)
         return remaining
 
     @property
@@ -308,3 +335,9 @@ async def get_circuit_stats() -> dict:
     """获取熔断器统计信息"""
     circuit_breaker = await get_global_circuit_breaker()
     return circuit_breaker.get_stats()
+
+
+async def wait_for_circuit_recovery():
+    """等待全局熔断器恢复"""
+    circuit_breaker = await get_global_circuit_breaker()
+    await circuit_breaker.wait_for_recovery()

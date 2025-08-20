@@ -19,24 +19,32 @@ from httpx import AsyncClient, HTTPError, HTTPStatusError, Limits, Timeout
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.crawl.circuit_breaker import CircuitBreakerOpenException, get_global_circuit_breaker, record_error
+from app.crawl.circuit_breaker import CircuitBreakerOpenException, record_error, wait_for_circuit_recovery, get_global_circuit_breaker
 from app.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 def should_retry_network_error(exception):
-    """重试条件：只有网络错误才重试"""
-    # 然后判断是否为网络错误
-    if isinstance(exception, (HTTPError, TimeoutError, json.JSONDecodeError)):
-        # 如果是503错误需要触发熔断器
-        if isinstance(exception, HTTPStatusError) and exception.response.status_code == 503:
-            logger.error("HTTP客户端检测到503错误，触发熔断器")
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(record_error())
-            else:
-                asyncio.run(record_error())
+    """重试条件：网络错误和503错误都可以重试，熔断器异常不重试"""
+    # 先处理503错误 - 触发熔断器并允许重试
+    if isinstance(exception, HTTPStatusError) and exception.response.status_code == 503:
+        logger.error("HTTP客户端检测到503错误，触发熔断器")
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(record_error())
+        else:
+            asyncio.run(record_error())
+        # 503错误应该可以重试（熔断器恢复后）
+        logger.info("503错误将在熔断器恢复后重试")
+        return True
+    
+    # 熔断器异常不重试（让熔断器恢复机制处理）
+    if isinstance(exception, CircuitBreakerOpenException):
+        return False
+    
+    # 判断是否为网络错误
+    if isinstance(exception, (ValueError, KeyError, HTTPError, TimeoutError, json.JSONDecodeError)):
         logger.info(f"网络错误，将进行重试: {type(exception).__name__}: {str(exception)}")
         return True
 
@@ -49,7 +57,8 @@ def should_retry_network_error(exception):
 network_retry = retry(
     retry=retry_if_exception(should_retry_network_error),
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    # 对于503错误，等待时间由熔断器控制；对于其他网络错误，使用指数退避
+    wait=wait_exponential(multiplier=1, min=1, max=5),  # 缩短最大等待时间，因为熔断器会控制503错误的等待
     reraise=True
 )
 
@@ -148,6 +157,7 @@ class HttpClient:
         if self._client is None:
             self._client = self._create_http_client()
             logger.debug("创建新的AsyncClient实例")
+    
 
     @network_retry
     async def _request_single(self, url: str) -> Dict[str, Any]:
@@ -156,13 +166,8 @@ class HttpClient:
         :param url: 目标URL
         :return: 响应数据字典或错误信息
         """
-        # 首先检查熔断器状态
-        circuit_breaker = await get_global_circuit_breaker()
-        if circuit_breaker.is_open:
-            stats = circuit_breaker.get_stats()
-            remaining_time = stats.get('remaining_recovery_time', 0)
-            logger.warning(f"熔断器开启中，跳过HTTP请求，剩余恢复时间: {remaining_time:.1f}秒")
-            raise CircuitBreakerOpenException(f"熔断器开启中，剩余恢复时间: {remaining_time:.1f}秒")
+        # 等待熔断器恢复（如果开启的话）- 使用熔断器模块的统一接口
+        await wait_for_circuit_recovery()
 
         # 延迟创建客户端，确保在正确的事件循环上下文中
         await self._ensure_client()
@@ -172,7 +177,13 @@ class HttpClient:
         response.raise_for_status()
 
         # 解析JSON响应
-        return json.loads(response.content)
+        result = json.loads(response.content)
+        
+        # 记录成功请求（用于半开状态的恢复判断）
+        circuit_breaker = await get_global_circuit_breaker()
+        await circuit_breaker._record_success()
+        
+        return result
 
     async def _request_sequential(self, urls: List[str]) -> List[Dict[str, Any]]:
         """
