@@ -434,11 +434,14 @@ if __name__ == '__main__':
 
 
     async def debug_task():
-        from app.database.connection import ensure_db
-        ensure_db()
+        # 简化调试：只测试单个页面，避免数据库初始化问题
         c = get_crawl_flow()
-        result = await c.execute_crawl_task(["all"])
-        print(result)
+        try:
+            result = await c.execute_crawl_task(["all"])  # 只爬取jiazi页面
+        except Exception as e:
+            print(f"调试异常: {e}")
+        finally:
+            await c.close()
 
 
     asyncio.run(debug_task())

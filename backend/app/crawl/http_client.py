@@ -121,17 +121,32 @@ class HttpClient:
             pool=5.0
         )
 
+        # 模拟Chrome浏览器的完整HTTP头部
+        browser_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Sec-Ch-Ua": '"Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Connection": "keep-alive"
+        }
+
         client = AsyncClient(
             limits=limits,
             timeout=timeout,
             follow_redirects=True,
-            headers=self._config.user_agent,
+            headers=browser_headers,
             trust_env=False,
         )
 
         return client
 
-    @staticmethod
     def _parse_json_response(self, response) -> Dict[str, Any]:
         """解析JSON响应内容"""
         return json.loads(response.content)
