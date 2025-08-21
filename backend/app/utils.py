@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 from datetime import datetime, timedelta
 from time import strftime
 from typing import Dict, List, Any, Set, Type
@@ -108,3 +109,29 @@ def generate_job_id(job_type: str, run_time: datetime, page_id: str = None) -> s
     if page_id:
         return f"{base_id}_{page_id}"
     return base_id
+
+
+def generate_ranking_hash_id(ranking_data: dict) -> str:
+    """
+    为榜单数据生成MD5哈希ID
+    
+    使用以下字段按顺序拼接：rank_id|channel_name|channel_id|page_id|sub_channel_id
+    空值使用空字符串
+    
+    :param ranking_data: 榜单数据字典
+    :return: 32位MD5哈希字符串
+    """
+    # 按指定顺序提取字段，空值使用空字符串
+    fields = [
+        ranking_data.get("rank_id", "") or "",
+        ranking_data.get("channel_name", "") or "", 
+        ranking_data.get("channel_id", "") or "",
+        ranking_data.get("page_id", "") or "",
+        ranking_data.get("sub_channel_id", "") or ""
+    ]
+    
+    # 转换为字符串并拼接
+    text_to_hash = "|".join(str(field) for field in fields)
+    
+    # 生成MD5哈希
+    return hashlib.md5(text_to_hash.encode('utf-8')).hexdigest()

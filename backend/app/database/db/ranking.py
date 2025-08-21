@@ -38,6 +38,12 @@ class Ranking(Base):
         index=True,
         comment="榜单唯一标识ID，来源于晋江文学城的榜单ID",
     )
+    hash_id: Mapped[str] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        comment="榜单哈希唯一标识，基于rank_id|channel_name|channel_id|page_id|sub_channel_id生成的MD5值",
+    )
     channel_name: Mapped[str] = mapped_column(
         String(100),
         nullable=True,
@@ -63,6 +69,7 @@ class Ranking(Base):
     # 索引优化
     __table_args__ = (
         Index("idx_ranking_rank_id", "rank_id"),
+        Index("idx_ranking_hash_id", "hash_id"),
         Index("idx_ranking_channel_name", "channel_name"),
         Index("idx_ranking_page_id", "page_id"),
         Index("idx_ranking_group_type", "rank_group_type"),

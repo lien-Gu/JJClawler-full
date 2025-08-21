@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import book, ranking
 from ..db.ranking import Ranking, RankingSnapshot
-from ...utils import filter_dict, get_model_fields
+from ...utils import filter_dict, get_model_fields, generate_ranking_hash_id
 
 
 class RankingService:
@@ -23,59 +23,25 @@ class RankingService:
     ) -> Ranking:
         """
         根据ranking_data中的信息创建或更新榜单。
-        查找逻辑：
-        1. 如果有rank_id，优先根据rank_id查找
-        2. 如果rank_id为空或查找不到，则根据channel_name查找
-        3. 如果都查找不到，创建新榜单
+        使用hash_id进行唯一标识，简化查找逻辑。
         
-        :param db:
-        :param ranking_data:
-        :return:
+        :param db: 数据库会话对象
+        :param ranking_data: 榜单数据字典
+        :return: 创建或更新后的Ranking对象
         """
-        rank_id = ranking_data.get("rank_id")
-        channel_name = ranking_data.get("channel_name")
-        candidate_rankings = []
-        
-        # 1. 优先根据rank_id查找（如果rank_id不为空）
-        if rank_id and rank_id.strip():
-            candidate_rankings = self.get_rankings_by_rank_id(db, rank_id)
-        
-        # 2. 如果rank_id为空或未找到，且有channel_name，则根据channel_name查找
-        if not candidate_rankings and channel_name and channel_name.strip():
-            candidate_rankings = self.get_rankings_by_channel_name(db, channel_name)
-        
-        # 3. 根据查找结果进行逻辑判断
-        if not candidate_rankings:
-            # 榜单不存在，直接创建
-            return self.create_ranking(db, ranking_data)
-        elif len(candidate_rankings) == 1:
-            # 列表只有一个元素，直接更新
-            return self.update_ranking(db, candidate_rankings[0], ranking_data)
+        # 生成hash_id
+        hash_id = generate_ranking_hash_id(ranking_data)
+        ranking_data["hash_id"] = hash_id
+
+        # 根据hash_id查找榜单
+        existing_ranking = self.get_ranking_by_hash_id(db, hash_id)
+
+        if existing_ranking:
+            # 榜单已存在，更新它
+            return self.update_ranking(db, existing_ranking, ranking_data)
         else:
-            # 列表有多个元素，需要进一步筛选
-            channel_id = ranking_data.get("channel_id")
-            
-            # 如果有channel_id，进行二次筛选
-            if channel_id:
-                filtered_rankings = [
-                    r for r in candidate_rankings if r.channel_id == channel_id
-                ]
-                
-                if len(filtered_rankings) == 1:
-                    # 精准匹配到一个，更新它
-                    return self.update_ranking(db, filtered_rankings[0], ranking_data)
-                elif len(filtered_rankings) == 0:
-                    # 没有匹配的，创建新榜单
-                    return self.create_ranking(db, ranking_data)
-                else:
-                    # 理论上不应该发生，除非(rank_id, channel_id)组合在数据库中不唯一
-                    raise SystemError(
-                        f"数据库中存在重复的榜单组合，无法确定更新目标"
-                    )
-            else:
-                # 没有channel_id进行区分，选择第一个进行更新（或者可以创建新的）
-                # 这里选择更新第一个找到的榜单
-                return self.update_ranking(db, candidate_rankings[0], ranking_data)
+            # 榜单不存在，创建新榜单
+            return self.create_ranking(db, ranking_data)
 
     @staticmethod
     def batch_create_ranking_snapshots(
@@ -107,11 +73,42 @@ class RankingService:
         """
         根据书ID获取days天内的书籍排名信息
 
-        :param db:
-        :param novel_id:
-        :param days:
-        :return:
+        :param db: 数据库会话对象
+        :param novel_id: 书籍ID，对应Book表的novel_id字段
+        :param days: 查询天数，查询最近N天的排名记录
+        :return: 书籍排名信息列表，按时间倒序排列
         """
+        # 计算查询时间范围
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=days)
+        
+        # 查询指定书籍在时间范围内的所有排名快照
+        # 关联Ranking表获取榜单详细信息
+        ranking_snapshots = db.execute(
+            select(
+                RankingSnapshot.novel_id,
+                RankingSnapshot.position,
+                RankingSnapshot.snapshot_time,
+                Ranking.page_id,
+                Ranking.channel_name,
+                Ranking.sub_channel_name
+            )
+            .join(Ranking, RankingSnapshot.ranking_id == Ranking.id)
+            .where(
+                and_(
+                    RankingSnapshot.novel_id == novel_id,
+                    RankingSnapshot.snapshot_time >= start_time,
+                    RankingSnapshot.snapshot_time <= end_time
+                )
+            )
+            .order_by(desc(RankingSnapshot.snapshot_time))
+        ).fetchall()
+        
+        # 转换为BookRankingInfo模型
+        return [
+            book.BookRankingInfo.model_validate(snapshot) for snapshot in ranking_snapshots
+        ]
+
 
     @staticmethod
     def get_ranking_by_id(db: Session, ranking_id: int) -> Ranking | None:
@@ -478,24 +475,14 @@ class RankingService:
     # ==================== 内部依赖方法 ====================
 
     @staticmethod
-    def get_rankings_by_rank_id(db: Session, rank_id: str) -> List[Ranking]:
+    def get_ranking_by_hash_id(db: Session, hash_id: str) -> Optional[Ranking]:
         """
-        根据rank_id获取所有匹配的榜单列表
-        :param db:
-        :param rank_id:
-        :return: 一个榜单对象的列表
+        根据hash_id获取榜单（唯一查找）
+        :param db: 数据库会话对象
+        :param hash_id: 榜单哈希ID
+        :return: 榜单对象或None
         """
-        return list(db.execute(select(Ranking).where(Ranking.rank_id == rank_id)).scalars())
-    
-    @staticmethod
-    def get_rankings_by_channel_name(db: Session, channel_name: str) -> List[Ranking]:
-        """
-        根据channel_name获取所有匹配的榜单列表
-        :param db:
-        :param channel_name:
-        :return: 一个榜单对象的列表
-        """
-        return list(db.execute(select(Ranking).where(Ranking.channel_name == channel_name)).scalars())
+        return db.execute(select(Ranking).where(Ranking.hash_id == hash_id)).scalar_one_or_none()
 
     @staticmethod
     def create_ranking(db: Session, ranking_data: dict[str, Any]) -> Ranking:

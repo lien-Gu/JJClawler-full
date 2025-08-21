@@ -111,7 +111,8 @@ class RankingParser:
             "position": index,
             "novel_id": raw_basic_data.get("novelId") or raw_basic_data.get("novelid"),
             "title": raw_basic_data.get("novelName") or raw_basic_data.get("novelname"),
-            "author_id": raw_basic_data.get("authorId") or raw_basic_data.get("authorid") or 0,  # 修复：None值设为0
+            "author_id": raw_basic_data.get("authorId") or raw_basic_data.get("authorid") or 0,
+            "author_name":raw_basic_data.get("authorName") or raw_basic_data.get("authorname") or None,
             "snapshot_time": datetime.now()
         }
 
@@ -199,6 +200,7 @@ class NovelPageParser:
             "novel_id": raw_detail_data.get("novelId", None),
             "title": raw_detail_data.get("novelName", None),
             "author_id": raw_detail_data.get("authorId", 0),
+            "author_name": raw_detail_data.get("authorName", None),
             "status": raw_detail_data.get("series", None),
             "word_counts": raw_detail_data.get("novelSize", None),
             "chapter_counts": raw_detail_data.get("novelChapterCount", None),

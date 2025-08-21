@@ -35,11 +35,15 @@ class Book(Base):
     author_id: Mapped[int] = mapped_column(
         Integer, nullable=True, comment="作者唯一标识ID，来源于晋江文学城的作者ID"
     )
+    author_name: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="作者名称，来源于晋江文学城的作者姓名"
+    )
 
     # 索引优化
     __table_args__ = (
         Index("idx_book_title", "title"),
         Index("idx_book_author", "author_id"),
+        Index("idx_book_author_name", "author_name"),
     )
 
 
