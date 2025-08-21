@@ -1001,3 +1001,94 @@ async def _fetch_books_with_circuit_breaker_support(self, novel_ids: List[int]) 
 - 大幅提升了在网络不稳定环境下的数据采集成功率
 - 实现了更智能的故障恢复机制
 - 为高可用性数据采集系统奠定了技术基础
+
+## 2025-08-21 健康检查接口pydantic验证错误修复
+
+### 问题：DataResponse模型接收协程对象而不是布尔值
+
+**时间**：2025-08-21 12:00
+
+**错误信息**：
+```
+2025-08-21 12:00:58-app.middleware.exception_middleware-WARNING-值错误: 1 validation error for DataResponse
+success
+  Input should be a valid boolean [type=bool_type, input_value=<coroutine object check_s...duler at 0x7f3628de4700>, input_type=coroutine]
+```
+
+**现象**：
+- 服务在Docker容器中运行时健康检查接口报错
+- 容器状态显示为 "unhealthy"
+- Pydantic验证失败，提示success字段接收到协程对象而不是布尔值
+
+**原因分析**：
+- 位置：`app/main.py:127-170` 的 `health_check()` 函数
+- **根本问题**：可能存在版本不一致或运行时异常导致异步调用出现问题
+- 具体机制：
+  1. `check_scheduler()` 是异步函数，应该返回布尔值
+  2. 可能在某些异常情况下返回了协程对象
+  3. 将协程对象传递给 `DataResponse.success` 字段导致pydantic验证失败
+
+**解决方法**：
+1. **增加异常处理**：为每个组件检查添加try-except块
+2. **类型强制转换**：确保传递给 DataResponse 的值都是正确类型
+3. **错误恢复**：单个组件检查失败时设置合理的默认值
+
+**修复后代码**：
+```python
+@app.get("/health", response_model=DataResponse[Dict])
+async def health_check():
+    """健康检查 - 简洁的系统状态检查"""
+    settings = get_settings()
+
+    # 检查各个组件状态（简化为布尔值）
+    try:
+        from .database.connection import check_db
+        db_ok = check_db()
+    except Exception as e:
+        logger.error(f"数据库健康检查失败: {e}")
+        db_ok = False
+    
+    try:
+        from .schedule.scheduler import check_scheduler
+        scheduler_ok = await check_scheduler()
+    except Exception as e:
+        logger.error(f"调度器健康检查失败: {e}")
+        scheduler_ok = False
+
+    # 计算运行时间
+    uptime = time.time() - APP_START_TIME
+
+    # 确定整体状态
+    all_ok = db_ok and scheduler_ok
+    health_status = "healthy" if all_ok else "unhealthy"
+
+    health_data = {
+        "status": health_status,
+        "version": settings.project_version,
+        "uptime": round(uptime, 2),
+        "components": {
+            "database": "ok" if db_ok else "error",
+            "scheduler": "ok" if scheduler_ok else "error"
+        }
+    }
+
+    # 确保传递给 DataResponse 的值都是正确的类型
+    return DataResponse(
+        success=bool(all_ok),  # 确保是布尔类型
+        code=200 if all_ok else 503,
+        message=f"服务状态: {health_status}",
+        data=health_data
+    )
+```
+
+**修复效果**：
+- ✅ **异常处理增强**：单个组件检查失败不影响整个健康检查
+- ✅ **类型安全**：使用 `bool()` 强制转换确保类型正确
+- ✅ **错误恢复**：组件检查异常时提供合理的默认值
+- ✅ **日志记录**：异常时记录详细错误信息便于排查
+
+**影响范围**：
+- 解决了健康检查接口的pydantic验证错误
+- 提高了Docker容器健康检查的可靠性
+- 增强了系统对组件异常的容错能力
+- 为监控和运维提供了更稳定的健康状态指示

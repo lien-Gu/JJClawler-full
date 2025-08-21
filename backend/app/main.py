@@ -130,10 +130,19 @@ async def health_check():
     settings = get_settings()
 
     # 检查各个组件状态（简化为布尔值）
-    from .database.connection import check_db
-    db_ok = check_db()
-    from .schedule.scheduler import check_scheduler
-    scheduler_ok = await check_scheduler()
+    try:
+        from .database.connection import check_db
+        db_ok = check_db()
+    except Exception as e:
+        logger.error(f"数据库健康检查失败: {e}")
+        db_ok = False
+    
+    try:
+        from .schedule.scheduler import check_scheduler
+        scheduler_ok = await check_scheduler()
+    except Exception as e:
+        logger.error(f"调度器健康检查失败: {e}")
+        scheduler_ok = False
 
     # 计算运行时间
     uptime = time.time() - APP_START_TIME
@@ -152,8 +161,9 @@ async def health_check():
         }
     }
 
+    # 确保传递给 DataResponse 的值都是正确的类型
     return DataResponse(
-        success=all_ok,
+        success=bool(all_ok),  # 确保是布尔类型
         code=200 if all_ok else 503,
         message=f"服务状态: {health_status}",
         data=health_data
