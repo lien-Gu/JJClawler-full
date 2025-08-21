@@ -1,10 +1,12 @@
 <template>
-  <view class="stats-card" :class="{ 'clickable': clickable }" @tap="onClick">
-    <view class="stats-header" v-if="title">
-      <text class="stats-title">{{ title }}</text>
-      <text class="stats-subtitle" v-if="subtitle">{{ subtitle }}</text>
-    </view>
-    
+  <BaseCard
+    :title="title"
+    :subtitle="subtitle"
+    :clickable="clickable"
+    :class="`color-${color}`"
+    @click="onClick"
+  >
+    <!-- 统计内容 -->
     <view class="stats-content">
       <view class="stats-main">
         <text class="stats-number">{{ formatNumber(value) }}</text>
@@ -17,13 +19,19 @@
       </view>
     </view>
     
-    <view class="stats-footer" v-if="description">
-      <text class="stats-description">{{ description }}</text>
-    </view>
-  </view>
+    <!-- 描述信息 -->
+    <template #footer v-if="description">
+      <view class="stats-footer">
+        <text class="stats-description">{{ description }}</text>
+      </view>
+    </template>
+  </BaseCard>
 </template>
 
 <script>
+import BaseCard from '@/components/BaseCard.vue'
+import formatterMixin from '@/mixins/formatter.js'
+
 /**
  * 统计卡片组件
  * @description 用于展示统计数据的卡片组件，支持标题、数值、趋势、描述等
@@ -39,6 +47,10 @@
  */
 export default {
   name: 'StatsCard',
+  components: {
+    BaseCard
+  },
+  mixins: [formatterMixin],
   props: {
     title: {
       type: String,
@@ -70,9 +82,11 @@ export default {
     },
     color: {
       type: String,
-      default: 'primary'
+      default: 'primary',
+      validator: (value) => ['primary', 'success', 'warning', 'error', 'info'].includes(value)
     }
   },
+  emits: ['click'],
   
   computed: {
     /**
@@ -94,21 +108,6 @@ export default {
   
   methods: {
     /**
-     * 格式化数字显示
-     */
-    formatNumber(num) {
-      if (typeof num !== 'number') return num
-      
-      if (num >= 10000) {
-        return (num / 10000).toFixed(1) + '万'
-      } else if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'k'
-      }
-      
-      return num.toString()
-    },
-    
-    /**
      * 点击事件
      */
     onClick() {
@@ -121,124 +120,94 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.stats-card {
-  @include card-style;
-  padding: $spacing-lg;
-  margin-bottom: $spacing-sm;
-  transition: all 0.3s ease;
-  
-  &.clickable {
-    cursor: pointer;
-    
-    &:hover {
-      transform: translateY(-2rpx);
-      box-shadow: $shadow-dark;
-    }
-    
-    &:active {
-      transform: translateY(0);
-    }
-  }
-}
-
-.stats-header {
-  margin-bottom: $spacing-md;
-  
-  .stats-title {
-    display: block;
-    font-size: $font-size-lg;
-    font-weight: bold;
-    color: $text-primary;
-    margin-bottom: $spacing-xs;
-  }
-  
-  .stats-subtitle {
-    font-size: $font-size-sm;
-    color: $text-secondary;
-  }
-}
+@import '@/styles/design-tokens.scss';
 
 .stats-content {
-  @include flex-between;
+  display: flex;
+  justify-content: space-between;
   align-items: flex-end;
   margin-bottom: $spacing-sm;
 }
 
 .stats-main {
-  @include flex-center;
+  display: flex;
   align-items: baseline;
+  gap: $spacing-xs;
   
   .stats-number {
-    font-size: $font-size-xxl;
-    font-weight: bold;
-    color: $primary-color;
-    margin-right: $spacing-xs;
+    font-size: 48rpx;
+    font-weight: 700;
+    color: $brand-primary;
   }
   
   .stats-unit {
-    font-size: $font-size-md;
+    font-size: 28rpx;
     color: $text-secondary;
   }
 }
 
 .stats-trend {
-  @include flex-center;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
   
   .trend-icon,
   .trend-text {
-    font-size: $font-size-sm;
-    font-weight: bold;
-  }
-  
-  .trend-icon {
-    margin-right: 4rpx;
+    font-size: 24rpx;
+    font-weight: 600;
   }
   
   &.trend-up {
     .trend-icon,
     .trend-text {
-      color: #4cd964;
+      color: #34c759;
     }
   }
   
   &.trend-down {
     .trend-icon,
     .trend-text {
-      color: #dd524d;
+      color: #ff3b30;
     }
   }
 }
 
 .stats-footer {
   .stats-description {
-    font-size: $font-size-sm;
-    color: $text-placeholder;
+    font-size: 24rpx;
+    color: rgba($text-secondary, 0.7);
     line-height: 1.4;
   }
 }
 
 // 主题色彩变体
-.stats-card.color-success {
+:deep(.color-success) {
   .stats-number {
-    color: #4cd964;
+    color: #34c759;
   }
 }
 
-.stats-card.color-warning {
+:deep(.color-warning) {
   .stats-number {
-    color: #f0ad4e;
+    color: #ff9500;
   }
 }
 
-.stats-card.color-error {
+:deep(.color-error) {
   .stats-number {
-    color: #dd524d;
+    color: #ff3b30;
   }
 }
 
-.stats-card.color-info {
+:deep(.color-info) {
   .stats-number {
-    color: #5bc0de;
+    color: #007aff;
+  }
+}
+
+:deep(.color-primary) {
+  .stats-number {
+    color: $brand-primary;
   }
 }
 </style> 

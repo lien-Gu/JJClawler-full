@@ -1,168 +1,126 @@
 <template>
   <view class="search-bar">
-    <view class="search-input-wrapper">
+    <view class="search-container">
+      <view class="search-icon">
+        <text class="icon">⚙</text>
+      </view>
       <input 
         class="search-input"
         type="text"
-        :placeholder="placeholder"
         :value="value"
+        :placeholder="placeholder"
         @input="onInput"
+        @confirm="onConfirm"
         @focus="onFocus"
         @blur="onBlur"
-        @confirm="onConfirm"
       />
-      <view class="search-icon" v-if="!value">
-        <text class="icon">🔍</text>
-      </view>
-      <view class="clear-icon" v-if="value" @tap="onClear">
-        <text class="icon">✕</text>
+      <view class="search-action" @click="onSearch">
+        <text class="search-icon-text">🔍</text>
       </view>
     </view>
   </view>
 </template>
 
 <script>
-/**
- * 搜索栏组件
- * @description 可复用的搜索输入框组件，支持占位符、清空、确认等功能
- * @property {String} placeholder 占位符文本
- * @property {String} value 输入框的值
- * @event {Function} input 输入事件
- * @event {Function} search 搜索事件（点击确认或回车）
- * @event {Function} clear 清空事件
- * @event {Function} focus 获得焦点事件
- * @event {Function} blur 失去焦点事件
- */
 export default {
   name: 'SearchBar',
   props: {
-    placeholder: {
-      type: String,
-      default: '搜索'
-    },
     value: {
       type: String,
       default: ''
+    },
+    placeholder: {
+      type: String,
+      default: 'Hinted search text'
     }
   },
-  
+  emits: ['input', 'search', 'focus', 'blur'],
   methods: {
-    /**
-     * 输入框内容变化
-     */
     onInput(e) {
-      const value = e.detail.value
-      this.$emit('input', value)
-      this.$emit('update:value', value)
+      this.$emit('input', e.detail.value);
     },
     
-    /**
-     * 获得焦点
-     */
-    onFocus(e) {
-      this.$emit('focus', e)
-    },
-    
-    /**
-     * 失去焦点
-     */
-    onBlur(e) {
-      this.$emit('blur', e)
-    },
-    
-    /**
-     * 确认搜索（回车或点击搜索）
-     */
     onConfirm(e) {
-      const value = e.detail.value
-      this.$emit('search', value)
-      this.$emit('confirm', value)
+      this.$emit('search', e.detail.value);
     },
     
-    /**
-     * 清空输入框
-     */
-    onClear() {
-      this.$emit('input', '')
-      this.$emit('update:value', '')
-      this.$emit('clear')
+    onSearch() {
+      this.$emit('search', this.value);
+    },
+    
+    onFocus(e) {
+      this.$emit('focus', e);
+    },
+    
+    onBlur(e) {
+      this.$emit('blur', e);
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/design-tokens.scss';
+
 .search-bar {
-  width: 100%;
-  padding: $spacing-sm 0;
+  padding: $spacing-md;
 }
 
-.search-input-wrapper {
-  position: relative;
-  @include flex-center;
-  background-color: $background-color;
-  border-radius: $border-radius-large;
-  border: 2rpx solid $border-light;
-  transition: border-color 0.3s ease;
+.search-container {
+  height: 96rpx; // 48px
+  background: $surface-container-high;
+  border-radius: $radius-2xl;
+  display: flex;
+  align-items: center;
+  padding: 0 $spacing-md;
+  gap: $spacing-sm;
+}
+
+.search-icon {
+  width: 48rpx; // 24px
+  height: 48rpx; // 24px
+  display: flex;
+  align-items: center;
+  justify-content: center;
   
-  &:focus-within {
-    border-color: $primary-color;
+  .icon {
+    font-size: 32rpx; // 16px
+    color: $text-secondary;
   }
 }
 
 .search-input {
   flex: 1;
-  height: 80rpx;
-  padding: 0 $spacing-md;
-  font-size: $font-size-md;
+  height: 100%;
+  font-family: $font-family-base;
+  font-size: 32rpx; // 16px
   color: $text-primary;
-  background-color: transparent;
+  background: transparent;
   border: none;
   outline: none;
   
   &::placeholder {
-    color: $text-placeholder;
-  }
-}
-
-.search-icon,
-.clear-icon {
-  position: absolute;
-  right: $spacing-md;
-  @include flex-center;
-  width: 40rpx;
-  height: 40rpx;
-  
-  .icon {
-    font-size: $font-size-lg;
-    color: $text-placeholder;
-  }
-}
-
-.clear-icon {
-  .icon {
     color: $text-secondary;
-    font-size: $font-size-md;
+    opacity: 0.6;
   }
+}
+
+.search-action {
+  width: 48rpx; // 24px
+  height: 48rpx; // 24px
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity $transition-fast;
   
   &:active {
     opacity: 0.6;
   }
 }
 
-// 适配不同主题
-.search-bar.theme-dark {
-  .search-input-wrapper {
-    background-color: #2c2c2c;
-    border-color: #444;
-  }
-  
-  .search-input {
-    color: #fff;
-    
-    &::placeholder {
-      color: #999;
-    }
-  }
+.search-icon-text {
+  font-size: 32rpx; // 16px
+  color: $text-secondary;
 }
-</style> 
+</style>

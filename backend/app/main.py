@@ -1,190 +1,169 @@
 """
-FastAPI 应用入口
-
-晋江文学城爬虫后端服务主应用
+FastAPI应用程序入口
 """
-import logging
-from datetime import datetime
+
+import sys
+import time
 from contextlib import asynccontextmanager
+from typing import Dict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.config import get_settings, ensure_directories
+from .api import api_router
+from .config import get_settings
+from .logger import get_logger, setup_logging
+from .middleware import ExceptionMiddleware
+from .models.base import DataResponse
+from .models.error import ErrorResponse
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# 修复中文编码显示问题
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+# 初始化日志系统
+setup_logging()
+logger = get_logger(__name__)
+
+# 应用启动时间
+APP_START_TIME = time.time()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
-    # 启动时执行
-    logger.info("正在启动 JJCrawler3 应用...")
-    
-    # 确保必要目录存在
-    ensure_directories()
-    logger.info("目录结构检查完成")
-    
-    # 初始化数据库
+    """应用程序生命周期管理"""
+    # 启动时的初始化代码
+    logger.info("应用程序启动")
+
+    # 数据库初始化
     try:
-        from app.modules.database import create_db_and_tables, check_database_health
-        create_db_and_tables()
-        
-        if check_database_health():
-            logger.info("数据库初始化成功，连接正常")
-        else:
-            logger.warning("数据库连接检查失败")
+        from .database.connection import ensure_db
+        ensure_db()
+        logger.info("数据库初始化成功")
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")
-        raise
-    
-    # 启动任务调度器
+        raise  # 数据库初始化失败应该阻止应用启动
+
+    # 启动调度器
     try:
-        from app.modules.service.scheduler_service import start_scheduler
+        from .schedule import start_scheduler
         await start_scheduler()
         logger.info("任务调度器启动成功")
     except Exception as e:
         logger.error(f"任务调度器启动失败: {e}")
-        # 不阻止应用启动，调度器可以后续手动启动
-    
-    logger.info("应用启动完成")
-    
+
     yield
-    
-    # 关闭时执行
-    logger.info("正在关闭应用...")
-    
-    # 关闭数据服务
+
+    # 关闭时的清理代码
     try:
-        from app.modules.database import close_database_connections
-        close_database_connections()
-        logger.info("数据服务已关闭")
-    except Exception as e:
-        logger.error(f"关闭数据服务失败: {e}")
-    
-    # 停止任务调度器
-    try:
-        from app.modules.service.scheduler_service import stop_scheduler
-        stop_scheduler()
+        from .schedule import stop_scheduler
+        await stop_scheduler()
         logger.info("任务调度器已停止")
     except Exception as e:
-        logger.error(f"停止任务调度器失败: {e}")
-    
-    logger.info("应用已关闭")
+        logger.error(f"任务调度器停止失败: {e}")
+
+    logger.info("应用程序关闭")
 
 
 # 创建FastAPI应用实例
-def create_app() -> FastAPI:
-    """创建FastAPI应用"""
+app = FastAPI(
+    title="JJCrawler API",
+    description="晋江文学城爬虫系统API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# 添加异常处理中间件（必须在CORS之前添加）
+app.add_middleware(ExceptionMiddleware)
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境中应该限制具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# 添加HTTP异常处理器（FastAPI HTTPException）
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """FastAPI HTTP异常处理器 - 使用统一的响应格式"""
+    return ErrorResponse.generate_error_response(request, exc.status_code, exc.detail).to_json_obj()
+
+
+# 添加Starlette HTTP异常处理器（路由未找到等）
+@app.exception_handler(StarletteHTTPException)
+async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Starlette HTTP异常处理器 - 使用统一的响应格式"""
+    detail = exc.detail if hasattr(exc, 'detail') else "页面未找到"
+    return ErrorResponse.generate_error_response(request, exc.status_code, detail).to_json_obj()
+
+
+# 注册路由
+app.include_router(api_router)
+
+
+@app.get("/", response_model=DataResponse[Dict])
+async def root():
+    """根路径 - 返回应用基本信息"""
     settings = get_settings()
-    
-    app = FastAPI(
-        title=settings.PROJECT_NAME,
-        version=settings.VERSION,
-        description="晋江文学城爬虫后端服务 - 提供榜单数据采集和API接口",
-        docs_url="/docs" if settings.DEBUG else None,
-        redoc_url="/redoc" if settings.DEBUG else None,
-        lifespan=lifespan
+
+    return DataResponse(
+        success=True,
+        code=200,
+        message="API服务运行正常",
+        data={
+            "name": settings.project_name,
+            "version": settings.project_version,
+            "description": settings.api.description,
+            "environment": settings.env
+        }
     )
-    
-    # 配置CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"] if settings.DEBUG else [],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # 注册路由
-    setup_routes(app)
-    
-    return app
 
 
-def setup_routes(app: FastAPI):
-    """设置路由"""
-    
-    @app.get("/", tags=["基础"])
-    async def root():
-        """根路径 - 项目信息"""
-        settings = get_settings()
-        return {
-            "project": settings.PROJECT_NAME,
-            "version": settings.VERSION,
-            "message": "晋江文学城爬虫后端服务运行中",
-            "docs": "/docs",
-            "api": settings.API_V1_STR
-        }
-    
-    @app.get("/health", tags=["基础"])
-    async def health_check():
-        """健康检查"""
-        return {
-            "status": "ok",
-            "timestamp": datetime.now().isoformat(),
-            "service": "jjcrawler3",
-            "version": get_settings().VERSION
-        }
-    
-    @app.get("/stats", tags=["基础"])
-    async def get_system_stats():
-        """获取系统统计信息"""
-        try:
-            from app.modules.service.crawler_service import CrawlerService
-            crawler_service = CrawlerService()
-            stats = await crawler_service.get_crawl_statistics()
-            crawler_service.close()
-            
-            from app.modules.service.task_service import get_task_manager
-            task_manager = get_task_manager()
-            task_summary = task_manager.get_task_summary()
-            
-            from app.modules.service.scheduler_service import get_scheduler_stats
-            scheduler_stats = get_scheduler_stats()
-            
-            return {
-                "status": "ok",
-                "timestamp": datetime.now().isoformat(),
-                "crawler_stats": stats,
-                "task_stats": task_summary,
-                "scheduler_stats": scheduler_stats
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "timestamp": datetime.now().isoformat(),
-                "error": str(e)
-            }
-    
-    # 注册API v1路由
-    from app.api import pages, rankings, books, crawl, stats
-    
+@app.get("/health", response_model=DataResponse[Dict])
+async def health_check():
+    """健康检查 - 简洁的系统状态检查"""
     settings = get_settings()
-    app.include_router(pages.router, prefix=settings.API_V1_STR)
-    app.include_router(rankings.router, prefix=settings.API_V1_STR)
-    app.include_router(books.router, prefix=settings.API_V1_STR)
-    app.include_router(crawl.router, prefix=settings.API_V1_STR)
-    app.include_router(stats.router, prefix=settings.API_V1_STR)
+
+    # 检查各个组件状态（简化为布尔值）
+    from .database.connection import check_db
+    db_ok = check_db()
+    from .schedule.scheduler import check_scheduler
+    scheduler_ok = check_scheduler()
+
+    # 计算运行时间
+    uptime = time.time() - APP_START_TIME
+
+    # 确定整体状态
+    all_ok = db_ok and scheduler_ok
+    health_status = "healthy" if all_ok else "unhealthy"
+
+    health_data = {
+        "status": health_status,
+        "version": settings.project_version,
+        "uptime": round(uptime, 2),
+        "components": {
+            "database": "ok" if db_ok else "error",
+            "scheduler": "ok" if scheduler_ok else "error"
+        }
+    }
+
+    return DataResponse(
+        success=all_ok,
+        code=200 if all_ok else 503,
+        message=f"服务状态: {health_status}",
+        data=health_data
+    )
 
 
-# 创建应用实例
-app = create_app()
+
 
 
 if __name__ == "__main__":
     import uvicorn
-    
-    settings = get_settings()
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
-    )
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
