@@ -6,7 +6,8 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/app/.venv/bin:$PATH"
 
 # 配置国内镜像源以加速下载
 RUN echo "deb http://mirrors.tencent.com/debian/ bookworm main" > /etc/apt/sources.list && \
@@ -23,7 +24,7 @@ RUN pip config set global.index-url https://mirrors.cloud.tencent.com/pypi/simpl
 # 复制依赖文件
 COPY pyproject.toml uv.lock ./
 
-# 安装 uv 和项目依赖
+# 安装 uv 和项目依赖（生产环境只需要生产依赖）
 RUN pip install uv --timeout=300 && \
     uv sync --no-dev --frozen
 
@@ -40,5 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# 启动命令（以root用户运行，无权限问题）
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 启动命令 - 直接使用虚拟环境中的 python
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
