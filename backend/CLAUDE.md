@@ -4,257 +4,141 @@ always response in chinese
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 项目概述
 
-This is a Python FastAPI web crawler backend for Jinjiang Literature City (晋江文学城). The project crawls ranking data and novel information, providing RESTful APIs for data access. The project follows an **interface-driven development** approach where APIs are defined first, then functionality is broken down into independent modules.
+JJCrawler 是一个专为晋江文学城（Jinjiang Literature City）设计的 Python FastAPI 网络爬虫后端项目。
+项目主要爬取小说排行榜数据和小说信息，为前端提供 RESTful API 数据访问服务。
+项目采用**接口驱动开发**方法，优先定义 API 接口，然后将功能分解为独立模块。
 
-## Development Workflow
 
-### 1. API-First Development Approach
-The project follows a strict API-First development methodology:
+## 项目技术栈
 
-**Phase 1: Project Setup (Day 1-2)**
-1. Project structure and environment configuration
-2. Poetry dependency management setup
-3. Basic FastAPI application framework
+- 后端核心技术:FastAPI、SQLModel、SQLite、httpx、APScheduler、Uvicorn
+- 开发工具链: uv、Python 3.12+、Black、isort、Ruff、pytest、pytest-mock
+- 部署运维: Docker、Nginx、systemd
 
-**Phase 2: API Design Priority (Day 3-4)**
-1. Define all API endpoints based on business requirements
-2. Create Pydantic models for request/response validation
-3. Implement Mock APIs returning fake data for frontend development
-4. Generate and review API documentation
+## 项目结构
+项目源代码： @app
 
-**Phase 3: Database Implementation (Day 5-6)**
-1. Design SQLModel models based on API requirements
-2. Database schema creation and migrations
-3. Basic CRUD operations implementation
+项目各个子模块路径：
+    API目录：@app/api/
+    爬虫模块：@app/crawl/
+    数据库模块：@app/database/
+    数据模型模块：@app/models/
+    通用工具模块：@app/utils.py
+    配置模块：@app/config.py
 
-**Phase 4: Module Development (Day 7-11)**
-1. Replace Mock APIs with real implementations
-2. Develop crawler, data service, and task management modules
-3. Integrate all components
+测试文件路径：@tests/，按 @tests/test_{module}/ 格式的子文件夹中存放各个模块的单元测试文件
 
-**Phase 5: Testing & Optimization (Day 12-14)**
-1. End-to-end testing and performance optimization
-2. Documentation and deployment preparation
+脚本文件：@scripts/
 
-### 2. Simplified Project Structure
-```
-JJClawer3/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                   # FastAPI application entry
-│   ├── models.py                 # SQLModel data models (4 tables only)
-│   ├── database.py               # Database connection and config
-│   ├── config.py                 # Configuration management
-│   ├── api/                      # API routes
-│   │   ├── __init__.py
-│   │   ├── pages.py              # Page configuration APIs
-│   │   ├── rankings.py           # Ranking data APIs
-│   │   ├── books.py              # Book information APIs
-│   │   └── crawl.py              # Crawler management APIs
-│   └── modules/                  # Business modules
-│       ├── __init__.py
-│       ├── crawler.py            # Crawling functionality
-│       ├── data_service.py       # Data queries and filtering
-│       └── task_service.py       # Task management (JSON files)
-├── data/
-│   ├── urls.json                 # Crawling configuration
-│   ├── tasks/                    # Task JSON storage
-│   │   ├── tasks.json           # Current task status
-│   │   └── history/             # Historical task records
-│   └── example/                  # Example data
-├── tests/                        # Test directory
-├── pyproject.toml
-└── .env.example
-```
+文档目录：@docs/
+    API文档：@docs/API.md，记录项目中暴露的 API 相关内容、API 地址、请求体格式
+    错误记录文档：@docs/issues.md，开发过程中遇到的错误或问题需要简要记录到此文档中
 
-## Development Commands
+## 开发流程
 
-### Environment Setup
+1. **代码参考**：检查或生成代码时，优先使用 context7 获取最新的参考代码
+2. **思考过程**：根据内容复杂程度，在合适时机调用 mcp sequential-thinking 进行深度思考
+3. **代码生成**：代码需要生成在相应功能模块下，并在对应测试文件夹中生成测试文件，确保测试通过
+4. **错误记录**：代码发生错误并修复时，需要在 @docs/issues.md 中记录错误时间、原因和解决方法
+5. **API文档同步**：修改或生成 @app/api/ 模块代码时，同步更新 @docs/API.md 文件内容
+
+
+## 开发命令
+
+### 环境设置
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
-# Activate virtual environment
-poetry shell
+# Activate virtual environment (optional, can use uv run directly)
+source .venv/bin/activate  # Linux/Mac
+# or .venv\Scripts\activate  # Windows
 ```
 
-### Running the Application
+### 运行应用
 ```bash
 # Start the FastAPI development server
-poetry run uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8000
 
-# Or if in poetry shell
+# Or if in activated environment
 uvicorn main:app --reload --port 8000
 ```
 
-### Development Tools
+### 开发工具
 ```bash
 # Add new dependencies
-poetry add package_name
+uv add package_name
 
 # Add development dependencies
-poetry add --group dev package_name
+uv add --dev package_name
 
 # Run tests (when implemented)
-poetry run pytest
+uv run pytest
 
 # Format code (when configured)
-poetry run black .
-poetry run isort .
+uv run black .
+uv run isort .
+uv run ruff check . --fix
 ```
 
-### Testing
-Use the provided `test_main.http` file to test endpoints manually. API documentation is available at `http://127.0.0.1:8000/docs` when the server is running.
+## 代码风格规范
 
-## Project Architecture
+### PEP 8 规范
+- **命名规范**
+  - 类名：使用 PascalCase（如 `BookService`）
+  - 函数和变量名：使用 snake_case（如 `get_book_info`）
+  - 常量：使用 UPPER_SNAKE_CASE（如 `MAX_RETRY_COUNT`）
+  - 私有变量：以单下划线开头（如 `_private_var`）
+  - 模块名：使用小写字母和下划线（如 `book_service.py`）
 
-### Core API Endpoints
-- `GET /health` - Health check
-- `GET /api/v1/rankings/latest` - Latest ranking data
-- `GET /api/v1/rankings` - Historical rankings with filters
-- `GET /api/v1/novels/{novel_id}` - Novel details
-- `GET /api/v1/novels` - Novel list with filters
-- `POST /api/v1/crawl/jiazi` - Trigger jiazi ranking crawl
-- `POST /api/v1/crawl/page` - Trigger specific page crawl
-- `GET /api/v1/tasks` - Task status and history
-- `GET /api/v1/stats` - System statistics
+- **代码布局**
+  - 行长度：不超过 88 字符（Black 默认设置）
+  - 缩进：使用 4 个空格，不使用制表符
+  - 空行：顶级函数和类定义前后用两个空行分隔
+  - 导入：按标准库、第三方库、本地库顺序分组
 
-### Database Design
+- **注释和文档字符串**
+  - 使用中文注释说明复杂逻辑
+  - 函数使用 Google 风格的文档字符串
+  - 类和模块需要有简洁的说明文档
 
-Uses SQLite with SQLModel ORM for type-safe database operations:
+### 代码质量原则
 
-**Database Tables (SQLite):**
-- `rankings`: Ranking configuration (metadata)
-- `books`: Book static information (title, author, etc.)
-- `book_snapshots`: Book dynamic information over time (clicks, favorites)
-- `ranking_snapshots`: Book positions in rankings over time
+- **简单优先**：选择最简单可行的实现方案
+- **代码复用**：如有相同或相似代码，必须抽取成公共函数
+- **函数单一职责**：每个函数只做一件事情，功能清晰明确
+- **避免重复代码**：遵循 DRY (Don't Repeat Yourself) 原则
+- **易读性优先**：代码应该易于理解和维护
+- **类型安全**：使用 SQLModel 进行数据库模型定义，使用 Pydantic 进行 API 模型验证
 
-**JSON File Storage:**
-- `data/tasks/tasks.json`: Current and completed task status
-- `data/tasks/history/`: Historical task records by date
-- `data/urls.json`: Crawling configuration
+### 代码重构指导
 
-**Key Design Decisions:**
-1. **Separation of Concerns**: Database for core data, JSON for simple task management
-2. **Time Series Data**: Snapshot approach for trend analysis
-3. **Simplified Architecture**: Flat structure, minimal layers
+1. **相似代码识别**
+   - 相同的业务逻辑必须抽取为公共函数
+   - 相似的数据处理逻辑抽取为工具函数
+   - 重复的数据库操作抽取为 DAO 层方法
 
-**Database Schema:**
-```sql
--- Static book information
-books: book_id, title, author_id, author_name, novel_class, tags, first_seen, last_updated
+2. **函数抽取原则**
+   - 超过 20 行的函数考虑拆分
+   - 有重复逻辑的代码立即抽取
+   - 复杂条件判断抽取为独立函数
 
--- Dynamic book statistics over time
-book_snapshots: book_id, total_clicks, total_favorites, comment_count, chapter_count, snapshot_time
+3. **模块化设计**
+   - 相关功能归类到同一模块
+   - 保持模块间低耦合
+   - 使用明确的接口定义
 
--- Ranking positions over time
-ranking_snapshots: ranking_id, book_id, position, snapshot_time
+## 开发规范
 
--- Ranking metadata
-rankings: ranking_id, name, channel, frequency, update_interval, parent_id
-```
-
-**Task JSON Format:**
-```json
-{
-  "current_tasks": [
-    {
-      "task_id": "jiazi_20240101_120000",
-      "task_type": "jiazi",
-      "status": "running", 
-      "created_at": "2024-01-01T12:00:00Z",
-      "progress": 50,
-      "items_crawled": 25
-    }
-  ],
-  "completed_tasks": [...] 
-}
-```
-
-### BookSnapshot Design Rationale
-
-**Why separate dynamic information?**
-
-The decision to use a separate `book_snapshots` table was made based on:
-
-1. **Business Requirements**: User explicitly needs "book click/favorite change trends"
-2. **Data Nature**: Static info (title, author) vs dynamic stats (clicks, favorites)
-3. **Query Patterns**: Different access patterns for metadata vs time-series data
-4. **Data Integrity**: Prevents loss of historical data during updates
-
-**Benefits:**
-- ✅ Complete trend analysis capabilities
-- ✅ Clear separation of concerns
-- ✅ Optimized indexes for different query types
-- ✅ Supports both global and ranking-specific statistics
-
-**Trade-offs:**
-- ❌ Additional storage space required
-- ❌ More complex data maintenance
-- ⚠️ Need to manage snapshot creation timing
-
-### Key Dependencies
-- FastAPI: Web framework
-- SQLModel: Type-safe ORM based on SQLAlchemy and Pydantic
-- httpx: Async HTTP client for crawling
-- APScheduler: Task scheduling
-- Poetry: Dependency management
-- Uvicorn: ASGI server
-
-## Detailed Task Breakdown
-
-### Task Categories by Module
-
-**Crawler Module Tasks:**
-- T4.1.1: HTTP Client Setup (httpx configuration, retry mechanism, rate limiting)
-- T4.1.2: Jiazi Ranking Scraper (parse jiazi API response, extract book data)
-- T4.1.3: Category Page Scraper (parse ranking pages, extract book lists)
-- T4.1.4: Book Detail Scraper (fetch complete book information)
-- T4.1.5: Data Parser (clean and standardize scraped data)
-
-**Data Service Module Tasks:**
-- T4.2.1: Page Service (generate page config from urls.json, manage hierarchy)
-- T4.2.2: Ranking Service (ranking queries, history comparison, rank change calculation)
-- T4.2.3: Book Service (book detail queries, ranking history, trend analysis)
-- T4.2.4: Pagination Service (generic pagination, multi-dimension filtering, sorting)
-
-**Task Management Module Tasks:**
-- T4.3.1: JSON File Operations (read/write tasks.json, status management)
-- T4.3.2: Task Status Management (pending, running, completed, failed states)
-- T4.3.3: Scheduler Integration (APScheduler setup, cron configuration)
-- T4.3.4: Task Monitoring (progress tracking, error handling)
-
-**API Implementation Tasks:**
-- T4.4.1: Replace Page Mock APIs with real implementations
-- T4.4.2: Replace Ranking Mock APIs with real implementations  
-- T4.4.3: Replace Book Mock APIs with real implementations
-- T4.4.4: Replace Crawler Mock APIs with real implementations
-
-### Task Dependencies and Sequencing
-
-**Critical Path:**
-1. T2.1 → T3.1 → T4.4.x (API models → DB models → API implementation)
-2. T3.2 → T4.2.x (DB operations → Data services)
-3. T4.1.x → T4.3.x (Crawler → Task management)
-
-**Parallel Development Opportunities:**
-- T4.1.x and T4.2.x can be developed simultaneously
-- T4.3.x (JSON task management) is independent and can be developed early
-- Frontend development can start after T2.x completion
-
-## Development Notes
-
-- **Simplicity First**: Choose the simplest implementation that works
-- **API-First**: Always define APIs before implementing backend logic
-- **Flat Architecture**: Minimal layers, direct module communication
-- **Mixed Storage**: Database for complex data, JSON for simple state management
-- **Type Safety**: Use SQLModel for database models and Pydantic for API models
-- **Task Isolation**: Each sub-task has clear inputs/outputs, avoiding cross-module coupling
-- **Mock-to-Real**: Staged replacement of mock implementations with real functionality
-- **Error Handling**: Implement proper error handling and logging in each module
-- **Rate Limiting**: Respect target site's rate limits (1 second intervals)
-- **Data Validation**: Use Pydantic models for request/response validation
-- **Async Operations**: Use async/await for I/O operations
-- **Testing Strategy**: Mock APIs early to enable frontend development
+- **接口优先**：总是先定义 API 接口，再实现后端逻辑
+- **扁平架构**：最小化层次结构，模块间直接通信
+- **混合存储**：复杂数据使用数据库，简单状态管理使用 JSON
+- **任务隔离**：每个子任务有清晰的输入输出，避免跨模块耦合
+- **渐进替换**：分阶段将 Mock 实现替换为真实功能
+- **错误处理**：每个模块都要实现完善的错误处理和日志记录
+- **限流控制**：尊重目标站点的访问限制（1秒间隔）
+- **数据验证**：使用 Pydantic 模型进行请求响应验证
+- **异步操作**：I/O 操作使用 async/await
+- **测试策略**：优先实现 Mock API 以支持前端开发

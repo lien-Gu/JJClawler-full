@@ -85,3 +85,4 @@ logs/
 # Poetry
 poetry.lock
 /data/tasks/
+/data/example/tmp.json

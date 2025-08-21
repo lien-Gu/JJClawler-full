@@ -1,69 +1,254 @@
 """
-配置管理模块
-
-使用pydantic-settings管理环境变量和应用配置
+配置管理模块 - 使用Pydantic BaseSettings自动读取环境变量
 """
-import os
-from typing import Optional
 
+from pathlib import Path
+from typing import Any
+
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings
 
 
+class DatabaseSettings(BaseSettings):
+    """数据库配置"""
+
+    # 数据库连接配置
+    url: str = Field(default="sqlite:///./data/jjcrawler.db", description="数据库连接URL")
+    echo: bool = Field(default=False, description="是否打印SQL语句")
+
+    # 连接池配置
+    pool_size: int = Field(default=5, ge=1, le=50, description="连接池大小")
+    max_overflow: int = Field(default=10, ge=0, le=100, description="连接池最大溢出连接数")
+    pool_timeout: int = Field(default=30, ge=1, le=300, description="连接池获取连接超时时间（秒）")
+    pool_recycle: int = Field(default=3600, ge=300, le=86400, description="连接回收时间（秒）")
+
+    class Config:
+        env_prefix = "DATABASE_"
+        env_file_encoding = "utf-8"
+
+
+class APISettings(BaseSettings):
+    """API服务配置"""
+
+    # 基本配置
+    title: str = Field(default="JJCrawler API", description="API标题")
+    description: str = Field(default="晋江文学城爬虫API服务", description="API描述")
+    version: str = Field(default="v1", description="API版本")
+
+    # 服务器配置
+    host: str = Field(default="0.0.0.0", description="服务器监听地址")
+    port: int = Field(default=8000, ge=1, le=65535, description="服务器端口")
+    debug: bool = Field(default=False, description="是否开启调试模式")
+
+    # 跨域配置
+    cors_enabled: bool = Field(default=True, description="是否启用CORS")
+
+    # 分页配置
+    default_page_size: int = Field(default=20, ge=1, le=100, description="默认分页大小")
+    max_page_size: int = Field(default=100, ge=1, le=1000, description="最大分页大小")
+
+    class Config:
+        env_prefix = "API_"
+        env_file_encoding = "utf-8"
+
+
+class CrawlerSettings(BaseSettings):
+    """爬虫配置"""
+
+    # HTTP客户端配置
+    user_agent: dict = Field(
+        default={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Sec-Ch-Ua": '"Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Connection": "keep-alive"
+        },
+        description="User-Agent字符串",
+    )
+    timeout: int = Field(default=30, ge=5, le=300, description="请求超时时间（秒）")
+
+    # 统一并发控制配置 - 针对503错误优化
+    request_delay: float = Field(default=2.0, ge=0.1, le=60.0, description="请求间隔延迟（秒）")
+    max_concurrent_requests: int = Field(default=3, ge=1, le=5, description="全局最大并发请求数")
+    
+    # 重试配置
+    retry_times: int = Field(default=2, ge=0, le=5, description="页面级重试次数")
+    retry_delay: float = Field(default=2.0, ge=0.5, le=10.0, description="页面重试延迟（秒）")
+    
+    # 指数退避重试配置
+    max_retry_time: float = Field(default=60.0, ge=10.0, le=300.0, description="最大重试时间（秒）")
+    retry_multiplier: float = Field(default=2.0, ge=1.0, le=5.0, description="指数退避倍数")
+    retry_min_wait: float = Field(default=1.0, ge=0.1, le=5.0, description="最小等待时间（秒）")
+    retry_max_wait: float = Field(default=30.0, ge=5.0, le=120.0, description="最大等待时间（秒）")
+
+    class Config:
+        env_prefix = "CRAWLER_"
+        env_file_encoding = "utf-8"
+
+
+class SchedulerSettings(BaseSettings):
+    """任务调度器配置
+    
+    重构后的配置支持APScheduler 4.0的并发特性，
+    包括更细粒度的任务并发控制。
+    """
+
+    # 调度器基本配置
+    timezone: str = Field(default="Asia/Shanghai", description="时区设置")
+    max_workers: int = Field(default=5, ge=1, le=20, description="最大工作线程数，控制同时执行的任务数量")
+    # 任务存储配置
+    job_store_type: str = Field(default="SQLAlchemyJobStore", description="任务存储类型")
+    job_store_url: str | None = Field(default=None, description="任务存储连接URL，默认使用数据库URL")
+    job_store_table_name: str = Field(default="scheduler_jobs", description="调度任务存储表格")
+    
+    # 事件系统配置
+    enable_event_logging: bool = Field(default=True, description="是否启用事件日志记录")
+    event_retry_delay: float = Field(default=1.0, ge=0.1, le=10.0, description="事件处理失败重试延迟（秒）")
+    
+    # 任务清理配置
+    job_cleanup_enabled: bool = Field(default=True, description="是否启用任务清理功能")
+    job_retention_days: int = Field(default=7, ge=1, le=365, description="任务保留天数")
+    cleanup_interval_hours: int = Field(default=24, ge=1, le=168, description="清理任务执行间隔(小时)")
+    cleanup_batch_size: int = Field(default=100, ge=10, le=1000, description="每次清理的任务批量大小")
+
+    class Config:
+        env_prefix = "SCHEDULER_"
+        env_file_encoding = "utf-8"
+
+
+
+class LoggingSettings(BaseSettings):
+    """日志配置"""
+
+    level: str = Field(default="INFO", description="日志级别")
+    log_format: str = Field(default="%(asctime)s-%(name)s-%(levelname)s-%(message)s", description="日志格式")
+    console_enabled: bool = Field(default=True, description="是否启用控制台输出")
+    file_enabled: bool = Field(default=True, description="是否启用文件输出")
+
+    # 日志文件配置
+    file_path: str = Field(default="./logs/jjcrawler.log", description="日志文件路径")
+    backup_count: int = Field(default=5, ge=1, le=20, description="备份日志文件数量")
+
+    # 错误日志配置
+    error_file_enabled: bool = Field(default=True, description="是否启用错误日志文件")
+    error_file_path: str = Field(default="./logs/jjcrawler_error.log", description="错误日志文件路径")
+
+    class Config:
+        env_prefix = "LOG_"
+        env_file_encoding = "utf-8"
+
+    @field_validator("level")
+    @classmethod
+    def validate_log_level(cls, v: str):
+        """验证日志级别"""
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v.upper() not in valid_levels:
+            raise ValueError(f"日志级别必须是 {valid_levels} 中的一个")
+        return v.upper()
+
+
 class Settings(BaseSettings):
-    """应用配置"""
-    
+    """主配置类 - 整合所有配置"""
+
+    # 环境配置
+    env: str = Field(default="dev", description="运行环境")
+    debug: bool = Field(default=False, description="调试模式")
+
     # 项目信息
-    PROJECT_NAME: str = "JJCrawler3"
-    VERSION: str = "0.1.0"
-    DEBUG: bool = True
-    
-    # API配置
-    API_V1_STR: str = "/api/v1"
-    
-    # 数据库配置
-    DATABASE_URL: str = "sqlite:///./data/jjcrawler.db"
-    
-    # 爬虫配置
-    CRAWL_DELAY: float = 1.0
-    REQUEST_TIMEOUT: int = 30
-    MAX_RETRIES: int = 3
-    
-    # 日志配置
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
-    # 任务调度配置
-    SCHEDULER_TIMEZONE: str = "Asia/Shanghai"
-    JIAZI_SCHEDULE: str = "0 */1 * * *"  # 每小时执行
-    RANKING_SCHEDULE: str = "0 0 * * *"  # 每天执行
-    
-    # 文件路径配置
-    DATA_DIR: str = "./data"
-    TASKS_FILE: str = "./data/tasks/tasks.json"
-    URLS_CONFIG_FILE: str = "./data/urls.json"
-    
-    model_config = {
-        "env_file": ".env",
-        "case_sensitive": True
-    }
+    project_name: str = Field(default="JJCrawler", description="项目名称")
+    project_version: str = Field(default="1.0.0", description="项目版本")
+
+    # 数据目录配置
+    data_dir: str = Field(default="./data", description="数据目录")
+    logs_dir: str = Field(default="./logs", description="日志目录")
+
+    # 子配置
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings, description="数据库配置")
+    api: APISettings = Field(default_factory=APISettings, description="API配置")
+    crawler: CrawlerSettings = Field(default_factory=CrawlerSettings, description="爬虫配置")
+    scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings, description="调度器配置")
+    logging: LoggingSettings = Field(default_factory=LoggingSettings, description="日志配置")
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._ensure_directories()
+
+    def model_post_init(self, __context):
+        """模型初始化后处理，设置scheduler使用database的URL"""
+        if self.scheduler.job_store_url is None:
+            self.scheduler.job_store_url = self.database.url
+
+    def _ensure_directories(self):
+        """确保必要的目录存在"""
+        directories = [
+            self.data_dir,
+            self.logs_dir,
+            Path(self.logging.file_path).parent,
+        ]
+
+        for directory in directories:
+            if directory:
+                Path(directory).mkdir(parents=True, exist_ok=True)
+
+    @field_validator("env")
+    @classmethod
+    def validate_environment(cls, v):
+        """验证环境配置"""
+        valid_environments = ["dev", "test", "prod"]
+        if v.lower() not in valid_environments:
+            raise ValueError(f"环境必须是 {valid_environments} 中的一个")
+        return v.lower()
+
+    def get_database_url(self) -> str:
+        """获取数据库连接URL"""
+        return self.database.url
 
 
-# 全局配置实例
-settings = Settings()
+# 全局设置实例
+_settings = Settings()
+settings = _settings
 
 
+# 便捷访问函数
 def get_settings() -> Settings:
-    """获取配置实例"""
-    return settings
+    """获取设置实例"""
+    return _settings
 
 
-def ensure_directories():
-    """确保必要的目录存在"""
-    directories = [
-        settings.DATA_DIR,
-        os.path.dirname(settings.TASKS_FILE),
-        f"{settings.DATA_DIR}/tasks/history",
-    ]
-    
-    for directory in directories:
-        os.makedirs(directory, exist_ok=True)
+def get_database_url() -> str:
+    """获取数据库连接URL"""
+    return _settings.get_database_url()
+
+
+def is_debug() -> bool:
+    """是否为调试模式"""
+    return _settings.debug or _settings.env == "dev"
+
+
+def is_production() -> bool:
+    """是否为生产环境"""
+    return _settings.is_production()
+
+
+if __name__ == "__main__":
+    try:
+        # Pydantic-settings 会自动从环境变量或 .env 文件加载
+        # 这里我们直接传入数据进行测试
+        config = get_settings().logging
+        print("有效配置测试通过:")
+        print(f"  log Level: {config.level}")  # 输出: WARNING
+    except ValidationError as e:
+        print("有效配置测试失败:", e)

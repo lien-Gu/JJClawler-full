@@ -8,7 +8,8 @@ import configData from '../data/config.json'
 class ConfigManager {
   constructor() {
     this.config = configData
-    this.currentEnvironment = this.config.api.environment || 'development'
+    this.currentEnvironment = this.config.api.environment || 'dev'
+    console.log(`running environment variables:${this.config.api.environment}`)
   }
 
   /**

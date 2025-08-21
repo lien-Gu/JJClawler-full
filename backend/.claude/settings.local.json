@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(uv:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(mv:*)",
+      "Bash(git add:*)",
+      "Bash(unset all_proxy)",
+      "Bash(unset http_proxy)",
+      "Bash(unset https_proxy)",
+      "Bash(del teststest_crawltest_crawl_flow_fixed.py)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(timeout:*)",
+      "Bash(echo:*)",
+      "Bash(chcp:*)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(env)",
+      "Bash(unset:*)",
+      "Bash(grep:*)",
+      "Bash(set HTTP_PROXY=)",
+      "Bash(set HTTPS_PROXY=)",
+      "Bash(set ALL_PROXY=)"
+    ],
+    "deny": [],
+    "additionalDirectories": [
+      "D:\\d D:\\code\\Python\\JJClawler-full"
+    ]
+  }
+}

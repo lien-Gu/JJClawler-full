@@ -3,14 +3,14 @@
  * @description 统一管理三种环境下的数据获取：dev(后端API)、test(假数据)、pro(服务器API)
  */
 
-import configManager from './config.js'
+import envConfig from './env-config.js'
 import request from './request.js'
-import fakeData from '../data/fake_data.json'
+import fakeDataManager from './fake-data-manager.js'
 
 class DataManager {
   constructor() {
-    this.configManager = configManager
-    this.fakeData = fakeData
+    this.envConfig = envConfig
+    this.fakeDataManager = fakeDataManager
   }
 
   /**
@@ -18,7 +18,7 @@ class DataManager {
    * @returns {string} 环境名称
    */
   getCurrentEnvironment() {
-    return this.configManager.getCurrentEnvironment()
+    return this.envConfig.getCurrentEnv()
   }
 
   /**
@@ -26,7 +26,7 @@ class DataManager {
    * @returns {boolean} 
    */
   shouldUseFakeData() {
-    return this.getCurrentEnvironment() === 'test'
+    return this.envConfig.useLocalData()
   }
 
   /**
@@ -37,10 +37,15 @@ class DataManager {
    * @param {Object} options 请求选项
    * @returns {Promise} 数据Promise
    */
-  async getData(apiPath, fakeDataPath, params = {}, options = {}) {
+  async getData(apiPath, fakeDataMethod, params = {}, options = {}) {
     if (this.shouldUseFakeData()) {
-      // 使用假数据
-      return this.getFakeData(fakeDataPath, params)
+      // 使用假数据管理器
+      if (typeof this.fakeDataManager[fakeDataMethod] === 'function') {
+        return await this.fakeDataManager[fakeDataMethod](params)
+      } else {
+        this.envConfig.error(`假数据方法不存在: ${fakeDataMethod}`)
+        return null
+      }
     } else {
       // 使用真实API
       return await request.get(apiPath, params, options)
@@ -70,28 +75,6 @@ class DataManager {
    * @param {Object} params 模拟查询参数
    * @returns {any} 数据
    */
-  getFakeData(path, params = {}) {
-    const pathParts = path.split('.')
-    let data = this.fakeData
-    
-    // 按路径深入获取数据
-    for (const part of pathParts) {
-      if (data && typeof data === 'object' && part in data) {
-        data = data[part]
-      } else {
-        console.warn(`假数据路径不存在: ${path}`)
-        return null
-      }
-    }
-
-    // 模拟一些查询参数的处理
-    if (params.limit && Array.isArray(data)) {
-      data = data.slice(0, params.limit)
-    }
-
-    // 深拷贝数据避免修改原始数据
-    return JSON.parse(JSON.stringify(data))
-  }
 
   // ================== 具体业务API方法 ==================
 
@@ -99,21 +82,21 @@ class DataManager {
    * 获取首页统计概览
    */
   async getOverviewStats() {
-    return this.getData('/stats/overview', 'stats.overview')
+    return this.getData('/stats/overview', 'getOverviewStats')
   }
 
   /**
    * 获取榜单列表
    */
   async getRankingsList(params = {}) {
-    return this.getData('/rankings', 'rankings.list', params)
+    return this.getData('/rankings', 'getRankingsList', params)
   }
 
   /**
    * 获取热门榜单
    */
   async getHotRankings(params = {}) {
-    return this.getData('/rankings/hot', 'rankings.hot', params)
+    return this.getData('/rankings/hot', 'getHotRankings', params)
   }
 
   /**
@@ -123,9 +106,7 @@ class DataManager {
    */
   async getRankingBooks(rankingId, params = {}) {
     if (this.shouldUseFakeData()) {
-      // 根据榜单ID返回对应的假数据
-      const fakeDataKey = `books.${rankingId}_list`
-      return this.getFakeData(fakeDataKey, params) || this.getFakeData('books.jiazi_list', params)
+      return await this.fakeDataManager.getRankingBooks(rankingId, params)
     } else {
       return await request.get(`/rankings/${rankingId}/books`, params)
     }
@@ -137,7 +118,7 @@ class DataManager {
    */
   async getBookDetail(bookId) {
     if (this.shouldUseFakeData()) {
-      return this.getFakeData(`books.detail.${bookId}`) || this.getFakeData('books.detail.book_001')
+      return await this.fakeDataManager.getBookDetail(bookId)
     } else {
       return await request.get(`/books/${bookId}`)
     }
@@ -149,8 +130,7 @@ class DataManager {
    */
   async getBookRankings(bookId) {
     if (this.shouldUseFakeData()) {
-      const bookDetail = this.getFakeData(`books.detail.${bookId}`) || this.getFakeData('books.detail.book_001')
-      return bookDetail?.ranking_history || []
+      return await this.fakeDataManager.getBookRankings(bookId)
     } else {
       return await request.get(`/books/${bookId}/rankings`)
     }
@@ -230,7 +210,7 @@ class DataManager {
    * 获取用户关注列表
    */
   async getUserFollows() {
-    return this.getData('/user/follows', 'user.follows')
+    return this.getData('/user/follows', 'getUserFollows')
   }
 
   /**
@@ -245,14 +225,14 @@ class DataManager {
    * 获取爬虫任务列表
    */
   async getCrawlTasks() {
-    return this.getData('/crawl/tasks', 'crawl.tasks')
+    return this.getData('/crawl/tasks', 'getCrawlTasks')
   }
 
   /**
    * 获取调度器状态
    */
   async getSchedulerStatus() {
-    return this.getData('/crawl/scheduler/status', 'crawl.status')
+    return this.getData('/crawl/scheduler/status', 'getSchedulerStatus')
   }
 
   /**
@@ -275,7 +255,7 @@ class DataManager {
       'pro': '生产环境 - 使用服务器API'
     }
     
-    if (configManager.isDebugMode()) {
+    if (this.envConfig.isDebug()) {
       console.log(`当前数据源: ${envDescriptions[env] || env}`)
     }
   }
@@ -289,8 +269,8 @@ class DataManager {
       environment: env,
       useRealAPI: !this.shouldUseFakeData(),
       useFakeData: this.shouldUseFakeData(),
-      baseURL: configManager.getAPIBaseURL(),
-      debug: configManager.isDebugMode()
+      baseURL: this.envConfig.getBaseURL(),
+      debug: this.envConfig.isDebug()
     }
   }
 }
@@ -299,7 +279,7 @@ class DataManager {
 const dataManager = new DataManager()
 
 // 在调试模式下显示数据源提示
-if (configManager.isDebugMode()) {
+if (envConfig.isDebug()) {
   dataManager.showDataSourceTip()
 }
 

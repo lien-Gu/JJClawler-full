@@ -1,131 +1,142 @@
 """
-书籍相关接口
-
-提供书籍信息查询、榜单历史和趋势分析的API端点
+书籍相关API接口 - 简化版本
 """
-from typing import Optional
-from fastapi import APIRouter, Query, Path, HTTPException, Depends
-from app.modules.service import BookService
-from app.modules.models import (
+
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from ..database.connection import get_db
+from ..database.service.book_service import BookService
+from ..database.service.ranking_service import RankingService
+from ..models.base import DataResponse, PaginationData
+from ..models.book import (
     BookDetail,
-    BookRankingsResponse, 
-    BookTrendsResponse,
-    BookSearchResponse
+    BookRankingInfo,
+    BookBasic,
+    BookSnapshot,
 )
 
-router = APIRouter(prefix="/books", tags=["书籍信息"])
+router = APIRouter()
+
+# 初始化服务
+book_service = BookService()
+ranking_service = RankingService()
 
 
-def get_book_service() -> BookService:
-    """获取Book服务实例"""
-    return BookService()
-
-
-@router.get("/{book_id}", response_model=BookDetail)
-async def get_book_detail(
-    book_id: str = Path(..., description="书籍ID"),
-    book_service: BookService = Depends(get_book_service)
-):
+@router.get("/", response_model=DataResponse[PaginationData])
+async def get_books_list(
+        page: int = Query(1, ge=1, description="页码"),
+        size: int = Query(20, ge=1, le=100, description="每页数量"),
+        db: Session = Depends(get_db),
+) -> DataResponse[PaginationData[BookBasic]]:
     """
-    获取书籍详细信息
-    
-    返回指定书籍的完整信息，包括基本信息和最新统计数据
+    获取书籍列表（分页）
+    :param page:
+    :param size:
+    :param db:
+    :return:
     """
-    try:
-        book_detail = book_service.get_book_detail(book_id)
-        if not book_detail:
-            raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
-        return book_detail
-    finally:
-        book_service.close()
+    book_result, total = book_service.get_books_with_pagination(db, page, size)
+
+    return DataResponse(
+        data=PaginationData(
+            data_list=book_result,
+            page=page,
+            size=size,
+            total_pages=total
+        ),
+        message="获取书籍列表成功"
+    )
 
 
-@router.get("/{book_id}/rankings", response_model=BookRankingsResponse)
-async def get_book_rankings(
-    book_id: str = Path(..., description="书籍ID"),
-    days: int = Query(30, ge=1, le=365, description="历史天数"),
-    book_service: BookService = Depends(get_book_service)
-):
+@router.get("/{novel_id}", response_model=DataResponse[BookDetail])
+async def get_book_detail(novel_id: int, db: Session = Depends(get_db)) -> DataResponse[BookDetail]:
     """
-    获取书籍榜单历史
-    
-    返回指定书籍在各个榜单中的历史表现，
-    包括当前在榜情况和历史记录
+    获取书籍详细信息 - 使用novel_id
+    :param novel_id:
+    :param db:
+    :return:
     """
-    try:
-        book_detail, current_rankings, history_rankings = book_service.get_book_ranking_history(book_id, days)
-        
-        if not book_detail:
-            raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
-        
-        return BookRankingsResponse(
-            book=book_detail.model_dump(),
-            current_rankings=[ranking.model_dump() for ranking in current_rankings],
-            history=[record.model_dump() for record in history_rankings],
-            total_records=len(history_rankings)
-        )
-    finally:
-        book_service.close()
+    book = book_service.get_book_by_novel_id(db, novel_id)
+
+    # 通过novel_id获取详细信息
+    book_detail = book_service.get_book_detail_by_novel_id(db, book.novel_id)
+    if not book_detail:
+        raise HTTPException(status_code=404, detail=f"书籍详情不存在: {novel_id}")
+
+    return DataResponse(
+        data=book_detail,
+        message="获取书籍详情成功"
+    )
 
 
-@router.get("/{book_id}/trends", response_model=BookTrendsResponse) 
-async def get_book_trends(
-    book_id: str = Path(..., description="书籍ID"),
-    days: int = Query(30, ge=1, le=365, description="趋势天数"),
-    book_service: BookService = Depends(get_book_service)
-):
+@router.get("/{novel_id}/snapshots", response_model=DataResponse[List[BookSnapshot]])
+async def get_book_snapshots(
+        novel_id: int,
+        interval: str = Query(
+            "day",
+            pattern="^(hour|day|week|month)$",
+            description="时间间隔: hour/day/week/month"
+        ),
+        count: int = Query(7, ge=1, le=365, description="时间段数量"),
+        db: Session = Depends(get_db),
+) -> DataResponse:
     """
-    获取书籍数据变化趋势
-    
-    返回指定书籍在过去N天的统计数据变化，
-    包括点击量、收藏量、评论数、章节数的趋势
+    获取书籍历史快照
+
+    Examples:
+        - interval=hour, count=7: 获取7小时内每小时的第一个快照
+        - interval=day, count=7: 获取7天内每天的第一个快照
+        - interval=week, count=4: 获取4周内每周的第一个快照
+        - interval=month, count=3: 获取3个月内每月的第一个快照
+
+    :param novel_id: 书籍novel_id
+    :param interval: 时间间隔 (hour/day/week/month)
+    :param count: 时间段数量
+    :param db:
+    :return: 历史快照列表
     """
-    try:
-        # 先检查书籍是否存在
-        book_detail = book_service.get_book_detail(book_id)
-        if not book_detail:
-            raise HTTPException(status_code=404, detail=f"书籍 {book_id} 不存在")
-        
-        # 获取趋势数据
-        trends = book_service.get_book_trend_data(book_id, days)
-        
-        return BookTrendsResponse(
-            book_id=book_id,
-            title=book_detail.title,
-            days=days,
-            trends=[trend.model_dump() for trend in trends]
-        )
-    finally:
-        book_service.close()
+    # 参数范围限制
+    limits = {"hour": 168, "day": 90, "week": 52, "month": 24}
+    count = min(count, limits[interval])
+
+    # 获取书籍并验证存在性
+    book = book_service.get_book_by_novel_id(db, novel_id)
+
+    # 调用统一的历史快照获取方法
+    snapshots = book_service.get_historical_snapshots_by_novel_id(db, book.novel_id, interval, count)
+
+    return DataResponse(
+        data=snapshots,
+        message=f"获取{len(snapshots)}个{interval}间隔的历史快照成功"
+    )
 
 
-@router.get("", response_model=BookSearchResponse)
-async def search_books(
-    author: Optional[str] = Query(None, description="作者名筛选"),
-    title: Optional[str] = Query(None, description="书名筛选"),
-    novel_class: Optional[str] = Query(None, description="分类筛选"),
-    limit: int = Query(20, ge=1, le=100, description="每页数量"),
-    offset: int = Query(0, ge=0, description="偏移量"),
-    book_service: BookService = Depends(get_book_service)
-):
+@router.get("/{novel_id}/rankings", response_model=DataResponse[List[BookRankingInfo]])
+async def get_book_ranking_history(
+        novel_id: int,
+        days: int = Query(30, ge=1, le=365, description="统计天数"),
+        db: Session = Depends(get_db),
+) -> DataResponse:
     """
-    搜索书籍
-    
-    根据作者、书名、分类等条件搜索书籍，
-    支持分页查询
+    获取书籍排名历史 - 使用novel_id
+
+    :param novel_id: 书籍novel_id，晋江文学城的小说ID
+    :param days: 统计天数，查询最近多少天的排名历史
+    :param db: 数据库会话对象
+    :return: 书籍排名历史列表
     """
-    try:
-        books, total = book_service.search_books(
-            title=title,
-            author=author,
-            novel_class=novel_class,
-            limit=limit,
-            offset=offset
-        )
-        
-        return BookSearchResponse(
-            total=total,
-            books=[book.model_dump() for book in books]
-        )
-    finally:
-        book_service.close()
+    # 检查书籍是否存在
+    book = book_service.get_book_by_novel_id(db, novel_id)
+
+    # 使用ranking_service获取排名历史数据
+    ranking_infos = ranking_service.get_book_ranking_history(
+        db, book.novel_id, days
+    )
+
+    return DataResponse(
+        data=ranking_infos,
+        message=f"获取{len(ranking_infos)}条排名历史成功"
+    )
