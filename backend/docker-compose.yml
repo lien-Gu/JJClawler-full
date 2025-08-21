@@ -15,6 +15,8 @@ services:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+      # 日志配置 - 启用文件日志
+      - LOGGING_FILE_ENABLED=true
       
       # 应用配置
       - DEBUG=false

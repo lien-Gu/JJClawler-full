@@ -133,7 +133,7 @@ async def health_check():
     from .database.connection import check_db
     db_ok = check_db()
     from .schedule.scheduler import check_scheduler
-    scheduler_ok = check_scheduler()
+    scheduler_ok = await check_scheduler()
 
     # 计算运行时间
     uptime = time.time() - APP_START_TIME
