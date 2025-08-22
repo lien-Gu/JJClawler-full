@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import get_settings
 from ..logger import get_logger
-from ..utils import get_model_fields
 
 # 获取配置
 settings = get_settings()

@@ -44,6 +44,8 @@ def extract_number(string: str) -> int:
     :param string:
     :return:
     """
+    if not string:
+        return 0
     digits_str = ''.join(re.findall(r'\d', string))
     number = int(digits_str)
     return number

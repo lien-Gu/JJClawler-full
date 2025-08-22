@@ -25,7 +25,9 @@
       "Bash(grep:*)",
       "Bash(set HTTP_PROXY=)",
       "Bash(set HTTPS_PROXY=)",
-      "Bash(set ALL_PROXY=)"
+      "Bash(set ALL_PROXY=)",
+      "Bash(sqlite3:*)",
+      "Bash(.venv/Scripts/python.exe app/database/service/book_service.py)"
     ],
     "deny": [],
     "additionalDirectories": [

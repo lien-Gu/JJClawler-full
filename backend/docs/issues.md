@@ -1092,3 +1092,77 @@ async def health_check():
 - 提高了Docker容器健康检查的可靠性
 - 增强了系统对组件异常的容错能力
 - 为监控和运维提供了更稳定的健康状态指示
+
+## 2025-08-22 书籍详情API数据类型验证错误修复
+
+### 问题：Pydantic模型验证字符串格式数字失败
+
+**时间**：2025-08-22 10:19
+
+**错误信息**：
+```
+1 validation error for BookDetail
+word_counts
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='42,484', input_type=str]
+```
+
+**现象**：
+- 请求 `/api/v1/books/8953663` 接口时服务报错
+- 数据库中存储的 `word_counts` 字段是字符串格式 `'42,484'`（包含逗号）
+- Pydantic模型期望整数类型，无法自动转换带逗号的字符串
+
+**原因分析**：
+- 位置：`app/database/service/book_service.py:225` 的 `BookDetail.model_validate()`
+- **根本问题**：晋江文学城返回的数字数据包含千位分隔符逗号
+- 具体机制：
+  1. 爬虫获取到的数据：`word_counts: "42,484"`  
+  2. 存储到数据库时未进行数据清洗
+  3. API返回时 Pydantic 模型验证失败，无法解析带逗号的数字字符串
+
+**解决方法**：
+1. **添加数据清洗函数**：创建 `clean_snapshot_data()` 处理字符串格式数字
+2. **使用extract_number工具**：利用现有的工具函数移除字符串中的非数字字符
+3. **统一处理所有快照数据**：确保 `BookDetail` 和 `BookSnapshot` 都使用清洗后的数据
+
+**修复后代码**：
+```python
+def clean_snapshot_data(data_dict: dict) -> dict:
+    """
+    清洗书籍快照数据，处理字符串格式的数字字段
+    """
+    cleaned_data = data_dict.copy()
+    
+    # 需要清洗的数字字段
+    numeric_fields = ['word_counts', 'chapter_counts']
+    
+    for field in numeric_fields:
+        if field in cleaned_data and isinstance(cleaned_data[field], str):
+            try:
+                cleaned_data[field] = extract_number(cleaned_data[field])
+            except (ValueError, TypeError):
+                cleaned_data[field] = None
+    
+    return cleaned_data
+
+# 在BookDetail创建时使用
+snapshot_dict = clean_snapshot_data({
+    "word_counts": latest_snapshot.word_counts,
+    "chapter_counts": latest_snapshot.chapter_counts,
+    # ... 其他字段
+})
+
+# 在BookSnapshot创建时使用  
+return [book.BookSnapshot.model_validate(clean_snapshot_data(row._asdict())) for row in result]
+```
+
+**修复效果**：
+- ✅ **字符串数字转换**：`'42,484'` → `42484` 正确解析
+- ✅ **API接口正常**：`GET /api/v1/books/{novel_id}` 返回正确数据
+- ✅ **统一数据处理**：所有快照相关API都使用一致的数据清洗逻辑
+- ✅ **容错处理**：无法解析的数据设置为 `None` 而不是报错
+
+**影响范围**：
+- 修复了所有书籍详情和快照相关API的数据类型问题
+- 解决了晋江数据格式与系统模型不匹配的问题
+- 提高了API的健壮性和数据处理能力
+- 为后续处理其他格式化数字数据提供了通用方案

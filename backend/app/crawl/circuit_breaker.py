@@ -79,12 +79,12 @@ class CircuitBreaker:
         """计算当前恢复超时时间（指数退避）"""
         if self._failure_count <= 1:
             return self.config.base_recovery_timeout
-        
+
         # 指数退避：base_timeout * (multiplier ^ (failure_count - 1))
         timeout = self.config.base_recovery_timeout * (
-            self.config.backoff_multiplier ** (self._failure_count - 1)
+                self.config.backoff_multiplier ** (self._failure_count - 1)
         )
-        
+
         # 限制最大超时时间
         return min(timeout, self.config.max_recovery_timeout)
 
@@ -95,22 +95,22 @@ class CircuitBreaker:
         检查熔断器状态，如果开启则等待恢复，如果半开状态则检查请求限制
         """
         await self._update_state_if_needed()
-        
+
         if self.is_open:
             await self._wait_for_open_state_recovery()
         elif self._state == CircuitState.HALF_OPEN:
             await self._check_half_open_request_limit()
-    
+
     async def _wait_for_open_state_recovery(self):
         """等待开启状态的熔断器恢复"""
         stats = self.get_stats()
         remaining_time = stats.get('remaining_recovery_time', 0)
-        
+
         if remaining_time > 0.1:  # 如果剩余时间很少，直接跳过等待
             logger.warning(f"熔断器开启中，等待 {remaining_time:.1f} 秒后恢复...")
             await asyncio.sleep(remaining_time)
             await self._update_state_if_needed()
-        
+
         # 检查等待后的状态
         if self.is_open:
             remaining = self.get_stats().get('remaining_recovery_time', 0)
@@ -118,7 +118,7 @@ class CircuitBreaker:
             raise CircuitBreakerOpenException(f"熔断器开启中，剩余恢复时间: {remaining:.1f}秒")
         else:
             logger.info("熔断器已恢复，继续执行HTTP请求")
-    
+
     async def _check_half_open_request_limit(self):
         """检查半开状态下的请求数量限制"""
         async with self._lock:
@@ -127,7 +127,7 @@ class CircuitBreaker:
                 raise CircuitBreakerOpenException("半开状态请求数量已达上限，等待状态转换")
             self._half_open_attempts += 1
             logger.info(f"半开状态请求计数: {self._half_open_attempts}/{self.config.half_open_max_calls}")
-    
+
     async def _update_state_if_needed(self):
         """根据时间条件更新熔断器状态"""
         async with self._lock:
@@ -146,7 +146,7 @@ class CircuitBreaker:
             # 检查是否需要触发熔断
             if self._should_trip_circuit():
                 await self._transition_to_open()
-    
+
     def _should_trip_circuit(self) -> bool:
         """判断是否应该触发熔断"""
         if self._state == CircuitState.CLOSED:
@@ -162,7 +162,7 @@ class CircuitBreaker:
                 await self._handle_half_open_success()
             elif self._state == CircuitState.CLOSED:
                 await self._handle_closed_success()
-    
+
     async def _handle_half_open_success(self):
         """处理半开状态下的成功请求"""
         self._half_open_successes += 1
@@ -170,14 +170,13 @@ class CircuitBreaker:
 
         if self._half_open_successes >= self.config.half_open_success_threshold:
             await self._transition_to_closed()
-    
+
     async def _handle_closed_success(self):
         """处理正常状态下的成功请求"""
         if self._failure_count > 0:
             logger.info(f"请求成功，重置失败计数 {self._failure_count} -> 0")
             self._failure_count = 0
             self._last_failure_time = None
-
 
     async def _check_state_transition(self):
         """检查状态转换"""
@@ -240,11 +239,12 @@ class CircuitBreaker:
 
         logger.info("熔断器恢复正常状态 - 所有请求已允许")
 
-    def _is_503_error(self, exception: Exception) -> bool:
-        """检查是否是503错误"""
+    @staticmethod
+    def _is_503_error(exception: Exception) -> bool:
+        """检查是否是服务器错误"""
         # 检查httpx的HTTPStatusError
         if hasattr(exception, 'response') and hasattr(exception.response, 'status_code'):
-            return exception.response.status_code == 503
+            return 500 <= exception.response.status_code < 600
 
         # 检查错误消息中是否包含503
         error_msg = str(exception).lower()

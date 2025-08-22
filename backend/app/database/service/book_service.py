@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.database.sql.book_queries import (
     BOOK_HISTORY_QUERY,
 )
-from ..db.book import Book, BookSnapshot
-from ...models import book
-from ...utils import filter_dict, get_model_fields
+from app.database.db.book import Book, BookSnapshot
+from app.models import book
+from app.utils import filter_dict, get_model_fields
 
 
 class BookService:
@@ -81,19 +81,19 @@ class BookService:
         novel_id = book_data.get("novel_id")
         if not novel_id:
             raise ValueError("novel_id is required")
-        
+
         # 确保novel_id是整数类型
         try:
             novel_id = int(novel_id)
             book_data["novel_id"] = novel_id
         except (ValueError, TypeError):
             raise ValueError(f"Invalid novel_id format: {novel_id}")
-        
+
         # 尝试获取已存在的书籍
         book = self.get_book_by_novel_id(db, novel_id)
         if book:
             return self.update_book(db, book, book_data)
-        
+
         # 如果不存在，尝试创建新书籍
         try:
             return self.create_book(db, book_data)
@@ -223,3 +223,49 @@ class BookService:
             "vip_chapter_id": getattr(latest_snapshot, 'vip_chapter_id', None) or 0
         }
         return book.BookDetail.model_validate({**book_dict, **snapshot_dict})
+
+
+
+
+if __name__ == '__main__':
+    from app.models.base import DataResponse
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from pathlib import Path
+    import os
+
+    # 构建数据库文件路径
+    db_path = Path(__file__).parent.parent.parent.parent / "data" / "jjcrawler.db"
+    db_url = f"sqlite:///{db_path.absolute()}"
+
+    print(f"连接到爬虫数据库: {db_url}")
+
+    # 检查数据库文件是否损坏，如果损坏则删除
+    if db_path.exists():
+        try:
+            # 尝试简单的连接测试
+            from sqlalchemy import text
+
+            test_engine = create_engine(db_url, echo=False)
+            with test_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print("数据库文件正常")
+        except Exception as e:
+            print(f"数据库文件不存在: {e}")
+
+    # 创建引擎和会话
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=create_engine(db_url, echo=False))
+    db = SessionLocal()
+
+    novel_id = 8953663
+    book = BookService.get_book_by_novel_id(db, novel_id)
+
+    # 通过novel_id获取详细信息
+    book_detail = BookService.get_book_detail_by_novel_id(db, book.novel_id)
+
+    res =  DataResponse(
+        data=book_detail,
+        message="获取书籍详情成功"
+    )
+    print(res)
+
