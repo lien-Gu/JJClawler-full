@@ -427,30 +427,100 @@ docker-compose --env-file .env.local up -d
 
 **Nginx反向代理配置**
 
+```bash
+# 安装
+sudo apt update
+sudo apt install nginx -y
+
+# 启动并设置开机自启
+sudo systemctl start nginx
+sudo systemctl enable nginx
+sudo systemctl status nginx
+
+# 创建 Nginx 配置文件
+sudo nano /etc/nginx/sites-available/work.guliyu.top
+```
+
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
-    
-    client_max_body_size 50M;
-    
+    server_name work.guliyu.top;
+
+    # 日志配置
+    access_log /var/log/nginx/work.guliyu.top.access.log;
+    error_log /var/log/nginx/work.guliyu.top.error.log;
+
+    # 反向代理到 Docker 容器
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 超时设置
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
+
+        # WebSocket 支持（如果需要）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
     }
-    
-    # 静态文件缓存
+
+    # API 文档路由
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /redoc {
+        proxy_pass http://127.0.0.1:8000/redoc;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 健康检查
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 静态文件缓存优化
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 }
+```
+
+启动nginx
+```bash
+# 创建软链接启用站点
+sudo ln -s /etc/nginx/sites-available/work.guliyu.top /etc/nginx/sites-enabled/
+
+# 测试 Nginx 配置
+sudo nginx -t
+
+# 如果配置正确，重载 Nginx
+sudo systemctl reload nginx
+
+# 停止当前容器
+docker-compose down
+
+# 重新构建并启动（如果修改了配置）
+docker-compose up -d
 ```
 
 **系统服务配置**
