@@ -110,8 +110,8 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard/BaseCard.vue'
-import api from '@/api/request.js'
+import BaseCard from '@/components/BaseCard.vue'
+import api, { dataManager } from '@/api/request.js'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
@@ -120,7 +120,6 @@ export default {
   components: {
     BaseCard
   },
-  mixins: [formatterMixin, navigationMixin],
   
   data() {
     return {

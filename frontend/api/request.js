@@ -198,4 +198,6 @@ class RequestManager {
 // 创建单例实例
 const requestManager = new RequestManager()
 
+// 为了向后兼容，同时导出为 dataManager 别名
+export const dataManager = requestManager
 export default requestManager

@@ -63,8 +63,8 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard/BaseCard.vue'
-import BaseButton from '@/components/BaseButton/BaseButton.vue'
+import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 

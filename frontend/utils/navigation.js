@@ -210,6 +210,9 @@ export const navigation = {
   }
 }
 
+// 设置默认导出
+export default navigation
+
 // 导出便捷方法，可以直接导入使用
 export const {
   navigateTo,

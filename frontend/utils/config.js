@@ -183,6 +183,7 @@ export default configManager
 export const getAPIBaseURL = () => configManager.getAPIBaseURL()
 export const getAPITimeout = () => configManager.getAPITimeout()
 export const getCurrentEnvironment = () => configManager.getCurrentEnvironment()
+export const getAvailableEnvironments = () => configManager.getAvailableEnvironments()
 export const setEnvironment = (env) => configManager.setEnvironment(env)
 export const isDebugMode = () => configManager.isDebugMode()
 export const getAppInfo = () => configManager.getAppInfo()

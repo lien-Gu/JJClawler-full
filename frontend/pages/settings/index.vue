@@ -120,9 +120,9 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import BaseCard from '@/components/BaseCard.vue'
 import navigation from '@/utils/navigation.js'
-import { getEnvConfig } from '@/utils/common.js'
+import { getCurrentEnvironment, getAvailableEnvironments, setEnvironment } from '@/utils/config.js'
 
 export default {
   name: 'SettingsPage',
@@ -201,7 +201,7 @@ export default {
     },
     
     loadCurrentEnv() {
-      this.currentEnv = envConfig.getCurrentEnv()
+      this.currentEnv = getCurrentEnvironment()
       const envNames = {
         'test': '测试环境',
         'dev': '开发环境', 
@@ -211,7 +211,7 @@ export default {
     },
     
     showEnvSelector() {
-      const envs = envConfig.getAvailableEnvs()
+      const envs = getAvailableEnvironments()
       const envNames = envs.map(env => {
         const displayNames = {
           'test': '测试环境 (假数据)',
@@ -238,7 +238,7 @@ export default {
         content: `确定要切换到${env === 'test' ? '测试' : env === 'dev' ? '开发' : '生产'}环境吗？`,
         success: (res) => {
           if (res.confirm) {
-            const success = envConfig.switchEnv(env)
+            const success = setEnvironment(env)
             if (success) {
               this.loadCurrentEnv()
               uni.showToast({

@@ -108,9 +108,9 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard/BaseCard.vue'
-import BaseButton from '@/components/BaseButton/BaseButton.vue'
-import api from '@/api/request.js'
+import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import api, { dataManager } from '@/api/request.js'
 import { formatNumber, formatTime, formatWordCount } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
@@ -120,7 +120,6 @@ export default {
     BaseCard,
     BaseButton
   },
-  mixins: [formatterMixin, navigationMixin],
   
   data() {
     return {

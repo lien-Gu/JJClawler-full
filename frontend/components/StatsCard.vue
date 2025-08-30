@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import BaseCard from '@/components/BaseCard.vue'
 import { formatNumber } from '@/utils/format.js'
 
 /**
