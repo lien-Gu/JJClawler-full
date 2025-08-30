@@ -131,11 +131,11 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard.vue'
-import BaseButton from '@/components/BaseButton.vue'
-import dataManager from '@/utils/data-manager.js'
-import formatterMixin from '@/mixins/formatter.js'
-import navigationMixin from '@/mixins/navigation.js'
+import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import BaseButton from '@/components/BaseButton/BaseButton.vue'
+import api from '@/api/request.js'
+import { formatNumber, formatTime } from '@/utils/format.js'
+import navigation from '@/utils/navigation.js'
 
 export default {
   name: 'RankingDetailPage',
@@ -143,7 +143,8 @@ export default {
     BaseCard,
     BaseButton
   },
-  mixins: [formatterMixin, navigationMixin],
+  methods: {
+    ...navigation
   
   data() {
     return {

@@ -36,8 +36,8 @@
 </template>
 
 <script>
-import LoadingMore from './LoadingMore.vue'
-import EmptyState from './EmptyState.vue'
+import LoadingMore from '@/components/LoadingMore/LoadingMore.vue'
+import EmptyState from '@/components/EmptyState/EmptyState.vue'
 
 export default {
   name: 'ScrollableList',

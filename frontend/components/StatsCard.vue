@@ -29,8 +29,8 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard.vue'
-import formatterMixin from '@/mixins/formatter.js'
+import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import { formatNumber } from '@/utils/format.js'
 
 /**
  * 统计卡片组件

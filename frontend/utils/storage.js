@@ -1,5 +1,6 @@
 /**
- * 简化的本地存储工具
+ * 本地存储工具集合
+ * 支持简单值和复杂对象的存储
  */
 
 /**
@@ -27,6 +28,38 @@ export function getSync(key, defaultValue = null) {
     return value !== '' ? value : defaultValue
   } catch (error) {
     console.error('读取存储失败:', error)
+    return defaultValue
+  }
+}
+
+/**
+ * 存储对象（自动JSON序列化）
+ * @param {string} key 键名
+ * @param {Object} obj 对象
+ * @returns {boolean} 是否存储成功
+ */
+export function setObject(key, obj) {
+  try {
+    uni.setStorageSync(key, JSON.stringify(obj))
+    return true
+  } catch (error) {
+    console.error('存储对象失败:', error)
+    return false
+  }
+}
+
+/**
+ * 获取对象（自动JSON解析）
+ * @param {string} key 键名
+ * @param {Object} defaultValue 默认值
+ * @returns {Object} 解析后的对象或默认值
+ */
+export function getObject(key, defaultValue = null) {
+  try {
+    const value = uni.getStorageSync(key)
+    return value ? JSON.parse(value) : defaultValue
+  } catch (error) {
+    console.error('获取对象失败:', error)
     return defaultValue
   }
 }
@@ -67,10 +100,24 @@ export function getInfoSync() {
   }
 }
 
+// 导出存储对象，提供统一接口
+export const storage = {
+  set: setSync,
+  get: getSync,
+  setObject,
+  getObject,
+  remove: removeSync,
+  clear: clearSync,
+  getInfo: getInfoSync
+}
+
 export default {
   setSync,
   getSync,
+  setObject,
+  getObject,
   removeSync,
   clearSync,
-  getInfoSync
+  getInfoSync,
+  storage
 }

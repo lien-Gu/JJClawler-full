@@ -73,12 +73,12 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard.vue'
-import BaseButton from '@/components/BaseButton.vue'
-import ScrollableList from '@/components/ScrollableList.vue'
-import dataManager from '@/utils/data-manager.js'
-import formatterMixin from '@/mixins/formatter.js'
-import navigationMixin from '@/mixins/navigation.js'
+import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import BaseButton from '@/components/BaseButton/BaseButton.vue'
+import ScrollableList from '@/components/ScrollableList/ScrollableList.vue'
+import api from '@/api/request.js'
+import { formatNumber, formatTime } from '@/utils/format.js'
+import navigation from '@/utils/navigation.js'
 
 export default {
   name: 'FollowPage',
@@ -87,8 +87,6 @@ export default {
     BaseButton,
     ScrollableList
   },
-  mixins: [formatterMixin, navigationMixin],
-  
   data() {
     return {
       followData: [],
@@ -109,6 +107,9 @@ export default {
   },
   
   methods: {
+    ...navigation,
+    formatNumber,
+    formatTime,
     async loadFollowData() {
       try {
         // 优先从dataManager获取用户关注数据

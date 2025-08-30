@@ -41,11 +41,11 @@
 </template>
 
 <script>
-import SearchBar from '@/components/SearchBar.vue';
-import CategoryTabs from '@/components/CategoryTabs.vue';
-import RankingListItem from '@/components/RankingListItem.vue';
-import ScrollableList from '@/components/ScrollableList.vue';
-import dataManager from '@/utils/data-manager.js';
+import SearchBar from '@/components/SearchBar/SearchBar.vue';
+import CategoryTabs from '@/components/CategoryTabs/CategoryTabs.vue';
+import RankingListItem from '@/components/RankingListItem/RankingListItem.vue';
+import ScrollableList from '@/components/ScrollableList/ScrollableList.vue';
+import api from '@/api/request.js';
 import { getSitesList } from '@/data/url.js';
 
 export default {

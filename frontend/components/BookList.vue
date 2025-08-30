@@ -77,8 +77,8 @@
 </template>
 
 <script>
-import formatterMixin from '@/mixins/formatter.js'
-import navigationMixin from '@/mixins/navigation.js'
+import { formatNumber, formatWordCount } from '@/utils/format.js'
+import navigation from '@/utils/navigation.js'
 
 /**
  * 书籍列表组件
@@ -86,7 +86,10 @@ import navigationMixin from '@/mixins/navigation.js'
  */
 export default {
   name: 'BookList',
-  mixins: [formatterMixin, navigationMixin],
+  methods: {
+    ...navigation,
+    formatNumber,
+    formatWordCount
   
   props: {
     // 书籍列表数据

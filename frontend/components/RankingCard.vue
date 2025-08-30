@@ -63,10 +63,10 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard.vue'
-import BaseButton from '@/components/BaseButton.vue'
-import formatterMixin from '@/mixins/formatter.js'
-import navigationMixin from '@/mixins/navigation.js'
+import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import BaseButton from '@/components/BaseButton/BaseButton.vue'
+import { formatNumber, formatTime } from '@/utils/format.js'
+import navigation from '@/utils/navigation.js'
 
 /**
  * 榜单卡片组件

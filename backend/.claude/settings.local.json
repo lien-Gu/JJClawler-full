@@ -27,7 +27,8 @@
       "Bash(set HTTPS_PROXY=)",
       "Bash(set ALL_PROXY=)",
       "Bash(sqlite3:*)",
-      "Bash(.venv/Scripts/python.exe app/database/service/book_service.py)"
+      "Bash(.venv/Scripts/python.exe app/database/service/book_service.py)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "additionalDirectories": [

@@ -120,9 +120,9 @@
 </template>
 
 <script>
-import BaseCard from '@/components/BaseCard.vue'
-import navigationMixin from '@/mixins/navigation.js'
-import envConfig from '@/utils/env-config.js'
+import BaseCard from '@/components/BaseCard/BaseCard.vue'
+import navigation from '@/utils/navigation.js'
+import { getEnvConfig } from '@/utils/common.js'
 
 export default {
   name: 'SettingsPage',

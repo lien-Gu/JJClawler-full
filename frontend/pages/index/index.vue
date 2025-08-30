@@ -30,9 +30,9 @@
 </template>
 
 <script>
-import ReportCarousel from '@/components/ReportCarousel.vue';
-import ScrollableList from '@/components/ScrollableList.vue';
-import dataManager from '@/utils/data-manager.js';
+import ReportCarousel from '@/components/ReportCarousel/ReportCarousel.vue';
+import ScrollableList from '@/components/ScrollableList/ScrollableList.vue';
+import api from '@/api/request.js';
 
 export default {
   name: 'IndexPage',

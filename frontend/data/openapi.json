@@ -1,0 +1,1769 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "JJCrawler API",
+    "description": "晋江文学城爬虫系统API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/books/": {
+      "get": {
+        "tags": [
+          "books"
+        ],
+        "summary": "Get Books List",
+        "description": "获取书籍列表（分页）\n:param page:\n:param size:\n:param db:\n:return:",
+        "operationId": "get_books_list_api_v1_books__get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "页码",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "页码"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "每页数量",
+              "default": 20,
+              "title": "Size"
+            },
+            "description": "每页数量"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_PaginationData_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/{novel_id}": {
+      "get": {
+        "tags": [
+          "books"
+        ],
+        "summary": "Get Book Detail",
+        "description": "获取书籍详细信息 - 使用novel_id\n:param novel_id:\n:param db:\n:return:",
+        "operationId": "get_book_detail_api_v1_books__novel_id__get",
+        "parameters": [
+          {
+            "name": "novel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Novel Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_BookDetail_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/{novel_id}/snapshots": {
+      "get": {
+        "tags": [
+          "books"
+        ],
+        "summary": "Get Book Snapshots",
+        "description": "获取书籍历史快照\n\nExamples:\n    - interval=hour, count=7: 获取7小时内每小时的第一个快照\n    - interval=day, count=7: 获取7天内每天的第一个快照\n    - interval=week, count=4: 获取4周内每周的第一个快照\n    - interval=month, count=3: 获取3个月内每月的第一个快照\n\n:param novel_id: 书籍novel_id\n:param interval: 时间间隔 (hour/day/week/month)\n:param count: 时间段数量\n:param db:\n:return: 历史快照列表",
+        "operationId": "get_book_snapshots_api_v1_books__novel_id__snapshots_get",
+        "parameters": [
+          {
+            "name": "novel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Novel Id"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(hour|day|week|month)$",
+              "description": "时间间隔: hour/day/week/month",
+              "default": "day",
+              "title": "Interval"
+            },
+            "description": "时间间隔: hour/day/week/month"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "时间段数量",
+              "default": 7,
+              "title": "Count"
+            },
+            "description": "时间段数量"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_List_BookSnapshot__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/books/{novel_id}/rankings": {
+      "get": {
+        "tags": [
+          "books"
+        ],
+        "summary": "Get Book Ranking History",
+        "description": "获取书籍排名历史 - 使用novel_id\n\n:param novel_id: 书籍novel_id，晋江文学城的小说ID\n:param days: 统计天数，查询最近多少天的排名历史\n:param db: 数据库会话对象\n:return: 书籍排名历史列表",
+        "operationId": "get_book_ranking_history_api_v1_books__novel_id__rankings_get",
+        "parameters": [
+          {
+            "name": "novel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Novel Id"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "统计天数",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "统计天数"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_List_BookRankingInfo__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankings/": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Get Rankings",
+        "description": "查询榜单列表，首先根据page id查找榜单，如果page id为空或者没有查找到就使用name在Ranking\n表格中的channel name 和 sub channel name中进行模糊匹配。\n\n:param page_id: 榜单页面ID筛选\n:param name: 榜单名称筛选\n:param page: 页码\n:param size: 每页数量\n:param db: 数据库会话对象\n:return: 榜单列表",
+        "operationId": "get_rankings_api_v1_rankings__get",
+        "parameters": [
+          {
+            "name": "page_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "榜单页面ID筛选",
+              "title": "Page Id"
+            },
+            "description": "榜单页面ID筛选"
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "榜单名称筛选",
+              "title": "Name"
+            },
+            "description": "榜单名称筛选"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "页码",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "页码"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "每页数量",
+              "default": 20,
+              "title": "Size"
+            },
+            "description": "每页数量"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_PaginationData_RankingBasic__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankingsdetail/day/{ranking_id}": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Get Ranking Detail By Day",
+        "description": "获取榜单详情\n\n:param ranking_id: 榜单内部ID\n:param target_date: 指定日期，精确到天\n:param db: 数据库会话对象\n:return: 榜单详情",
+        "operationId": "get_ranking_detail_by_day_api_v1_rankingsdetail_day__ranking_id__get",
+        "parameters": [
+          {
+            "name": "ranking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ranking Id"
+            }
+          },
+          {
+            "name": "target_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "指定日期，默认为最新",
+              "title": "Target Date"
+            },
+            "description": "指定日期，默认为最新"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_RankingDetail_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankingsdetail/hour/{ranking_id}": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Get Jiazi Detail By Hour",
+        "description": "获取榜单小时级别详情，事实上只用于夹子榜单使用\n如果指定日期，没有指定小时，就获取那天最后一次快照，和函数get_ranking_detail一样\n如果指定小时，没有指定日期，那就获取当天这个小时的快照数据\n\n:param ranking_id: 榜单内部ID\n:param target_date: 指定日期，如果为None则获取最新数据\n:param hour: 指定小时（0-23），如果为None则获取当天最新数据\n:param db: 数据库会话对象\n:return: 夹子榜单详情",
+        "operationId": "get_jiazi_detail_by_hour_api_v1_rankingsdetail_hour__ranking_id__get",
+        "parameters": [
+          {
+            "name": "ranking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ranking Id"
+            }
+          },
+          {
+            "name": "target_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "指定日期，默认为最新",
+              "title": "Target Date"
+            },
+            "description": "指定日期，默认为最新"
+          },
+          {
+            "name": "hour",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 23,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "指定小时（0-23），24小时制，默认为最新",
+              "title": "Hour"
+            },
+            "description": "指定小时（0-23），24小时制，默认为最新"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_RankingDetail_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankings/history/day/{ranking_id}": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Get Ranking History By Day",
+        "description": "获取榜单历史数据，如果start_date必须小于end_date。\n每天的快照选择当天最后一次更新的快照内容。\n\n:param ranking_id: 榜单ID\n:param start_date: 开始日期，不能为空\n:param end_date: 结束日期，若为空，则默认为当天\n:param db: 数据库会话对象\n:return: 榜单历史数据",
+        "operationId": "get_ranking_history_by_day_api_v1_rankings_history_day__ranking_id__get",
+        "parameters": [
+          {
+            "name": "ranking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ranking Id"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "开始日期",
+              "title": "Start Date"
+            },
+            "description": "开始日期"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "结束日期",
+              "default": "2025-08-29",
+              "title": "End Date"
+            },
+            "description": "结束日期"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_RankingHistory_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankings/history/hour/{ranking_id}": {
+      "get": {
+        "tags": [
+          "rankings"
+        ],
+        "summary": "Get Ranking History By Hour",
+        "description": "获取小时级别榜单历史数据，如果start_time必须小于end_time\n每小时的快照选择当小时最后一次更新的快照内容。\n\n:param ranking_id: 榜单ID\n:param start_time: 开始时间，不能为空，这个数据的分和秒都为0\n:param end_time: 结束时间，这个数据的分和秒都为0。若为空，则默认为此时此刻\n:param db: 数据库会话对象\n:return: 榜单小时级历史数据",
+        "operationId": "get_ranking_history_by_hour_api_v1_rankings_history_hour__ranking_id__get",
+        "parameters": [
+          {
+            "name": "ranking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ranking Id"
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "开始时间，分和秒都为0",
+              "title": "Start Time"
+            },
+            "description": "开始时间，分和秒都为0"
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "结束时间，分和秒都为0。若为空，则默认为此时此刻",
+              "title": "End Time"
+            },
+            "description": "结束时间，分和秒都为0。若为空，则默认为此时此刻"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_RankingHistory_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedule/task/create": {
+      "post": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Create Crawl Job",
+        "description": "创建爬取任务,爬取列表中的所有页面。\n每个页面ID对应一个独立的调度任务。\n\n:param page_ids: 要爬取的页面ID列表\n:param run_time: 爬取任务的时间\n:return: 包含所有创建的任务信息的响应",
+        "operationId": "create_crawl_job_api_v1_schedule_task_create_post",
+        "parameters": [
+          {
+            "name": "page_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "爬取的页面id列表",
+              "default": [
+                "jiazi"
+              ],
+              "title": "Page Ids"
+            },
+            "description": "爬取的页面id列表"
+          },
+          {
+            "name": "run_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "任务运行时间",
+              "title": "Run Time"
+            },
+            "description": "任务运行时间"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_JobBasic_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedule/status": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "summary": "Get Scheduler Status",
+        "description": "获取调度器状态和任务信息\n\nReturns:\n    DataResponse: 调度器状态和任务统计信息",
+        "operationId": "get_scheduler_status_api_v1_schedule_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_SchedulerInfo_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "根路径 - 返回应用基本信息",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_Dict_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "健康检查 - 简洁的系统状态检查",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse_Dict_"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BookDetail": {
+        "properties": {
+          "snapshot_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot Time",
+            "description": "快照时间"
+          },
+          "favorites": {
+            "type": "integer",
+            "title": "Favorites",
+            "description": "收藏数",
+            "default": 0
+          },
+          "clicks": {
+            "type": "integer",
+            "title": "Clicks",
+            "description": "非V章点击数",
+            "default": 0
+          },
+          "comments": {
+            "type": "integer",
+            "title": "Comments",
+            "description": "评论数",
+            "default": 0
+          },
+          "nutrition": {
+            "type": "integer",
+            "title": "Nutrition",
+            "description": "营养液数量",
+            "default": 0
+          },
+          "word_counts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Word Counts",
+            "description": "字数"
+          },
+          "chapter_counts": {
+            "type": "integer",
+            "title": "Chapter Counts",
+            "description": "章节统计"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "状态"
+          },
+          "novel_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "description": "网站上的小说ID"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title",
+            "description": "书名"
+          },
+          "vip_chapter_id": {
+            "type": "integer",
+            "title": "Vip Chapter Id",
+            "description": "入v的章节，0表示没有入V",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_time",
+          "novel_id",
+          "title"
+        ],
+        "title": "BookDetail",
+        "description": "书籍详情响应，总是获取最新时间的point"
+      },
+      "BookRankingInfo": {
+        "properties": {
+          "novel_id": {
+            "type": "integer",
+            "title": "Novel Id",
+            "description": "书籍ID"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position",
+            "description": "排名位置"
+          },
+          "snapshot_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot Time",
+            "description": "快照时间"
+          },
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "榜单页面ID"
+          },
+          "channel_name": {
+            "type": "string",
+            "title": "Channel Name",
+            "description": "榜单名称"
+          },
+          "sub_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Channel Name",
+            "description": "子榜单名称"
+          }
+        },
+        "type": "object",
+        "required": [
+          "novel_id",
+          "position",
+          "snapshot_time",
+          "page_id",
+          "channel_name",
+          "sub_channel_name"
+        ],
+        "title": "BookRankingInfo",
+        "description": "书籍排名信息"
+      },
+      "BookSnapshot": {
+        "properties": {
+          "snapshot_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot Time",
+            "description": "快照时间"
+          },
+          "favorites": {
+            "type": "integer",
+            "title": "Favorites",
+            "description": "收藏数",
+            "default": 0
+          },
+          "clicks": {
+            "type": "integer",
+            "title": "Clicks",
+            "description": "非V章点击数",
+            "default": 0
+          },
+          "comments": {
+            "type": "integer",
+            "title": "Comments",
+            "description": "评论数",
+            "default": 0
+          },
+          "nutrition": {
+            "type": "integer",
+            "title": "Nutrition",
+            "description": "营养液数量",
+            "default": 0
+          },
+          "word_counts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Word Counts",
+            "description": "字数"
+          },
+          "chapter_counts": {
+            "type": "integer",
+            "title": "Chapter Counts",
+            "description": "章节统计"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "状态"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_time"
+        ],
+        "title": "BookSnapshot",
+        "description": "书籍快照响应模型"
+      },
+      "DataResponse_BookDetail_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[BookDetail]"
+      },
+      "DataResponse_Dict_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[Dict]"
+      },
+      "DataResponse_JobBasic_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobBasic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[JobBasic]"
+      },
+      "DataResponse_List_BookRankingInfo__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BookRankingInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[List[BookRankingInfo]]"
+      },
+      "DataResponse_List_BookSnapshot__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BookSnapshot"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[List[BookSnapshot]]"
+      },
+      "DataResponse_PaginationData_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[PaginationData]"
+      },
+      "DataResponse_PaginationData_RankingBasic__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationData_RankingBasic_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[PaginationData[RankingBasic]]"
+      },
+      "DataResponse_RankingDetail_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[RankingDetail]"
+      },
+      "DataResponse_RankingHistory_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingHistory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[RankingHistory]"
+      },
+      "DataResponse_SchedulerInfo_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "请求是否成功",
+            "default": true
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code",
+            "description": "响应码",
+            "default": 200
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "响应消息",
+            "default": ""
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "响应时间"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchedulerInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DataResponse[SchedulerInfo]"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JobBasic": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "default": ""
+          },
+          "job_type": {
+            "$ref": "#/components/schemas/JobType",
+            "default": "crawl"
+          },
+          "desc": {
+            "type": "string",
+            "title": "Desc",
+            "default": ""
+          },
+          "err": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Err"
+          }
+        },
+        "type": "object",
+        "title": "JobBasic",
+        "description": "基础任务信息 - 仅包含核心字段"
+      },
+      "JobType": {
+        "type": "string",
+        "enum": [
+          "crawl",
+          "report",
+          "clean"
+        ],
+        "title": "JobType",
+        "description": "任务处理器类型"
+      },
+      "PaginationData": {
+        "properties": {
+          "data_list": {
+            "items": {},
+            "type": "array",
+            "title": "Data List",
+            "description": "内容列表",
+            "default": []
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "第几页",
+            "default": 0
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "一页的数量",
+            "default": 20
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages",
+            "description": "总页数",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "PaginationData"
+      },
+      "PaginationData_RankingBasic_": {
+        "properties": {
+          "data_list": {
+            "items": {
+              "$ref": "#/components/schemas/RankingBasic"
+            },
+            "type": "array",
+            "title": "Data List",
+            "description": "内容列表",
+            "default": []
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "第几页",
+            "default": 0
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "一页的数量",
+            "default": 20
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages",
+            "description": "总页数",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "PaginationData[RankingBasic]"
+      },
+      "RankingBasic": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "榜单的内部唯一ID"
+          },
+          "channel_name": {
+            "type": "string",
+            "title": "Channel Name",
+            "description": "榜单名称"
+          },
+          "sub_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Channel Name",
+            "description": "子榜单名称"
+          },
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "页面ID"
+          },
+          "rank_group_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Group Type",
+            "description": "榜单分组类型"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "channel_name",
+          "page_id"
+        ],
+        "title": "RankingBasic",
+        "description": "榜单基础信息响应"
+      },
+      "RankingBook": {
+        "properties": {
+          "novel_id": {
+            "type": "integer",
+            "title": "Novel Id",
+            "description": "书籍ID"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position",
+            "description": "排名位置"
+          }
+        },
+        "type": "object",
+        "required": [
+          "novel_id",
+          "position"
+        ],
+        "title": "RankingBook"
+      },
+      "RankingDetail": {
+        "properties": {
+          "books": {
+            "items": {
+              "$ref": "#/components/schemas/RankingBook"
+            },
+            "type": "array",
+            "title": "Books",
+            "description": "榜单书籍列表",
+            "default": []
+          },
+          "snapshot_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot Time",
+            "description": "快照时间"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "榜单的内部唯一ID"
+          },
+          "channel_name": {
+            "type": "string",
+            "title": "Channel Name",
+            "description": "榜单名称"
+          },
+          "sub_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Channel Name",
+            "description": "子榜单名称"
+          },
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "页面ID"
+          },
+          "rank_group_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Group Type",
+            "description": "榜单分组类型"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_time",
+          "id",
+          "channel_name",
+          "page_id"
+        ],
+        "title": "RankingDetail",
+        "description": "榜单详情响应"
+      },
+      "RankingHistory": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "榜单的内部唯一ID"
+          },
+          "channel_name": {
+            "type": "string",
+            "title": "Channel Name",
+            "description": "榜单名称"
+          },
+          "sub_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Channel Name",
+            "description": "子榜单名称"
+          },
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "页面ID"
+          },
+          "rank_group_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Group Type",
+            "description": "榜单分组类型"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/RankingSnapshot"
+            },
+            "type": "array",
+            "title": "Snapshots",
+            "description": "榜单历史快照",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "channel_name",
+          "page_id"
+        ],
+        "title": "RankingHistory"
+      },
+      "RankingSnapshot": {
+        "properties": {
+          "books": {
+            "items": {
+              "$ref": "#/components/schemas/RankingBook"
+            },
+            "type": "array",
+            "title": "Books",
+            "description": "榜单书籍列表",
+            "default": []
+          },
+          "snapshot_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Snapshot Time",
+            "description": "快照时间"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_time"
+        ],
+        "title": "RankingSnapshot",
+        "description": "榜单快照信息"
+      },
+      "SchedulerInfo": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "调度器当前的状态"
+          },
+          "jobs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "调度器中的任务列表"
+          },
+          "run_time": {
+            "type": "string",
+            "title": "Run Time",
+            "description": "调度器运行的时间，格式为：%d天%h小时%m分钟%s秒"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "run_time"
+        ],
+        "title": "SchedulerInfo",
+        "description": "调度器信息"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
