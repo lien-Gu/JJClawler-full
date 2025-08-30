@@ -4,7 +4,9 @@
       "Bash(move:*)",
       "Bash(for dir in */)",
       "Bash(rmdir:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Read(D:\\code\\Python\\JJClawler-full\\backend/**)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

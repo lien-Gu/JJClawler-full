@@ -120,6 +120,23 @@ export default {
       return subCategory.channel || 'index';
     },
     
+    formatRankingName(channelName, subChannelName) {
+      // 格式化榜单名称，智能组合 channel_name 和 sub_channel_name
+      if (channelName && subChannelName) {
+        // 两个都有，组合显示
+        return `${channelName} - ${subChannelName}`;
+      } else if (channelName) {
+        // 只有主分类名
+        return channelName;
+      } else if (subChannelName) {
+        // 只有子分类名
+        return subChannelName;
+      } else {
+        // 都没有，返回默认名称
+        return '未知榜单';
+      }
+    },
+    
     async loadRankings() {
       if (this.loading || !this.hasMore) return;
       
@@ -136,18 +153,53 @@ export default {
         
         // 调用真实API获取榜单数据
         const response = await requestManager.getRankingsList(apiParams);
+
+        console.log('API响应数据:', response);
         
-        if (response && Array.isArray(response)) {
+        // 解析真实的API响应格式
+        let rankingsData = [];
+        let totalPages = 0;
+        
+        if (response && response.success && response.data) {
+          const responseData = response.data;
+          
+          // 获取榜单列表数据
+          if (responseData.data_list && Array.isArray(responseData.data_list)) {
+            rankingsData = responseData.data_list.map(item => ({
+              id: item.id,
+              name: this.formatRankingName(item.channel_name, item.sub_channel_name),
+              channel_name: item.channel_name || '',
+              sub_channel_name: item.sub_channel_name || '',
+              page_id: item.page_id,
+              rank_group_type: item.rank_group_type || '其他',
+              description: `${item.rank_group_type || '其他'} - ${item.page_id}`
+            }));
+            
+            // 获取分页信息
+            totalPages = responseData.total_pages || 1;
+          }
+        }
+        
+        console.log('处理后的榜单数据:', rankingsData);
+        console.log('总页数:', totalPages);
+        
+        // 检查是否获取到有效数据
+        if (rankingsData && rankingsData.length > 0) {
           if (this.page === 1) {
-            this.allRankings = response;
+            this.allRankings = rankingsData;
           } else {
-            this.allRankings.push(...response);
+            this.allRankings.push(...rankingsData);
           }
           
-          this.hasMore = response.length === this.pageSize;
+          // 根据总页数判断是否还有更多数据
+          this.hasMore = this.page < totalPages;
           this.page++;
           
           this.filterRankings();
+          console.log(`成功加载 ${rankingsData.length} 个榜单项目，当前第${this.page-1}页，共${totalPages}页`);
+        } else {
+          console.warn('未获取到有效的榜单数据，使用模拟数据');
+          this.loadMockRankings();
         }
       } catch (error) {
         console.error('加载榜单失败:', error);
@@ -162,9 +214,16 @@ export default {
     loadMockRankings() {
       // 模拟榜单数据
       const pageId = this.getCurrentPageId();
+      const mockRankingNames = [
+        '完结榜', '收藏榜', '点击榜', '推荐榜', '评分榜', 
+        '新书榜', '月度榜', '季度榜', '年度榜', '热门榜',
+        '原创榜', '同人榜', '现代榜', '古代榜', '幻想榜',
+        '都市榜', '校园榜', '职场榜', '军事榜', '历史榜'
+      ];
+      
       const mockRankings = Array.from({ length: this.pageSize }, (_, index) => ({
         id: `ranking_${pageId}_${this.page}_${index + 1}`,
-        name: `${pageId}榜单${(this.page - 1) * this.pageSize + index + 1}`,
+        name: mockRankingNames[((this.page - 1) * this.pageSize + index) % mockRankingNames.length],
         description: `${pageId}分类榜单`,
         hierarchy: `${pageId} > 子分类`,
         total_books: Math.floor(Math.random() * 1000) + 100,
@@ -181,10 +240,12 @@ export default {
       this.page++;
       
       this.filterRankings();
+      console.log(`成功加载 ${mockRankings.length} 个模拟榜单项目，当前第${this.page-1}页`);
     },
 
     filterRankings() {
       let filtered = [...this.allRankings];
+      console.log(`开始过滤榜单，原始数据量: ${this.allRankings.length}`);
       
       // 只根据搜索关键词过滤，API已经返回了对应分类的榜单
       if (this.searchKeyword.trim()) {
@@ -193,9 +254,11 @@ export default {
           ranking.name.toLowerCase().includes(keyword) ||
           (ranking.description && ranking.description.toLowerCase().includes(keyword))
         );
+        console.log(`搜索关键词"${this.searchKeyword}"过滤后: ${filtered.length} 个榜单`);
       }
       
       this.filteredRankings = filtered;
+      console.log(`最终显示榜单数量: ${this.filteredRankings.length}`);
     },
     
     onTabChange({ mainTab, subTab, tab }) {

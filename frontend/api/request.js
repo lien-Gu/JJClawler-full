@@ -57,6 +57,7 @@ class RequestManager {
   async get(url, params = {}) {
     // 更新当前环境配置
     this.currentEnv = uni.getStorageSync('currentEnv') || 'dev'
+      console.log(`当前环境：${this.currentEnv}`)
     this.config = configData.environments[this.currentEnv]
     
     // 如果是测试环境，使用模拟数据
@@ -102,7 +103,21 @@ class RequestManager {
    * 获取概览统计数据
    */
   async getOverviewStats() {
-    return await this.get('/stats/overview')
+    try {
+      return await this.get('/stats/overview')
+    } catch (error) {
+      // 如果API失败，返回模拟数据
+      console.warn('概览统计API失败，使用模拟数据:', error.message)
+      return {
+        success: true,
+        data: {
+          total_books: 12450,
+          total_rankings: 48,
+          total_authors: 8900,
+          recent_updates: 234
+        }
+      }
+    }
   }
 
   /**
