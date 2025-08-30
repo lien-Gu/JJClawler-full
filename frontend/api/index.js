@@ -8,5 +8,4 @@ export { reportsApi } from './modules/reports'
 export { scheduleApi } from './modules/schedule'
 
 // 导出请求管理器实例，便于环境切换等操作
-import requestManager from './request'
-export { requestManager }
+export { requestManager } from './request'

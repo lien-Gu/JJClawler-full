@@ -1,10 +1,13 @@
 <template>
-  <view class="loading-state">
-    <view v-if="loading" class="loading-more">
+  <view class="loading-more" v-if="loading || (!hasMore && showNoMore)">
+    <!-- 加载中状态 -->
+    <view v-if="loading" class="loading-state">
+      <text class="loading-icon">⏳</text>
       <text class="loading-text">{{ loadingText }}</text>
     </view>
     
-    <view v-else-if="!hasMore && showNoMore" class="no-more">
+    <!-- 没有更多数据状态 -->
+    <view v-else-if="!hasMore && showNoMore" class="no-more-state">
       <text class="no-more-text">{{ noMoreText }}</text>
     </view>
   </view>
@@ -41,23 +44,34 @@ export default {
 <style lang="scss" scoped>
 @import '@/styles/design-tokens.scss';
 
-.loading-state {
-  .loading-more,
-  .no-more {
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-lg;
+  
+  .loading-state,
+  .no-more-state {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: $spacing-lg;
-    
-    .loading-text,
-    .no-more-text {
-      font-size: 24rpx;
-      color: $text-secondary;
-    }
-    
-    .no-more-text {
-      opacity: 0.6;
-    }
+    gap: $spacing-sm;
   }
+  
+  .loading-icon {
+    font-size: 24rpx;
+    animation: spin 1s linear infinite;
+  }
+  
+  .loading-text,
+  .no-more-text {
+    font-size: 24rpx;
+    color: $text-secondary;
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

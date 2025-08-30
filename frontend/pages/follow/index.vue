@@ -76,7 +76,7 @@
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import ScrollableList from '@/components/ScrollableList.vue'
-import api, { dataManager } from '@/api/request.js'
+import requestManager from '@/api/request.js'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
@@ -112,8 +112,8 @@ export default {
     formatTime,
     async loadFollowData() {
       try {
-        // 优先从dataManager获取用户关注数据
-        const userFollows = await dataManager.getUserFollows()
+        // 优先从requestManager获取用户关注数据
+        const userFollows = await requestManager.getUserFollows()
         if (userFollows && Array.isArray(userFollows)) {
           this.followData = userFollows
         } else {

@@ -45,7 +45,7 @@ import SearchBar from '@/components/SearchBar.vue';
 import CategoryTabs from '@/components/CategoryTabs.vue';
 import RankingListItem from '@/components/RankingListItem.vue';
 import ScrollableList from '@/components/ScrollableList.vue';
-import api, { dataManager } from '@/api/request.js';
+import requestManager from '@/api/request.js';
 import { getSitesList } from '@/data/url.js';
 
 export default {
@@ -108,19 +108,34 @@ export default {
       }
     },
     
+    getCurrentPageId() {
+      // 根据当前主分类和子分类获取对应的page_id
+      const mainCategory = this.categories.find(cat => cat.key === this.currentMainTab);
+      if (!mainCategory) return 'index'; // 默认返回书城首页
+      
+      const subCategory = mainCategory.children?.find(sub => sub.key === this.currentSubTab);
+      if (!subCategory) return 'index';
+      
+      // 返回子分类对应的channel值作为page_id
+      return subCategory.channel || 'index';
+    },
+    
     async loadRankings() {
       if (this.loading || !this.hasMore) return;
       
       this.loading = true;
       
       try {
-        // 调用真实API获取榜单数据
-        const response = await dataManager.getRankingsList({
+        const apiParams = {
+          page_id: this.getCurrentPageId(),
           page: this.page,
-          pageSize: this.pageSize,
-          category: this.currentMainTab,
-          subCategory: this.currentSubTab
-        });
+          size: this.pageSize
+        };
+        
+        console.log(`正在请求榜单数据: /api/v1/rankings/?page_id=${apiParams.page_id}&page=${apiParams.page}&size=${apiParams.size}`);
+        
+        // 调用真实API获取榜单数据
+        const response = await requestManager.getRankingsList(apiParams);
         
         if (response && Array.isArray(response)) {
           if (this.page === 1) {
@@ -146,14 +161,14 @@ export default {
 
     loadMockRankings() {
       // 模拟榜单数据
+      const pageId = this.getCurrentPageId();
       const mockRankings = Array.from({ length: this.pageSize }, (_, index) => ({
-        id: `ranking_${this.page}_${index + 1}`,
-        name: `榜单名称${(this.page - 1) * this.pageSize + index + 1}`,
-        description: '榜单层级',
-        hierarchy: `分类 > 子分类`,
+        id: `ranking_${pageId}_${this.page}_${index + 1}`,
+        name: `${pageId}榜单${(this.page - 1) * this.pageSize + index + 1}`,
+        description: `${pageId}分类榜单`,
+        hierarchy: `${pageId} > 子分类`,
         total_books: Math.floor(Math.random() * 1000) + 100,
-        category: this.currentMainTab,
-        subCategory: this.currentSubTab
+        page_id: pageId
       }));
       
       if (this.page === 1) {
@@ -171,22 +186,13 @@ export default {
     filterRankings() {
       let filtered = [...this.allRankings];
       
-      // 根据搜索关键词过滤
+      // 只根据搜索关键词过滤，API已经返回了对应分类的榜单
       if (this.searchKeyword.trim()) {
         const keyword = this.searchKeyword.toLowerCase();
         filtered = filtered.filter(ranking => 
           ranking.name.toLowerCase().includes(keyword) ||
-          ranking.description.toLowerCase().includes(keyword)
+          (ranking.description && ranking.description.toLowerCase().includes(keyword))
         );
-      }
-      
-      // 根据分类过滤
-      if (this.currentMainTab) {
-        filtered = filtered.filter(ranking => ranking.category === this.currentMainTab);
-      }
-      
-      if (this.currentSubTab) {
-        filtered = filtered.filter(ranking => ranking.subCategory === this.currentSubTab);
       }
       
       this.filteredRankings = filtered;

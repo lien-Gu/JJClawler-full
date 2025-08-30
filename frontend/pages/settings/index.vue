@@ -121,7 +121,6 @@
 
 <script>
 import BaseCard from '@/components/BaseCard.vue'
-import navigation from '@/utils/navigation.js'
 import { getCurrentEnvironment, getAvailableEnvironments, setEnvironment } from '@/utils/config.js'
 
 export default {
@@ -129,7 +128,6 @@ export default {
   components: {
     BaseCard
   },
-  mixins: [navigationMixin],
   
   data() {
     return {

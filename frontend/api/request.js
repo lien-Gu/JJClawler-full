@@ -193,11 +193,188 @@ class RequestManager {
       baseURL: this.config.baseURL
     }
   }
+
+  // ========== 业务API方法 ==========
+
+  /**
+   * 获取概览统计数据
+   * @returns {Promise} 概览数据
+   */
+  async getOverviewStats() {
+    // 目前后端没有专门的概览接口，返回模拟数据
+    if (this.config.useLocalData) {
+      return await this.getMockData('/stats/overview')
+    }
+    return {
+      success: true,
+      data: {
+        total_books: 12450,
+        total_rankings: 48,
+        total_authors: 8900,
+        recent_updates: 234
+      }
+    }
+  }
+
+  /**
+   * 获取书籍详情
+   * @param {string|number} bookId 书籍ID
+   * @returns {Promise} 书籍详情
+   */
+  async getBookDetail(bookId) {
+    return await this.get(`/api/v1/books/${bookId}`)
+  }
+
+  /**
+   * 获取书籍排名历史
+   * @param {string|number} bookId 书籍ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 排名历史
+   */
+  async getBookRankings(bookId, params = {}) {
+    return await this.get(`/api/v1/books/${bookId}/rankings`, params)
+  }
+
+  /**
+   * 获取书籍快照
+   * @param {string|number} bookId 书籍ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 书籍快照
+   */
+  async getBookSnapshots(bookId, params = {}) {
+    return await this.get(`/api/v1/books/${bookId}/snapshots`, params)
+  }
+
+  /**
+   * 获取排行榜列表
+   * @param {Object} params 查询参数
+   * @returns {Promise} 排行榜列表
+   */
+  async getRankingsList(params = {}) {
+    return await this.get('/api/v1/rankings/', params)
+  }
+
+  /**
+   * 获取排行榜详情（按天）
+   * @param {string|number} rankingId 排行榜ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 排行榜详情
+   */
+  async getRankingDetail(rankingId, params = {}) {
+    return await this.get(`/api/v1/rankingsdetail/day/${rankingId}`, params)
+  }
+
+  /**
+   * 获取夹子排行榜详情（按小时）
+   * @param {string|number} rankingId 排行榜ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 夹子排行榜详情
+   */
+  async getJiaziDetail(rankingId, params = {}) {
+    return await this.get(`/api/v1/rankingsdetail/hour/${rankingId}`, params)
+  }
+
+  /**
+   * 获取排行榜书籍列表（从排行榜详情中提取）
+   * @param {string|number} rankingId 排行榜ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 书籍列表
+   */
+  async getRankingBooks(rankingId, params = {}) {
+    const response = await this.getRankingDetail(rankingId, params)
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          books: response.data.books || [],
+          total: response.data.books?.length || 0
+        }
+      }
+    }
+    return response
+  }
+
+  /**
+   * 获取排行榜历史（按天）
+   * @param {string|number} rankingId 排行榜ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 排行榜历史
+   */
+  async getRankingHistory(rankingId, params = {}) {
+    return await this.get(`/api/v1/rankings/history/day/${rankingId}`, params)
+  }
+
+  /**
+   * 获取排行榜历史（按小时）
+   * @param {string|number} rankingId 排行榜ID
+   * @param {Object} params 查询参数
+   * @returns {Promise} 排行榜小时历史
+   */
+  async getRankingHourHistory(rankingId, params = {}) {
+    return await this.get(`/api/v1/rankings/history/hour/${rankingId}`, params)
+  }
+
+  /**
+   * 创建爬取任务
+   * @param {Object} params 任务参数
+   * @returns {Promise} 任务创建结果
+   */
+  async createCrawlJob(params = {}) {
+    return await this.post('/api/v1/schedule/task/create', {}, { 
+      method: 'POST',
+      data: params 
+    })
+  }
+
+  /**
+   * 获取调度器状态
+   * @returns {Promise} 调度器状态
+   */
+  async getSchedulerStatus() {
+    return await this.get('/api/v1/schedule/status')
+  }
+
+  /**
+   * 获取用户关注数据（本地存储）
+   * @returns {Promise} 关注数据
+   */
+  async getUserFollows() {
+    // 从本地存储获取关注列表
+    try {
+      const followList = uni.getStorageSync('followList') || []
+      return {
+        success: true,
+        data: followList
+      }
+    } catch (error) {
+      return {
+        success: false,
+        data: [],
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * 获取热门榜单
+   * @param {Object} params 查询参数
+   * @returns {Promise} 热门榜单
+   */
+  async getHotRankings(params = {}) {
+    // 使用排行榜列表接口，限制数量
+    const defaultParams = { size: 10, ...params }
+    return await this.getRankingsList(defaultParams)
+  }
+
+  /**
+   * 健康检查
+   * @returns {Promise} 健康状态
+   */
+  async healthCheck() {
+    return await this.get('/health')
+  }
 }
 
 // 创建单例实例
 const requestManager = new RequestManager()
-
-// 为了向后兼容，同时导出为 dataManager 别名
-export const dataManager = requestManager
 export default requestManager

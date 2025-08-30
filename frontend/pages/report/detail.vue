@@ -111,7 +111,7 @@
 
 <script>
 import BaseCard from '@/components/BaseCard.vue'
-import api, { dataManager } from '@/api/request.js'
+import requestManager from '@/api/request.js'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
@@ -179,12 +179,12 @@ export default {
     },
     
     async loadOverviewData() {
-      const data = await dataManager.getOverviewStats()
+      const data = await requestManager.getOverviewStats()
       this.overviewData = data || {}
     },
     
     async loadRankingsData() {
-      const data = await dataManager.getHotRankings({ limit: 10 })
+      const data = await requestManager.getHotRankings({ limit: 10 })
       this.hotRankings = data || []
     },
     

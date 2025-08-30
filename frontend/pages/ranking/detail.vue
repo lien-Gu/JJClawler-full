@@ -133,7 +133,7 @@
 <script>
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
-import api, { dataManager } from '@/api/request.js'
+import requestManager from '@/api/request.js'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
@@ -183,7 +183,7 @@ export default {
     
     async loadRankingData() {
       try {
-        const data = await dataManager.getRankingDetail(this.rankingId)
+        const data = await requestManager.getRankingDetail(this.rankingId)
         if (data) {
           this.rankingData = data
           uni.setNavigationBarTitle({
@@ -215,7 +215,7 @@ export default {
           limit: this.pageSize
         }
         
-        const data = await dataManager.getRankingBooks(this.rankingId, params)
+        const data = await requestManager.getRankingBooks(this.rankingId, params)
         if (data && Array.isArray(data.books)) {
           if (reset) {
             this.booksList = data.books

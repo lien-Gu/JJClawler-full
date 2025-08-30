@@ -1,9 +1,17 @@
 <template>
   <view class="empty-state">
-    <text class="empty-icon" v-if="icon">{{ icon }}</text>
-    <text class="empty-title">{{ title }}</text>
-    <text class="empty-desc" v-if="description">{{ description }}</text>
-    <slot name="action"></slot>
+    <view class="empty-icon">
+      <text class="icon-text">{{ icon }}</text>
+    </view>
+    
+    <text class="empty-title" v-if="title">{{ title }}</text>
+    
+    <text class="empty-description" v-if="description">{{ description }}</text>
+    
+    <!-- 操作按钮插槽 -->
+    <view class="empty-action" v-if="$slots.action">
+      <slot name="action"></slot>
+    </view>
   </view>
 </template>
 
@@ -13,11 +21,11 @@ export default {
   props: {
     icon: {
       type: String,
-      default: ''
+      default: '📝'
     },
     title: {
       type: String,
-      required: true
+      default: '暂无数据'
     },
     description: {
       type: String,
@@ -39,23 +47,30 @@ export default {
   text-align: center;
   
   .empty-icon {
-    font-size: 120rpx;
     margin-bottom: $spacing-lg;
-    opacity: 0.6;
+    
+    .icon-text {
+      font-size: 80rpx;
+      opacity: 0.6;
+    }
   }
   
   .empty-title {
-    font-size: 32rpx;
-    font-weight: 600;
+    font-size: 28rpx;
+    font-weight: 500;
     color: $text-primary;
-    margin-bottom: $spacing-xs;
+    margin-bottom: $spacing-sm;
   }
   
-  .empty-desc {
+  .empty-description {
     font-size: 24rpx;
     color: $text-secondary;
-    margin-bottom: $spacing-xl;
-    line-height: 1.5;
+    line-height: 1.4;
+    margin-bottom: $spacing-lg;
+  }
+  
+  .empty-action {
+    margin-top: $spacing-md;
   }
 }
 </style>

@@ -212,7 +212,82 @@ uni-app 编译到微信小程序时，应该自动根据 `pages.json` 和 `manif
 6. ✅ **无效 mixin 引用** - 引用未导入的 mixin
 7. ✅ **app.json 文件缺失** - 微信小程序配置文件未生成
 
+### 2025-08-30: API方法缺失错误修复
+
+**问题描述：**
+运行时出现多个API方法未定义错误：
+```
+TypeError: api_request.dataManager.getOverviewStats is not a function
+TypeError: api_request.dataManager.getRankingsList is not a function  
+TypeError: api_request.dataManager.getUserFollows is not a function
+```
+
+**问题原因：**
+`RequestManager` 类只提供了基础的 HTTP 方法（get、post等），但缺少具体的业务 API 方法。前端页面调用的方法在类中不存在。
+
+**影响范围：**
+- 首页无法加载概览数据
+- 排行榜页面无法加载榜单列表
+- 关注页面无法加载关注数据
+- 书籍详情页面无法加载相关数据
+
+**修复方案：**
+在 `RequestManager` 类中添加所有缺失的业务API方法，根据 OpenAPI 规范实现：
+- `getOverviewStats()` - 概览统计数据
+- `getRankingsList()` - 排行榜列表
+- `getUserFollows()` - 用户关注数据（本地存储）
+- `getBookDetail()` - 书籍详情
+- `getBookRankings()` - 书籍排名历史
+- `getRankingDetail()` - 排行榜详情
+- `getRankingBooks()` - 排行榜书籍列表
+- `getHotRankings()` - 热门榜单
+- 以及其他相关API方法
+
+**修复状态：** ✅ 已修复
+
+### 2025-08-30: Settings页面mixin引用错误修复
+
+**问题描述：**
+设置页面运行时出现 mixin 未定义错误：
+```
+ReferenceError: navigationMixin is not defined
+```
+
+**问题原因：**
+`pages/settings/index.vue` 中引用了 `navigationMixin`，但该 mixin 从未被导入或定义。
+
+**修复方案：**
+移除无效的 mixin 引用：
+```javascript
+// 移除这一行
+mixins: [navigationMixin],
+```
+
+**修复状态：** ✅ 已修复
+
+## 问题总结
+
+总共发现并修复了 9 个主要问题：
+
+1. ✅ **Vue 语法错误** - 缺少对象逗号分隔符
+2. ✅ **组件导入路径错误** - 目录结构变更后路径未更新  
+3. ✅ **Navigation 导入/导出不匹配** - 命名导出与默认导入不匹配
+4. ⚠️ **SCSS 路径解析问题** - 编译器缓存相关
+5. ✅ **dataManager 未定义** - 缺少必要的导出别名
+6. ✅ **无效 mixin 引用** - 引用未导入的 mixin
+7. ✅ **app.json 文件缺失** - 微信小程序配置文件未生成
+8. ✅ **API方法缺失错误** - RequestManager缺少业务API方法
+9. ✅ **Settings页面mixin引用错误** - 无效的navigationMixin引用
+
+**当前状态：**
+所有主要错误已修复，项目现在应该能够：
+- 正常编译运行
+- 正确加载和显示数据
+- 正常进行页面导航
+- 在微信开发者工具中正常运行
+
 **建议：**
 - 在重新编译前，清理编译缓存以解决 SCSS 路径问题
 - 确保在微信开发者工具中正确导入编译后的项目目录
+- 确保后端API服务器在 `127.0.0.1:8000` 运行（开发环境）
 - 定期检查编译输出目录，确保所有必需文件都已正确生成

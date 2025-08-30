@@ -32,7 +32,7 @@
 <script>
 import ReportCarousel from '@/components/ReportCarousel.vue';
 import ScrollableList from '@/components/ScrollableList.vue';
-import api, { dataManager } from '@/api/request.js';
+import requestManager from '@/api/request.js';
 
 export default {
   name: 'IndexPage',
@@ -95,8 +95,8 @@ export default {
     async fetchReports(page, pageSize) {
       try {
         // 获取统计概览数据
-        const overviewStats = await dataManager.getOverviewStats();
-        const hotRankings = await dataManager.getHotRankings({ limit: 5 });
+        const overviewStats = await requestManager.getOverviewStats();
+        const hotRankings = await requestManager.getHotRankings({ limit: 5 });
         
         // 构造报告数据
         const reports = [
