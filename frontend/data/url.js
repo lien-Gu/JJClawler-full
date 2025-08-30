@@ -212,7 +212,7 @@ export function getSiteById(siteId) {
 }
 
 // 根据分站ID获取频道列表
-export function getChannelsBySiteId(siteId) {
+export function getChannelById(siteId) {
   const site = getSiteById(siteId)
   return site ? site.channels : []
 }
