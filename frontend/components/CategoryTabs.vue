@@ -71,10 +71,15 @@ export default {
   },
   methods: {
     selectMainTab(tab, index) {
-      if (this.currentMainTab === tab.key) return;
+      // 如果当前已经是这个主分类，且没有选择子分类，则不需要重复处理
+      if (this.currentMainTab === tab.key && this.currentSubTab === '') {
+        console.log(`主分类${tab.name}已经是当前选中状态，无需重复处理`);
+        return;
+      }
       
       // 选择主分类时，不自动选择子分类，让用户明确选择
       // 清空当前子分类选择，显示主分类的榜单内容
+      console.log(`切换到主分类: ${tab.name}，从子分类${this.currentSubTab || '无'}回到主分类`);
       
       this.$emit('change', {
         mainTab: tab.key,

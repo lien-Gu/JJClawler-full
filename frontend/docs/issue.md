@@ -326,9 +326,71 @@ selectMainTab(tab, index) {
 
 **修复状态：** ✅ 已修复
 
+### 2025-08-31: 分类标签无法从子分类回到主分类修复
+
+**问题描述：**
+在排行榜页面中，当用户从主分类切换到子分类后，再次点击主分类时无法回到主分类的榜单，这是因为组件的重复点击检查逻辑过于严格。
+
+**问题场景：**
+1. 点击"言情"主分类 → 显示page_id="yq"的榜单
+2. 点击"古言"子分类 → 显示page_id="yq.gy"的榜单  
+3. 再次点击"言情"主分类 → 期望回到page_id="yq"的榜单，但实际上没有反应
+
+**问题原因：**
+在 `CategoryTabs.vue` 的 `selectMainTab` 方法中，第74行的条件判断过于严格：
+```javascript
+if (this.currentMainTab === tab.key) return;
+```
+这会阻止用户在选择了子分类后重新点击主分类来回到主分类榜单。
+
+**影响范围：**
+- 所有复杂分类的主分类与子分类之间的切换
+- 用户体验：无法灵活在主分类和子分类之间切换
+- 导航逻辑不完整，缺少"回到主分类"的功能
+
+**修复方案：**
+修改 `selectMainTab` 方法的条件判断，只有当前已经是主分类且没有选择子分类时才跳过：
+
+**修复前：**
+```javascript
+selectMainTab(tab, index) {
+  if (this.currentMainTab === tab.key) return; // 过于严格
+  
+  this.$emit('change', {
+    mainTab: tab.key,
+    subTab: '',
+    tab: tab
+  });
+}
+```
+
+**修复后：**
+```javascript
+selectMainTab(tab, index) {
+  // 只有当前已经是这个主分类，且没有选择子分类时，才不需要重复处理
+  if (this.currentMainTab === tab.key && this.currentSubTab === '') return;
+  
+  console.log(`切换到主分类: ${tab.name}，从子分类${this.currentSubTab || '无'}回到主分类`);
+  
+  this.$emit('change', {
+    mainTab: tab.key,
+    subTab: '', // 清空子分类选择
+    tab: tab
+  });
+}
+```
+
+**修复效果：**
+- 点击"言情" → page_id="yq"，显示言情主分类榜单
+- 点击"古言" → page_id="yq.gy"，显示古言子分类榜单
+- 再点击"言情" → page_id="yq"，成功回到言情主分类榜单 ✅
+- 在主分类状态下重复点击主分类 → 不会重复触发（优化性能）
+
+**修复状态：** ✅ 已修复
+
 ## 问题总结
 
-总共发现并修复了 10 个主要问题：
+总共发现并修复了 11 个主要问题：
 
 1. ✅ **Vue 语法错误** - 缺少对象逗号分隔符
 2. ✅ **组件导入路径错误** - 目录结构变更后路径未更新  
@@ -340,6 +402,7 @@ selectMainTab(tab, index) {
 8. ✅ **API方法缺失错误** - RequestManager缺少业务API方法
 9. ✅ **Settings页面mixin引用错误** - 无效的navigationMixin引用
 10. ✅ **分类标签自动选择子分类错误** - 点击主分类时自动选择第一个子分类
+11. ✅ **分类标签无法从子分类回到主分类** - 重复点击检查逻辑过于严格
 
 **当前状态：**
 所有主要错误已修复，项目现在应该能够：
