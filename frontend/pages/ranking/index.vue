@@ -24,12 +24,25 @@
       :has-more="hasMore"
       :height="'calc(100vh - 300rpx - env(safe-area-inset-top) - env(safe-area-inset-bottom))'"
       empty-icon="📋"
-      empty-title="暂无榜单数据"
-      no-more-text="没有更多榜单了"
+      :empty-title="isJiaziStrategy ? '暂无书籍数据' : '暂无榜单数据'"
+      :no-more-text="isJiaziStrategy ? '没有更多书籍了' : '没有更多榜单了'"
       @refresh="onRefresh"
       @load-more="onLoadMore"
     >
+      <!-- 夹子榜单使用书籍列表项 -->
+      <BookListItem
+        v-if="isJiaziStrategy"
+        v-for="(item, index) in filteredRankings"
+        :key="item.id"
+        :book="item.bookData || item"
+        :index="index"
+        @click="handleRankingClick"
+        @follow="handleBookFollow"
+      />
+      
+      <!-- 普通榜单使用榜单列表项 -->
       <RankingListItem
+        v-else
         v-for="(ranking, index) in filteredRankings"
         :key="ranking.id"
         :ranking="ranking"
@@ -44,6 +57,7 @@
 import SearchBar from '@/components/SearchBar.vue';
 import CategoryTabs from '@/components/CategoryTabs.vue';
 import RankingListItem from '@/components/RankingListItem.vue';
+import BookListItem from '@/components/BookListItem.vue';
 import ScrollableList from '@/components/ScrollableList.vue';
 import requestManager from '@/api/request.js';
 import { getSitesList } from '@/data/url.js';
@@ -54,6 +68,7 @@ export default {
     SearchBar,
     CategoryTabs,
     RankingListItem,
+    BookListItem,
     ScrollableList
   },
   data() {
@@ -70,6 +85,12 @@ export default {
       page: 1,
       pageSize: 20
     };
+  },
+  
+  computed: {
+    isJiaziStrategy() {
+      return this.currentMainTab=== 'jiazi';
+    }
   },
   
   onLoad(options) {
@@ -105,15 +126,8 @@ export default {
     initData() {
       // 默认选择书城分类（index），而不是第一个分类
       const defaultCategory = this.categories.find(cat => cat.key === 'index');
-      if (defaultCategory) {
-        this.currentMainTab = defaultCategory.key;
-        // 对于所有分类，初始时都不选择子分类（允许用户自己选择是看主分类还是子分类）
-        this.currentSubTab = '';
-      } else if (this.categories.length > 0) {
-        // 备选方案：如果找不到书城，选择第一个
-        this.currentMainTab = this.categories[0].key;
-        this.currentSubTab = '';
-      }
+      this.currentMainTab = defaultCategory.key;
+      this.currentSubTab = '';
     },
     
     getCurrentPageId() {
@@ -159,7 +173,7 @@ export default {
 
     /**
      * 确定数据加载策略
-     * @returns {string} 'jiazi-books' | 'ranking-list'
+     * @returns {string} 'jiazi' | 'rankings'
      */
     determineLoadStrategy() {
       const pageId = this.getCurrentPageId();
@@ -177,7 +191,7 @@ export default {
      */
     async loadJiaziBooks() {
       const JIAZI_RANKING_ID = 1;
-      console.log(`正在加载夹子榜单书籍数据: /rankingsdetail/day/${JIAZI_RANKING_ID}`);
+      console.log(`正在加载夹子榜单书籍数据`);
       
       return await requestManager.getRankingDetail(JIAZI_RANKING_ID, {
         page: this.page,
@@ -209,21 +223,19 @@ export default {
       this.loading = true;
       
       try {
-        const strategy = this.determineLoadStrategy();
-        console.log(`使用加载策略: ${strategy}, 页面ID: ${this.getCurrentPageId()}`);
-        
         // 根据策略选择加载方法
-        const result = strategy === 'jiazi-books' 
-          ? await this.loadJiaziBooks() 
-          : await this.loadRankingsList();
-        
-        // 处理加载结果
-        if (result.success && result.data && result.data.length > 0) {
-          this.processLoadedData(result.data, result.totalPages);
-          const itemType = strategy === 'jiazi-books' ? '书籍' : '榜单';
-          console.log(`成功加载 ${result.data.length} 个${itemType}项目，当前第${this.page-1}页，共${result.totalPages}页`);
+        if (this.currentMainTab === 'jiazi') {
+          const result = await this.loadJiaziBooks()
+          if (result.success && result.data && result.data.length > 0) {
+            this.processLoadedData(result.data, result.totalPages);
+            console.log(`成功加载 ${result.data.length} 个书籍项目，当前第${this.page-1}页，共${result.totalPages}页`);
+          }
         } else {
-          console.warn(`未获取到有效的数据 (策略: ${strategy})`);
+          const result = await this.loadRankingsList();
+          if (result.success && result.data && result.data.length > 0) {
+            this.processLoadedData(result.data, result.totalPages);
+            console.log(`成功加载 ${result.data.length} 个榜单项目，当前第${this.page-1}页，共${result.totalPages}页`);
+          }
         }
       } catch (error) {
         console.error('数据加载失败:', error);
@@ -246,6 +258,11 @@ export default {
       // 根据总页数判断是否还有更多数据
       this.hasMore = this.page < totalPages;
       this.page++;
+      
+      // 如果是夹子榜单，更新关注状态
+      if (this.isJiaziStrategy) {
+        this.updateBooksFollowStatus();
+      }
       
       this.filterRankings();
     },
@@ -315,16 +332,80 @@ export default {
     handleRankingClick(ranking) {
       console.log('点击项目:', ranking);
       
-      if (ranking.isBook) {
+      if (ranking.isBook || this.isJiaziStrategy) {
         // 如果是书籍项，跳转到书籍详情页
+        const bookId = ranking.bookData?.id || ranking.bookData?.novel_id || ranking.id?.replace('book_', '') || ranking.id;
         uni.navigateTo({
-          url: `/pages/book/detail?id=${ranking.bookData?.id || ranking.id.replace('book_', '')}`
+          url: `/pages/book/detail?id=${bookId}`
         });
       } else {
         // 如果是榜单项，跳转到榜单详情页
         uni.navigateTo({
           url: `/pages/ranking/detail?id=${ranking.id}&name=${encodeURIComponent(ranking.name)}`
         });
+      }
+    },
+    
+    handleBookFollow(book) {
+      try {
+        const followList = uni.getStorageSync('followList') || [];
+        const existingIndex = followList.findIndex(item => item.id === book.id);
+        
+        if (existingIndex === -1) {
+          // 添加关注
+          const followItem = {
+            id: book.id,
+            type: 'book',
+            name: book.title || book.name,
+            author: book.author || '未知作者',
+            category: '夹子榜单',
+            isOnList: true,
+            followDate: new Date().toISOString()
+          };
+          
+          followList.push(followItem);
+          uni.setStorageSync('followList', followList);
+          book.isFollowed = true;
+          
+          uni.showToast({
+            title: '已关注',
+            icon: 'success',
+            duration: 1000
+          });
+        } else {
+          // 取消关注
+          followList.splice(existingIndex, 1);
+          uni.setStorageSync('followList', followList);
+          book.isFollowed = false;
+          
+          uni.showToast({
+            title: '已取消关注',
+            icon: 'success',
+            duration: 1000
+          });
+        }
+        
+        // 更新列表中的关注状态
+        this.updateBooksFollowStatus();
+      } catch (error) {
+        console.error('关注操作失败:', error);
+        uni.showToast({
+          title: '操作失败',
+          icon: 'none'
+        });
+      }
+    },
+    
+    updateBooksFollowStatus() {
+      try {
+        const followList = uni.getStorageSync('followList') || [];
+        this.filteredRankings.forEach(item => {
+          if (item.bookData) {
+            item.bookData.isFollowed = followList.some(follow => follow.id === item.bookData.id);
+          }
+        });
+      } catch (error) {
+        console.error('更新关注状态失败:', error);
       }
     }
   }

@@ -114,8 +114,10 @@
               </view>
 
               <view class="book-info">
-                <text class="book-title">{{ book.title || book.id }}</text>
-                <text class="book-author" v-if="book.author">{{ book.author}}</text>
+                <view class="book-title-row">
+                  <text class="book-title">{{ book.title || book.id }}</text>
+                  <text class="book-author" v-if="book.author">{{ book.author}}</text>
+                </view>
                 <view class="book-stats">
                   <text class="stat-item" v-if="book.collectCount">
                     收藏: {{ formatNumber(book.collectCount)}}
@@ -636,25 +638,32 @@ export default {
             flex: 1;
             min-width: 0;
 
-            .book-title {
-              display: block;
-              font-size: 28rpx;
-              font-weight: 500;
-              color: $text-primary;
+            .book-title-row {
+              display: flex;
+              align-items: center;
               margin-bottom: 8rpx;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-
-            .book-author {
-              display: block;
-              font-size: 22rpx;
-              color: $text-secondary;
-              margin-bottom: 8rpx;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
+              gap: 16rpx;
+              
+              .book-title {
+                font-size: 28rpx;
+                font-weight: 500;
+                color: $text-primary;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex: 1;
+                min-width: 0;
+              }
+              
+              .book-author {
+                font-size: 22rpx;
+                color: $text-secondary;
+                white-space: nowrap;
+                flex-shrink: 0;
+                max-width: 120rpx;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              }
             }
 
             .book-stats {
