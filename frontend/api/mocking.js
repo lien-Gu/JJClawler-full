@@ -133,6 +133,31 @@ class MockingManager {
   }
 
   /**
+   * 生成模拟排行榜报告数据
+   */
+  generateMockRankingReport(rankingId) {
+    const rankingNames = ['完结榜', '收藏榜', '点击榜', '推荐榜', '评分榜'];
+    const name = rankingNames[rankingId % rankingNames.length] || '测试排行榜';
+    
+    return {
+      success: true,
+      data: {
+        ranking_id: rankingId,
+        name: name,
+        level: `Level ${Math.floor(Math.random() * 5) + 1}`,
+        description: `${name}包含了最受欢迎的书籍，按照${name.includes('完结') ? '完结时间' : name.includes('收藏') ? '收藏数量' : name.includes('点击') ? '点击次数' : '综合评分'}进行排序。`,
+        total_books: Math.floor(Math.random() * 500) + 100,
+        last_updated: new Date().toISOString(),
+        statistics: {
+          weekly_growth: (Math.random() * 20 - 10).toFixed(1), // -10 到 +10
+          monthly_growth: (Math.random() * 50 - 25).toFixed(1), // -25 到 +25
+          total_views: Math.floor(Math.random() * 100000) + 10000
+        }
+      }
+    };
+  }
+
+  /**
    * 根据API路径返回对应的模拟数据
    */
   async getMockDataByPath(path, params = {}) {
@@ -148,6 +173,12 @@ class MockingManager {
     if (path.startsWith('/rankingsdetail/day/')) {
       const { page = 1, size = 20 } = params;
       return this.generateMockBooks(parseInt(page), parseInt(size));
+    }
+    
+    // 排行榜报告数据
+    if (path.startsWith('/reports/latest/')) {
+      const rankingId = path.replace('/reports/latest/', '');
+      return this.generateMockRankingReport(parseInt(rankingId));
     }
     
     // 概览统计
