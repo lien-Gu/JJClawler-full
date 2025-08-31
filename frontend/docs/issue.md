@@ -265,9 +265,70 @@ mixins: [navigationMixin],
 
 **修复状态：** ✅ 已修复
 
+### 2025-08-31: 分类标签自动选择子分类错误修复
+
+**问题描述：**
+排行榜页面中，当用户点击复杂分类（如"言情"）的主分类时，系统会自动选择该分类下的第一个子分类（如"古言"），导致显示的是子分类的榜单而不是主分类的榜单。
+
+**问题表现：**
+- 点击"言情"分类 → 自动选中"古言"，显示page_id=yq.gy的榜单
+- 期望行为：点击"言情"分类 → 不选择子分类，显示page_id=yq的榜单
+- 只有明确点击"古言"时才应该显示page_id=yq.gy的榜单
+
+**问题原因：**
+在 `components/CategoryTabs.vue` 的 `selectMainTab` 方法中，第76-77行的代码自动选择了第一个子分类：
+```javascript
+// 选择主分类时，自动选择第一个子分类（如果有）
+const firstSubTab = tab.children?.[0]?.key || '';
+```
+
+**影响范围：**
+- 所有使用CategoryTabs组件的页面（主要是ranking/index.vue）
+- 影响用户对复杂分类（言情、纯爱、衍生等）的导航体验
+- 导致用户无法查看主分类本身的榜单内容
+
+**修复方案：**
+修改 `CategoryTabs.vue` 中的 `selectMainTab` 方法，点击主分类时不自动选择子分类：
+
+1. **修复前的逻辑：**
+```javascript
+selectMainTab(tab, index) {
+  // 选择主分类时，自动选择第一个子分类（如果有）
+  const firstSubTab = tab.children?.[0]?.key || '';
+  
+  this.$emit('change', {
+    mainTab: tab.key,
+    subTab: firstSubTab,  // 自动选择第一个子分类
+    tab: tab
+  });
+}
+```
+
+2. **修复后的逻辑：**
+```javascript
+selectMainTab(tab, index) {
+  // 选择主分类时，不自动选择子分类，让用户明确选择
+  // 清空当前子分类选择，显示主分类的榜单内容
+  
+  this.$emit('change', {
+    mainTab: tab.key,
+    subTab: '', // 不自动选择子分类
+    tab: tab
+  });
+}
+```
+
+**修复效果：**
+- 点击"言情"分类 → currentSubTab为空，page_id="yq"，显示言情主分类榜单
+- 点击"古言"子分类 → currentSubTab="gy"，page_id="yq.gy"，显示古言子分类榜单
+- 点击"纯爱"分类 → page_id="ca"，显示纯爱主分类榜单
+- 用户可以明确控制是查看主分类还是子分类的榜单
+
+**修复状态：** ✅ 已修复
+
 ## 问题总结
 
-总共发现并修复了 9 个主要问题：
+总共发现并修复了 10 个主要问题：
 
 1. ✅ **Vue 语法错误** - 缺少对象逗号分隔符
 2. ✅ **组件导入路径错误** - 目录结构变更后路径未更新  
@@ -278,12 +339,14 @@ mixins: [navigationMixin],
 7. ✅ **app.json 文件缺失** - 微信小程序配置文件未生成
 8. ✅ **API方法缺失错误** - RequestManager缺少业务API方法
 9. ✅ **Settings页面mixin引用错误** - 无效的navigationMixin引用
+10. ✅ **分类标签自动选择子分类错误** - 点击主分类时自动选择第一个子分类
 
 **当前状态：**
 所有主要错误已修复，项目现在应该能够：
 - 正常编译运行
 - 正确加载和显示数据
 - 正常进行页面导航
+- 正确处理分类标签的用户交互逻辑
 - 在微信开发者工具中正常运行
 
 **建议：**

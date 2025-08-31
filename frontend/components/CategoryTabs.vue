@@ -73,12 +73,12 @@ export default {
     selectMainTab(tab, index) {
       if (this.currentMainTab === tab.key) return;
       
-      // 选择主分类时，自动选择第一个子分类（如果有）
-      const firstSubTab = tab.children?.[0]?.key || '';
+      // 选择主分类时，不自动选择子分类，让用户明确选择
+      // 清空当前子分类选择，显示主分类的榜单内容
       
       this.$emit('change', {
         mainTab: tab.key,
-        subTab: firstSubTab,
+        subTab: '', // 不自动选择子分类
         tab: tab
       });
     },

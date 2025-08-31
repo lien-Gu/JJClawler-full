@@ -119,8 +119,6 @@ export default {
     getCurrentPageId() {
       // 根据当前主分类和子分类获取对应的page_id
       const mainCategory = this.categories.find(cat => cat.key === this.currentMainTab);
-      console.log(`getCurrentPageId - 当前主分类: ${this.currentMainTab}, 子分类: ${this.currentSubTab}`);
-      console.log(`getCurrentPageId - 找到的主分类:`, mainCategory);
       
       if (!mainCategory) {
         console.warn(`未找到主分类 ${this.currentMainTab}，返回默认index`);
@@ -129,15 +127,12 @@ export default {
       
       // 特殊处理：夹子分类直接返回其ID，不需要子分类
       if (mainCategory.key === 'jiazi') {
-        console.log(`夹子分类，返回: jiazi`);
         return 'jiazi';
       }
       
       // 简单分类（如书城、百合）直接返回其channel值
       if (mainCategory.type === 'simple') {
-        const pageId = mainCategory.channel || mainCategory.id;
-        console.log(`简单分类 ${mainCategory.name}，返回: ${pageId}`);
-        return pageId;
+        return mainCategory.channel || mainCategory.id;
       }
       
       // 复杂分类处理
@@ -145,7 +140,6 @@ export default {
         // 如果有选中子分类，返回组合的page_id格式：主分类.子分类
         if (this.currentSubTab) {
           const subCategory = mainCategory.children?.find(sub => sub.key === this.currentSubTab);
-          console.log(`查找子分类 ${this.currentSubTab}，找到:`, subCategory);
           if (subCategory) {
             // 对于复杂分类的子分类，使用 主分类id.子分类id 的格式
             const pageId = `${mainCategory.id}.${subCategory.id}`;
@@ -160,9 +154,7 @@ export default {
       }
       
       // 其他情况：返回主分类的channel或id
-      const pageId = mainCategory.channel || mainCategory.id;
-      console.log(`其他分类，返回: ${pageId}`);
-      return pageId;
+      return mainCategory.channel || mainCategory.id;
     },
 
     /**
@@ -418,8 +410,8 @@ export default {
       console.log(`最终显示榜单数量: ${this.filteredRankings.length}`);
     },
     
-    onTabChange({ mainTab, subTab, tab }) {
-      console.log('Tab切换:', { mainTab, subTab, tab });
+    onTabChange({ mainTab, subTab }) {
+      console.log('Tab切换:', { mainTab, subTab});
       this.currentMainTab = mainTab;
       this.currentSubTab = subTab || ''; // 允许子分类为空
       
