@@ -63,24 +63,24 @@ class RankingParser:
 
         if not data_list or data_list == []:
             data_list = raw_data.get("list", [])
-        
+
         # 处理嵌套结构（如夹子榜的 data.list 格式）
         if isinstance(data_list, dict) and "list" in data_list:
             data_list = data_list["list"]
-        
+
         # 如果data字段为空，尝试直接获取list字段
         if not data_list:
             data_list = raw_data.get("list", [])
-            
+
         if data_list == []:
             return data_list
-            
+
         if not isinstance(data_list, list) or not isinstance(data_list[0], dict):
             raise TypeError("响应体data结构错误")
-            
+
         if "channelName" in data_list[0]:
             self.has_sub_ranking = True
-            
+
         return data_list
 
     def _parse_ranking_info(self, raw_ranking_data: Dict, is_sub_ranking: bool = False) -> Dict[str, Any]:
@@ -112,7 +112,7 @@ class RankingParser:
             "novel_id": raw_basic_data.get("novelId") or raw_basic_data.get("novelid"),
             "title": raw_basic_data.get("novelName") or raw_basic_data.get("novelname"),
             "author_id": raw_basic_data.get("authorId") or raw_basic_data.get("authorid") or 0,
-            "author_name":raw_basic_data.get("authorName") or raw_basic_data.get("authorname") or None,
+            "author_name": raw_basic_data.get("authorName") or raw_basic_data.get("authorname") or None,
             "snapshot_time": datetime.now()
         }
 
@@ -125,7 +125,7 @@ class RankingParser:
         return {
             "rank_id": "jiazi",
             "channel_name": "夹子相关",  # 修复缺失的channel_name字段
-            "rank_group_type": "热门",   # 设置合理的默认值
+            "rank_group_type": "热门",  # 设置合理的默认值
             "page_id": "jiazi"
         }
 
@@ -172,7 +172,6 @@ class PageParser:
         return list(res)
 
 
-
 class NovelPageParser:
     """
     解析书籍详情网页爬取信息
@@ -189,13 +188,7 @@ class NovelPageParser:
         :param raw_detail_data:
         :return:
         """
-        # 安全处理clicks字段，避免None对象切片错误
-        novip_clicks = raw_detail_data.get("novip_clicks", "0")
-        if novip_clicks and len(str(novip_clicks)) > 4:
-            clicks_value = str(novip_clicks)[:-4]
-        else:
-            clicks_value = str(novip_clicks) if novip_clicks else "0"
-            
+
         self.book_detail = {
             "novel_id": raw_detail_data.get("novelId", None),
             "title": raw_detail_data.get("novelName", None),
