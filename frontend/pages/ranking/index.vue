@@ -171,136 +171,33 @@ export default {
       return 'ranking-list';
     },
     
-    formatRankingName(channelName, subChannelName) {
-      // 格式化榜单名称，智能组合 channel_name 和 sub_channel_name
-      if (channelName && subChannelName) {
-        // 两个都有，组合显示
-        return `${channelName} - ${subChannelName}`;
-      } else if (channelName) {
-        // 只有主分类名
-        return channelName;
-      } else if (subChannelName) {
-        // 只有子分类名
-        return subChannelName;
-      } else {
-        // 都没有，返回默认名称
-        return '未知榜单';
-      }
-    },
 
     /**
      * 加载夹子榜单的书籍数据
-     * @returns {Promise<{success: boolean, data: Array, totalPages: number}>}
      */
     async loadJiaziBooks() {
-      const JIAZI_RANKING_ID = 1; // 夹子榜单ID固定为1
+      const JIAZI_RANKING_ID = 1;
+      console.log(`正在加载夹子榜单书籍数据: /rankingsdetail/day/${JIAZI_RANKING_ID}`);
       
-      try {
-        console.log(`正在加载夹子榜单书籍数据: /rankingsdetail/day/${JIAZI_RANKING_ID}`);
-        
-        // 调用夹子榜单详情API获取书籍数据
-        const response = await requestManager.getRankingDetail(JIAZI_RANKING_ID, {
-          page: this.page,
-          size: this.pageSize
-        });
-        
-        console.log('夹子书籍API响应:', response);
-        
-        if (response && response.success && response.data) {
-          const responseData = response.data;
-          const booksData = responseData.books || [];
-          
-          // 将书籍数据转换为榜单显示格式
-          const rankingsData = booksData.map((book, index) => ({
-            id: `book_${book.id}`,
-            name: book.title || book.name || `书籍${index + 1}`,
-            description: `作者: ${book.author || '未知'} | 收藏: ${book.collectCount || 0}`,
-            channel_name: '夹子榜单',
-            sub_channel_name: `排名第${((this.page - 1) * this.pageSize) + index + 1}位`,
-            page_id: 'jiazi',
-            rank_group_type: 'jiazi',
-            bookData: book, // 保存原始书籍数据
-            isBook: true // 标识这是书籍项而不是榜单项
-          }));
-          
-          return {
-            success: true,
-            data: rankingsData,
-            totalPages: Math.ceil((responseData.total || booksData.length) / this.pageSize)
-          };
-        }
-        
-        return { success: false, data: [], totalPages: 0 };
-      } catch (error) {
-        console.error('加载夹子书籍失败:', error);
-        return { success: false, data: [], totalPages: 0 };
-      }
+      return await requestManager.getRankingDetail(JIAZI_RANKING_ID, {
+        page: this.page,
+        size: this.pageSize
+      });
     },
 
     /**
-     * 加载榜单列表数据（通用逻辑）
-     * @returns {Promise<{success: boolean, data: Array, totalPages: number}>}
+     * 加载榜单列表数据
      */
     async loadRankingsList() {
-      try {
-        const apiParams = {
-          page_id: this.getCurrentPageId(),
-          page: this.page,
-          size: this.pageSize
-        };
-        
-        console.log(`正在请求榜单数据: /rankings/?page_id=${apiParams.page_id}&page=${apiParams.page}&size=${apiParams.size}`);
-        
-        // 调用榜单列表API
-        const response = await requestManager.getRankingsList(apiParams);
-        console.log('榜单列表API响应:', response);
-        
-        if (response && response.success && response.data) {
-          const responseData = response.data;
-          console.log('responseData结构:', JSON.stringify(responseData, null, 2));
-          
-          // 获取榜单列表数据
-          if (responseData.data_list && Array.isArray(responseData.data_list)) {
-            console.log(`找到data_list数组，长度: ${responseData.data_list.length}`);
-            
-            if (responseData.data_list.length > 0) {
-              const rankingsData = responseData.data_list.map(item => ({
-                id: item.id,
-                name: this.formatRankingName(item.channel_name, item.sub_channel_name),
-                channel_name: item.channel_name || '',
-                sub_channel_name: item.sub_channel_name || '',
-                page_id: item.page_id,
-                rank_group_type: item.rank_group_type || '其他',
-                description: `${item.rank_group_type || '其他'} - ${item.page_id}`,
-                isBook: false // 标识这是榜单项
-              }));
-              
-              console.log(`成功转换 ${rankingsData.length} 个榜单项目`);
-              return {
-                success: true,
-                data: rankingsData,
-                totalPages: responseData.total_pages || 1
-              };
-            } else {
-              console.warn('data_list数组为空');
-              return { success: false, data: [], totalPages: 0 };
-            }
-          } else {
-            console.warn('responseData中没有找到data_list数组');
-          }
-        } else {
-          console.warn('API响应格式不正确:', {
-            hasResponse: !!response,
-            hasSuccess: response?.success,
-            hasData: !!response?.data
-          });
-        }
-        
-        return { success: false, data: [], totalPages: 0 };
-      } catch (error) {
-        console.error('加载榜单列表失败:', error);
-        return { success: false, data: [], totalPages: 0 };
-      }
+      const apiParams = {
+        page_id: this.getCurrentPageId(),
+        page: this.page,
+        size: this.pageSize
+      };
+      
+      console.log(`正在请求榜单数据: /rankings/?page_id=${apiParams.page_id}&page=${apiParams.page}&size=${apiParams.size}`);
+      
+      return await requestManager.getRankingsList(apiParams);
     },
     
     /**
@@ -315,28 +212,21 @@ export default {
         const strategy = this.determineLoadStrategy();
         console.log(`使用加载策略: ${strategy}, 页面ID: ${this.getCurrentPageId()}`);
         
-        let result;
-        
         // 根据策略选择加载方法
-        if (strategy === 'jiazi-books') {
-          result = await this.loadJiaziBooks();
-        } else {
-          result = await this.loadRankingsList();
-        }
+        const result = strategy === 'jiazi-books' 
+          ? await this.loadJiaziBooks() 
+          : await this.loadRankingsList();
         
         // 处理加载结果
         if (result.success && result.data && result.data.length > 0) {
           this.processLoadedData(result.data, result.totalPages);
-          
           const itemType = strategy === 'jiazi-books' ? '书籍' : '榜单';
           console.log(`成功加载 ${result.data.length} 个${itemType}项目，当前第${this.page-1}页，共${result.totalPages}页`);
         } else {
-          console.warn(`未获取到有效的数据，使用模拟数据 (策略: ${strategy})`);
-          this.loadMockRankings();
+          console.warn(`未获取到有效的数据 (策略: ${strategy})`);
         }
       } catch (error) {
         console.error('数据加载失败:', error);
-        this.loadMockRankings();
       } finally {
         this.loading = false;
         this.refreshing = false;
@@ -360,37 +250,6 @@ export default {
       this.filterRankings();
     },
 
-    loadMockRankings() {
-      // 模拟榜单数据
-      const pageId = this.getCurrentPageId();
-      const mockRankingNames = [
-        '完结榜', '收藏榜', '点击榜', '推荐榜', '评分榜', 
-        '新书榜', '月度榜', '季度榜', '年度榜', '热门榜',
-        '原创榜', '同人榜', '现代榜', '古代榜', '幻想榜',
-        '都市榜', '校园榜', '职场榜', '军事榜', '历史榜'
-      ];
-      
-      const mockRankings = Array.from({ length: this.pageSize }, (_, index) => ({
-        id: `ranking_${pageId}_${this.page}_${index + 1}`,
-        name: mockRankingNames[((this.page - 1) * this.pageSize + index) % mockRankingNames.length],
-        description: `${pageId}分类榜单`,
-        hierarchy: `${pageId} > 子分类`,
-        total_books: Math.floor(Math.random() * 1000) + 100,
-        page_id: pageId
-      }));
-      
-      if (this.page === 1) {
-        this.allRankings = mockRankings;
-      } else {
-        this.allRankings.push(...mockRankings);
-      }
-      
-      this.hasMore = this.page < 3; // 模拟3页数据
-      this.page++;
-      
-      this.filterRankings();
-      console.log(`成功加载 ${mockRankings.length} 个模拟榜单项目，当前第${this.page-1}页`);
-    },
 
     filterRankings() {
       let filtered = [...this.allRankings];

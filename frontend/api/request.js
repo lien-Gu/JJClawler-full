@@ -5,6 +5,7 @@
 
 import configData from '@/data/config.json'
 import mockData from '@/data/fake_data.json'
+import mockingManager from './mocking.js'
 
 class RequestManager {
   constructor() {
@@ -142,17 +143,178 @@ class RequestManager {
   }
 
   /**
+   * 格式化榜单名称
+   */
+  formatRankingName(channelName, subChannelName) {
+    if (channelName && subChannelName) {
+      return `${channelName} - ${subChannelName}`;
+    } else if (channelName) {
+      return channelName;
+    } else if (subChannelName) {
+      return subChannelName;
+    } else {
+      return '未知榜单';
+    }
+  }
+
+  /**
    * 获取排行榜列表
+   * 包含完整的数据处理逻辑
    */
   async getRankingsList(params = {}) {
-    return await this.get('/rankings/', params)
+    try {
+      const response = await this.get('/rankings/', params);
+      console.log('榜单列表API响应:', response);
+      
+      if (response && response.success && response.data) {
+        const responseData = response.data;
+        console.log('responseData结构:', JSON.stringify(responseData, null, 2));
+        
+        // 获取榜单列表数据
+        if (responseData.data_list && Array.isArray(responseData.data_list)) {
+          console.log(`找到data_list数组，长度: ${responseData.data_list.length}`);
+          
+          if (responseData.data_list.length > 0) {
+            const rankingsData = responseData.data_list.map(item => ({
+              id: item.id,
+              name: this.formatRankingName(item.channel_name, item.sub_channel_name),
+              channel_name: item.channel_name || '',
+              sub_channel_name: item.sub_channel_name || '',
+              page_id: item.page_id,
+              rank_group_type: item.rank_group_type || '其他',
+              description: `${item.rank_group_type || '其他'} - ${item.page_id}`,
+              isBook: false
+            }));
+            
+            console.log(`成功转换 ${rankingsData.length} 个榜单项目`);
+            return {
+              success: true,
+              data: rankingsData,
+              totalPages: responseData.total_pages || 1
+            };
+          } else {
+            console.warn('data_list数组为空，使用模拟数据');
+            return await this.getMockRankingsListFallback(params);
+          }
+        } else {
+          console.warn('responseData中没有找到data_list数组，使用模拟数据');
+          return await this.getMockRankingsListFallback(params);
+        }
+      } else {
+        console.warn('API响应格式不正确，使用模拟数据:', {
+          hasResponse: !!response,
+          hasSuccess: response?.success,
+          hasData: !!response?.data
+        });
+        return await this.getMockRankingsListFallback(params);
+      }
+    } catch (error) {
+      console.error('加载榜单列表失败，使用模拟数据:', error);
+      return await this.getMockRankingsListFallback(params);
+    }
+  }
+
+  /**
+   * 榜单列表的模拟数据回退方案
+   */
+  async getMockRankingsListFallback(params = {}) {
+    const mockResponse = await mockingManager.getMockDataByPath('/rankings/', params);
+    if (mockResponse.success && mockResponse.data.data_list) {
+      const rankingsData = mockResponse.data.data_list.map(item => ({
+        id: item.id,
+        name: this.formatRankingName(item.channel_name, item.sub_channel_name),
+        channel_name: item.channel_name || '',
+        sub_channel_name: item.sub_channel_name || '',
+        page_id: item.page_id,
+        rank_group_type: item.rank_group_type || '模拟',
+        description: `${item.rank_group_type || '模拟'} - ${item.page_id}`,
+        isBook: false
+      }));
+      
+      return {
+        success: true,
+        data: rankingsData,
+        totalPages: mockResponse.data.total_pages || 1
+      };
+    }
+    
+    return { success: false, data: [], totalPages: 0 };
   }
 
   /**
    * 获取排行榜详情（按天）
+   * 包含夹子榜单的特殊处理逻辑
    */
   async getRankingDetail(rankingId, params = {}) {
-    return await this.get(`/rankingsdetail/day/${rankingId}`, params)
+    try {
+      const response = await this.get(`/rankingsdetail/day/${rankingId}`, params);
+      console.log('夹子书籍API响应:', response);
+      
+      if (response && response.success && response.data) {
+        const responseData = response.data;
+        const booksData = responseData.books || [];
+        
+        if (booksData.length > 0) {
+          // 将书籍数据转换为统一格式
+          const { page = 1, size = 20 } = params;
+          const rankingsData = booksData.map((book, index) => ({
+            id: `book_${book.id}`,
+            name: book.title || book.name || `书籍${index + 1}`,
+            description: `作者: ${book.author || '未知'} | 收藏: ${book.collectCount || 0}`,
+            channel_name: '夹子榜单',
+            sub_channel_name: `排名第${((page - 1) * size) + index + 1}位`,
+            page_id: 'jiazi',
+            rank_group_type: 'jiazi',
+            bookData: book,
+            isBook: true
+          }));
+          
+          return {
+            success: true,
+            data: rankingsData,
+            totalPages: Math.ceil((responseData.total || booksData.length) / size)
+          };
+        } else {
+          console.warn('夹子榜单书籍数据为空，使用模拟数据');
+          return await this.getMockJiaziFallback(params);
+        }
+      } else {
+        console.warn('夹子榜单API响应格式不正确，使用模拟数据');
+        return await this.getMockJiaziFallback(params);
+      }
+    } catch (error) {
+      console.error('加载夹子书籍失败，使用模拟数据:', error);
+      return await this.getMockJiaziFallback(params);
+    }
+  }
+
+  /**
+   * 夹子榜单的模拟数据回退方案
+   */
+  async getMockJiaziFallback(params = {}) {
+    const mockResponse = await mockingManager.getMockDataByPath('/rankingsdetail/day/1', params);
+    if (mockResponse.success && mockResponse.data.books) {
+      const { page = 1, size = 20 } = params;
+      const rankingsData = mockResponse.data.books.map((book, index) => ({
+        id: `book_${book.id}`,
+        name: book.title || book.name || `书籍${index + 1}`,
+        description: `作者: ${book.author || '未知'} | 收藏: ${book.collectCount || 0}`,
+        channel_name: '夹子榜单',
+        sub_channel_name: `排名第${((page - 1) * size) + index + 1}位`,
+        page_id: 'jiazi',
+        rank_group_type: 'jiazi',
+        bookData: book,
+        isBook: true
+      }));
+      
+      return {
+        success: true,
+        data: rankingsData,
+        totalPages: Math.ceil((mockResponse.data.total || rankingsData.length) / size)
+      };
+    }
+    
+    return { success: false, data: [], totalPages: 0 };
   }
 
   /**
