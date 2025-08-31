@@ -241,52 +241,6 @@ class RequestManager {
         return {success: false, data: [], totalPages: 0};
     }
 
-    /**
-     * 获取排行榜详情（按天）
-     * 包含夹子榜单的特殊处理逻辑
-     */
-    async getRankingDetail(rankingId, params = {}) {
-        try {
-            const response = await this.get(`/rankingsdetail/day/${rankingId}`, params);
-            console.log('夹子书籍API响应:', response);
-
-            if (response && response.success && response.data) {
-                const responseData = response.data;
-                const booksData = responseData.books || [];
-
-                if (booksData.length > 0) {
-                    // 将书籍数据转换为统一格式
-                    const {page = 1, size = 20} = params;
-                    const rankingsData = booksData.map((book, index) => ({
-                        id: `book_${book.id}`,
-                        name: book.title || book.name || `书籍${index + 1}`,
-                        description: `作者: ${book.author || '未知'} | 收藏: ${book.collectCount || 0}`,
-                        channel_name: '夹子榜单',
-                        sub_channel_name: `排名第${((page - 1) * size) + index + 1}位`,
-                        page_id: 'jiazi',
-                        rank_group_type: 'jiazi',
-                        bookData: book,
-                        isBook: true
-                    }));
-
-                    return {
-                        success: true,
-                        data: rankingsData,
-                        totalPages: Math.ceil((responseData.total || booksData.length) / size)
-                    };
-                } else {
-                    console.warn('夹子榜单书籍数据为空，使用模拟数据');
-                    return await this.getMockJiaziFallback(params);
-                }
-            } else {
-                console.warn('夹子榜单API响应格式不正确，使用模拟数据');
-                return await this.getMockJiaziFallback(params);
-            }
-        } catch (error) {
-            console.error('加载夹子书籍失败，使用模拟数据:', error);
-            return await this.getMockJiaziFallback(params);
-        }
-    }
 
     /**
      * 夹子榜单的模拟数据回退方案
@@ -317,22 +271,6 @@ class RequestManager {
         return {success: false, data: [], totalPages: 0};
     }
 
-    /**
-     * 获取排行榜书籍列表（从排行榜详情中提取）
-     */
-    async getRankingBooks(rankingId, params = {}) {
-        const response = await this.getRankingDetail(rankingId, params)
-        if (response.success && response.data) {
-            return {
-                success: true,
-                data: {
-                    books: response.data.books || [],
-                    total: response.data.books?.length || 0
-                }
-            }
-        }
-        return response
-    }
 
     /**
      * 获取排行榜历史（按天）
@@ -400,18 +338,24 @@ class RequestManager {
      */
     async getRankingBooksDetail(rankingId, params = {}) {
         // 复用现有的getRankingDetail方法，它已经正确处理了书籍数据
-        const response = await this.getRankingDetail(rankingId, params);
+        const response = await this.get(`/rankingsdetail/day/${rankingId}`);
+        console.log('夹子书籍API响应:', response);
 
-        if (response.success && response.data) {
+        if (response && response.success && response.data) {
+            const booksData = response.data.books || [];
+            if (booksData.length <= 0) {
+                console.warn('夹子榜单书籍数据为空，使用模拟数据');
+                return await this.getMockJiaziFallback(params);
+            }
             // 将书籍数据按排名排序（从低到高）
-            const sortedBooks = response.data.map((item, index) => ({
-                ...item.bookData || {},
-                id: item.bookData?.novel_id,
-                title: item.bookData?.title,
-                author: item.bookData?.author || "未知",
-                collectCount: item.bookData?.collectCount || 1,
-                clickCount: item.bookData?.clickCount || 1,
-                position: index + 1 + ((params.page - 1 || 0) * (params.limit || 20)),
+            const sortedBooks = booksData.map((book) => ({
+                novel_id: book.novel_id,
+                title: book.title,
+                author: book.author || "未知",
+                collectCount: book.favorites || 1,
+                clickCount: book.clicks || 1,
+                nutritionCount: book.nutrition || 1,
+                position: book.position + 1 + ((params.page - 1 || 0) * (params.limit || 20)),
                 isFollowed: false // 初始状态，后续会检查
             })).sort((a, b) => a.position - b.position);
 

@@ -115,7 +115,7 @@
 
               <view class="book-info">
                 <view class="book-title-row">
-                  <text class="book-title">{{ book.title || book.id }}</text>
+                  <text class="book-title">{{ book.title || book.novel_id }}</text>
                   <text class="book-author" v-if="book.author">{{ book.author}}</text>
                 </view>
                 <view class="book-stats">

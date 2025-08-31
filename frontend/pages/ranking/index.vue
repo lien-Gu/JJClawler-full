@@ -34,7 +34,7 @@
         v-if="isJiaziStrategy"
         v-for="(item, index) in filteredRankings"
         :key="item.id"
-        :book="item.bookData || item"
+        :book="item"
         :index="index"
         @click="handleRankingClick"
         @follow="handleBookFollow"
@@ -171,19 +171,7 @@ export default {
       return mainCategory.channel || mainCategory.id;
     },
 
-    /**
-     * 确定数据加载策略
-     * @returns {string} 'jiazi' | 'rankings'
-     */
-    determineLoadStrategy() {
-      const pageId = this.getCurrentPageId();
-      // 如果是夹子分类，直接加载书籍数据
-      if (pageId === 'jiazi') {
-        return 'jiazi-books';
-      }
-      // 其他情况加载榜单列表
-      return 'ranking-list';
-    },
+
     
 
     /**
@@ -193,7 +181,7 @@ export default {
       const JIAZI_RANKING_ID = 1;
       console.log(`正在加载夹子榜单书籍数据`);
       
-      return await requestManager.getRankingDetail(JIAZI_RANKING_ID, {
+      return await requestManager.getRankingBooksDetail(JIAZI_RANKING_ID, {
         page: this.page,
         size: this.pageSize
       });
@@ -399,14 +387,46 @@ export default {
     updateBooksFollowStatus() {
       try {
         const followList = uni.getStorageSync('followList') || [];
-        this.filteredRankings.forEach(item => {
+        this.allRankings.forEach(item => {
           if (item.bookData) {
             item.bookData.isFollowed = followList.some(follow => follow.id === item.bookData.id);
           }
         });
+        console.log('更新关注状态完成，书籍数量:', this.allRankings.length);
       } catch (error) {
         console.error('更新关注状态失败:', error);
       }
+    },
+    
+    transformBookData(item) {
+      // 处理夹子榜单的书籍数据，确保数据结构正确
+      if (!item) {
+        console.warn('transformBookData: item为空');
+        return { title: '数据为空' };
+      }
+      
+      const bookData = item.bookData || item;
+      
+      // 详细的调试日志
+      if (!bookData.title && !bookData.name) {
+        console.warn('书籍数据缺少标题:', { 
+          item: JSON.stringify(item, null, 2), 
+          bookData: JSON.stringify(bookData, null, 2) 
+        });
+      }
+      
+      const transformedData = {
+        id: bookData.id || bookData.novel_id || item.id,
+        title: bookData.title || bookData.name || item.name,
+        author: bookData.author || '未知作者',
+        collectCount: bookData.collectCount || bookData.collect_count || 0,
+        clickCount: bookData.clickCount || bookData.click_count || 0,
+        wordCount: bookData.wordCount || bookData.word_count || 0,
+        isFollowed: bookData.isFollowed || false
+      };
+      
+      console.log('转换结果:', transformedData);
+      return transformedData;
     }
   }
 }
