@@ -120,7 +120,7 @@ export default {
   
   // 边框
   &.card-bordered {
-    border: 1px solid rgba($text-secondary, 0.1);
+    border: 1px solid rgba(108, 117, 125, 0.1);
   }
 }
 
@@ -131,7 +131,7 @@ export default {
 
 .card-outlined {
   background: $surface-default;
-  border: 1px solid rgba($text-secondary, 0.2);
+  border: 1px solid rgba(108, 117, 125, 0.2);
   box-shadow: none;
 }
 
@@ -202,7 +202,7 @@ export default {
 
 .card-footer {
   padding: $spacing-md $spacing-lg $spacing-lg;
-  border-top: 1px solid rgba($text-secondary, 0.1);
+  border-top: 1px solid rgba(108, 117, 125, 0.1);
   margin-top: $spacing-md;
 }
 

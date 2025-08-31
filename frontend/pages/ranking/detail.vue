@@ -162,6 +162,7 @@
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import requestManager from '@/api/request.js'
+import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
 
 export default {
@@ -220,7 +221,7 @@ export default {
       try {
         console.log(`开始加载排行榜数据，id: ${this.rankingId},name:${this.rankingName}`);
         uni.setNavigationBarTitle({
-          title: this.name
+          title: this.rankingName || '榜单详情'
         });
         const response = await requestManager.getRankingReport(this.rankingId);
 
@@ -599,14 +600,14 @@ export default {
           align-items: center;
           padding: $spacing-md 0;
 
-          border-bottom: 1px solid rgba($text-secondary, 0.1);
+          border-bottom: 1px solid rgba(108, 117, 125, 0.1);
 
           &:last-child {
             border-bottom: none;
           }
 
           &:active {
-            background: rgba($text-secondary, 0.05);
+            background: rgba(108, 117, 125, 0.05);
             margin: 0 (-$spacing-sm);
             padding-left: $spacing-sm;
             padding-right: $spacing-sm;
@@ -662,7 +663,7 @@ export default {
 
               .stat-item {
                 font-size: 20rpx;
-                color: rgba($text-secondary, 0.8);
+                color: rgba(108, 117, 125, 0.8);
               }
             }
           }
