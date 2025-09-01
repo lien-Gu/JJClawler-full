@@ -214,9 +214,13 @@ export default {
         // 根据策略选择加载方法
         if (this.currentMainTab === 'jiazi') {
           const result = await this.loadJiaziBooks()
-          if (result.success && result.data && result.data.length > 0) {
-            this.processLoadedData(result.data, result.totalPages);
-            console.log(`成功加载 ${result.data.length} 个书籍项目，当前第${this.page-1}页，共${result.totalPages}页`);
+          if (result.success && result.data && result.data.books && result.data.books.length > 0) {
+            // 夹子榜单需要转换数据格式
+            const transformedBooks = result.data.books;
+            this.processLoadedData(transformedBooks, Math.ceil(result.data.total / this.pageSize));
+            console.log(`成功加载并转换 ${transformedBooks.length} 个书籍项目，当前第${this.page-1}页`);
+          } else {
+            console.warn('夹子榜单数据格式不正确:', result);
           }
         } else {
           const result = await this.loadRankingsList();
@@ -322,10 +326,18 @@ export default {
       
       if (ranking.isBook || this.isJiaziStrategy) {
         // 如果是书籍项，跳转到书籍详情页
-        const bookId = ranking.bookData?.id || ranking.bookData?.novel_id || ranking.id?.replace('book_', '') || ranking.id;
-        uni.navigateTo({
-          url: `/pages/book/detail?id=${bookId}`
-        });
+        const bookId = ranking.id || ranking.bookData?.novel_id || ranking.bookData?.id || ranking.novel_id;
+        if (bookId) {
+          uni.navigateTo({
+            url: `/pages/book/detail?id=${bookId}`
+          });
+        } else {
+          console.warn('无法获取书籍ID:', ranking);
+          uni.showToast({
+            title: '无法打开书籍详情',
+            icon: 'none'
+          });
+        }
       } else {
         // 如果是榜单项，跳转到榜单详情页
         uni.navigateTo({
@@ -388,11 +400,16 @@ export default {
       try {
         const followList = uni.getStorageSync('followList') || [];
         this.allRankings.forEach(item => {
-          if (item.bookData) {
-            item.bookData.isFollowed = followList.some(follow => follow.id === item.bookData.id);
+          if (item.isBook) {
+            // 对于转换后的书籍数据，直接更新 isFollowed 属性
+            item.isFollowed = followList.some(follow => follow.id === item.id);
+            // 如果存在 bookData，也更新它
+            if (item.bookData) {
+              item.bookData.isFollowed = item.isFollowed;
+            }
           }
         });
-        console.log('更新关注状态完成，书籍数量:', this.allRankings.length);
+        console.log('更新关注状态完成，书籍数量:', this.allRankings.filter(item => item.isBook).length);
       } catch (error) {
         console.error('更新关注状态失败:', error);
       }

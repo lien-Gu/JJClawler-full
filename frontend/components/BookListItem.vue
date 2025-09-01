@@ -9,7 +9,7 @@
 
     <view class="book-info">
       <view class="book-title-row">
-        <text class="book-title">{{ book.title || book.novel_id || "未知书名" }}</text>
+        <text class="book-title">{{ book.title || book.name || book.novel_id || "未知书名" }}</text>
         <text class="book-author">{{ book.author || "未知作者" }}</text>
       </view>
       <view class="book-stats">

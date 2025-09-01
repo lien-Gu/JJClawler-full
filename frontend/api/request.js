@@ -355,7 +355,7 @@ class RequestManager {
                 collectCount: book.favorites || 1,
                 clickCount: book.clicks || 1,
                 nutritionCount: book.nutrition || 1,
-                position: book.position + 1 + ((params.page - 1 || 0) * (params.limit || 20)),
+                position: book.position + 1,
                 isFollowed: false // 初始状态，后续会检查
             })).sort((a, b) => a.position - b.position);
 
@@ -364,8 +364,6 @@ class RequestManager {
                 data: {
                     books: sortedBooks,
                     total: response.totalPages * (params.limit || 20),
-                    page: params.page || 1,
-                    limit: params.limit || 20
                 }
             };
         }
