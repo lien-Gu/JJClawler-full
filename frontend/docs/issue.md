@@ -326,6 +326,165 @@ selectMainTab(tab, index) {
 
 **修复状态：** ✅ 已修复
 
+### 2025-09-02: 微信小程序真机测试getApp().$vm错误修复
+
+**问题描述：**
+在微信小程序真机测试时出现应用实例获取错误：
+```
+MiniProgramError
+undefined is not an object (evaluating 'getApp().$vm')
+TypeError: undefined is not an object (evaluating 'getApp().$vm')
+```
+
+**问题表现：**
+- 开发者工具中运行正常
+- 真机测试时页面无内容，应用崩溃
+- 错误发生在组件初始化阶段($createComponent)
+
+**问题原因：**
+1. **userStore立即执行问题**：在`store/userStore.js`文件末尾有立即执行的初始化代码：`userStore.initUserState()`，这会在应用实例完全初始化前就尝试访问存储和状态
+2. **App.vue异步阻塞**：`onLaunch`方法是异步的，可能延迟了应用实例的完整初始化
+3. **真机环境时序敏感**：真机环境对初始化时序要求更严格，getApp()需要在应用完全就绪后才能正常工作
+
+**影响范围：**
+- 所有真机测试环境
+- 微信小程序发布版本
+- 影响用户体验和功能可用性
+
+**修复方案：**
+
+1. **移除userStore立即执行**：
+```javascript
+// 修复前 - store/userStore.js
+const userStore = useUserStore()
+userStore.initUserState() // 立即执行，有问题
+
+// 修复后
+const userStore = useUserStore()
+// 移除立即执行
+```
+
+2. **修改App.vue初始化时序**：
+```javascript
+// 修复前
+async onLaunch() {
+  const result = await initializeApp() // 异步阻塞
+}
+
+// 修复后
+onLaunch() {
+  this.$nextTick(() => {
+    this.initializeAppSafely() // 延迟到下一个tick
+  })
+}
+```
+
+3. **添加安全检查**：
+```javascript
+// 在用户管理工具中添加uni对象检查
+isLoggedIn() {
+  if (typeof uni === 'undefined') {
+    console.warn('uni对象未准备就绪')
+    return false
+  }
+  // 其他逻辑...
+}
+```
+
+4. **优化初始化时序**：
+```javascript
+// 在初始化工具中添加延迟
+await new Promise(resolve => setTimeout(resolve, 100))
+```
+
+**修复效果：**
+- 真机测试正常启动
+- 应用实例正确初始化
+- 用户状态管理正常工作
+- 页面内容正确显示
+
+**修复状态：** ✅ 已修复
+
+### 2025-09-02: 微信小程序getUserProfile用户手势链断开错误修复
+
+**问题描述：**
+在微信小程序中点击登录按钮时出现用户授权错误：
+```
+getUserProfile:fail can only be invoked by user TAP gesture.
+```
+
+**问题表现：**
+- 微信登录凭证获取成功（uni.login正常）
+- 但用户信息获取失败（uni.getUserProfile报错）
+- 错误信息指出只能在用户点击手势中调用getUserProfile
+
+**问题原因：**
+微信小程序的安全限制：`uni.getUserProfile()` 只能在**用户直接点击事件的同步调用链**中执行，不能在异步回调中调用。
+
+原始代码流程：
+1. 用户点击登录按钮 ✅ (用户手势)
+2. 调用 `uni.login()` 获取code ✅ (同步)
+3. 在 `uni.login()` 的**异步回调**中调用 `uni.getUserProfile()` ❌ (手势链已断开)
+
+**影响范围：**
+- 所有需要获取用户信息的登录流程
+- 影响用户注册和个人信息获取功能
+
+**修复方案：**
+
+1. **调整API调用顺序**：将getUserProfile放在第一位
+```javascript
+// 修复前
+async login() {
+  const loginRes = await uni.login() // 先获取code
+  const userProfileRes = await uni.getUserProfile() // 在异步回调中调用，手势链断开
+}
+
+// 修复后  
+async login() {
+  const userProfileRes = await uni.getUserProfile() // 先获取用户信息，保持手势链
+  const loginRes = await uni.login() // 再获取code
+}
+```
+
+2. **移除async/await语法糖**：使用Promise链保持同步性
+```javascript
+// 修复前
+async handleLogin() {
+  const result = await userManager.login() // async/await可能断开手势链
+}
+
+// 修复后
+handleLogin() {
+  userManager.login().then(result => {
+    // 处理结果
+  })
+}
+```
+
+3. **添加事件修饰符**：确保事件不会被其他处理器干扰
+```vue
+<BaseButton @click.stop="handleLogin" />
+```
+
+**修复效果：**
+- 用户点击登录按钮可以正常获取用户信息
+- 登录流程完整可用
+- 用户授权弹窗正常显示
+
+**修复状态：** ✅ 已修复
+
+**重要提醒：**
+- `uni.getUserProfile()` 必须在用户点击事件的**同步执行链**中调用
+- 避免在异步回调、Promise.then、async/await中调用用户授权相关API
+- 微信小程序的用户手势检测非常严格，任何异步操作都会断开手势链
+
+**建议：**
+- 避免在模块加载时立即执行复杂的初始化逻辑
+- 使用$nextTick或setTimeout延迟需要访问应用实例的操作
+- 在真机环境中充分测试应用启动流程
+- 添加适当的错误处理和安全检查
+
 ### 2025-08-31: 分类标签无法从子分类回到主分类修复
 
 **问题描述：**
@@ -390,7 +549,7 @@ selectMainTab(tab, index) {
 
 ## 问题总结
 
-总共发现并修复了 11 个主要问题：
+总共发现并修复了 13 个主要问题：
 
 1. ✅ **Vue 语法错误** - 缺少对象逗号分隔符
 2. ✅ **组件导入路径错误** - 目录结构变更后路径未更新  
@@ -403,6 +562,8 @@ selectMainTab(tab, index) {
 9. ✅ **Settings页面mixin引用错误** - 无效的navigationMixin引用
 10. ✅ **分类标签自动选择子分类错误** - 点击主分类时自动选择第一个子分类
 11. ✅ **分类标签无法从子分类回到主分类** - 重复点击检查逻辑过于严格
+12. ✅ **微信小程序真机测试getApp().$vm错误** - 应用实例初始化时序问题
+13. ✅ **微信小程序getUserProfile用户手势链断开错误** - API调用时序和异步处理问题
 
 **当前状态：**
 所有主要错误已修复，项目现在应该能够：
@@ -411,9 +572,13 @@ selectMainTab(tab, index) {
 - 正常进行页面导航
 - 正确处理分类标签的用户交互逻辑
 - 在微信开发者工具中正常运行
+- **在微信小程序真机环境中正常运行**
+- 完整的用户登录和关注功能正常工作
 
 **建议：**
 - 在重新编译前，清理编译缓存以解决 SCSS 路径问题
 - 确保在微信开发者工具中正确导入编译后的项目目录
 - 确保后端API服务器在 `127.0.0.1:8000` 运行（开发环境）
 - 定期检查编译输出目录，确保所有必需文件都已正确生成
+- **在真机环境中充分测试应用启动和用户功能**
+- 避免在模块加载阶段进行复杂的异步初始化操作

@@ -37,6 +37,7 @@
           :index="index"
           @click="handleBookClick"
           @follow="handleBookFollow"
+          @login-required="showLoginPrompt"
       />
     </ScrollableList>
 
@@ -62,6 +63,13 @@
           @click="handleRankingClick"
       />
     </ScrollableList>
+    
+    <!-- 登录弹窗 -->
+    <LoginModal 
+      :visible="showLoginModal"
+      @close="hideLogin"
+      @login-success="onLoginSuccess"
+    />
   </view>
 </template>
 
@@ -71,6 +79,7 @@ import CategoryTabs from '@/components/CategoryTabs.vue'
 import RankingListItem from '@/components/RankingListItem.vue'
 import BookListItem from '@/components/BookListItem.vue'
 import ScrollableList from '@/components/ScrollableList.vue'
+import LoginModal from '@/components/LoginModal.vue'
 import requestManager from '@/api/request.js'
 import {getSitesList} from '@/data/url.js'
 
@@ -81,7 +90,8 @@ export default {
     CategoryTabs,
     RankingListItem,
     BookListItem,
-    ScrollableList
+    ScrollableList,
+    LoginModal
   },
   data() {
     return {
@@ -101,7 +111,8 @@ export default {
       jiaziLoading: false,
       jiaziRefreshing: false,
       jiaziHasMore: true,
-      jiaziPage: 1
+      jiaziPage: 1,
+      showLoginModal: false
     }
   },
 
@@ -483,6 +494,24 @@ export default {
           title: '操作失败',
           icon: 'none'
         })
+      }
+    },
+
+    // 显示登录提示
+    showLoginPrompt() {
+      this.showLoginModal = true
+    },
+
+    // 隐藏登录弹窗
+    hideLogin() {
+      this.showLoginModal = false
+    },
+
+    // 登录成功回调
+    onLoginSuccess(userInfo) {
+      console.log('登录成功，刷新书籍关注状态')
+      if (this.isJiaziStrategy) {
+        this.checkJiaziFollowStatus()
       }
     }
 

@@ -17,8 +17,25 @@
       </BaseCard>
     </view>
     
+    <!-- 未登录提示 -->
+    <view v-if="!isLoggedIn" class="login-prompt">
+      <BaseCard class="login-card">
+        <view class="prompt-content">
+          <view class="prompt-icon">🔒</view>
+          <text class="prompt-title">请先登录</text>
+          <text class="prompt-desc">登录后可以查看和管理您的关注列表</text>
+          <BaseButton 
+            type="primary"
+            text="立即登录"
+            @click="showLogin"
+          />
+        </view>
+      </BaseCard>
+    </view>
+
     <!-- 关注书籍列表 -->
     <ScrollableList
+      v-if="isLoggedIn"
       :items="followData"
       :loading="false"
       :refreshing="refreshing"
@@ -69,6 +86,13 @@
       </template>
     </ScrollableList>
     
+    <!-- 登录弹窗 -->
+    <LoginModal 
+      :visible="showLoginModal"
+      @close="hideLogin"
+      @login-success="onLoginSuccess"
+    />
+    
   </view>
 </template>
 
@@ -76,6 +100,8 @@
 import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import ScrollableList from '@/components/ScrollableList.vue'
+import LoginModal from '@/components/LoginModal.vue'
+import userStore from '@/store/userStore.js'
 import requestManager from '@/api/request.js'
 import { formatNumber, formatTime } from '@/utils/format.js'
 import navigation from '@/utils/navigation.js'
@@ -85,16 +111,27 @@ export default {
   components: {
     BaseCard,
     BaseButton,
-    ScrollableList
+    ScrollableList,
+    LoginModal
   },
   data() {
     return {
-      followData: [],
       refreshing: false,
-      followStats: {
-        totalBooks: 0,
-        onListBooks: 0
-      }
+      showLoginModal: false
+    }
+  },
+
+  computed: {
+    isLoggedIn() {
+      return userStore.state.isLoggedIn
+    },
+    
+    followData() {
+      return userStore.state.followList
+    },
+    
+    followStats() {
+      return userStore.followStats
     }
   },
   
@@ -110,38 +147,24 @@ export default {
     ...navigation,
     formatNumber,
     formatTime,
+    
     async loadFollowData() {
+      if (!this.isLoggedIn) {
+        console.log('用户未登录，跳过加载关注数据')
+        return
+      }
+      
       try {
-        // 优先从requestManager获取用户关注数据
-        const userFollows = await requestManager.getUserFollows()
-        if (userFollows && Array.isArray(userFollows)) {
-          this.followData = userFollows
-        } else {
-          // 如果没有或失败，从本地存储获取关注数据
-          const followList = uni.getStorageSync('followList') || []
-          this.followData = followList
-        }
-        
-        // 更新统计信息
-        this.updateStats()
+        // 刷新用户状态管理中的关注列表
+        await userStore.refreshFollowList()
+        console.log('关注数据加载成功')
       } catch (error) {
         console.error('加载关注数据失败:', error)
-        // 备用方案：从本地存储获取
-        try {
-          const followList = uni.getStorageSync('followList') || []
-          this.followData = followList
-          this.updateStats()
-        } catch (localError) {
-          console.error('本地关注数据也获取失败:', localError)
-          this.followData = []
-          this.updateStats()
-        }
+        uni.showToast({
+          title: '加载失败',
+          icon: 'none'
+        })
       }
-    },
-    
-    updateStats() {
-      this.followStats.totalBooks = this.followData.length
-      this.followStats.onListBooks = this.followData.filter(item => item.isOnList).length
     },
     
     async onRefresh() {
@@ -185,14 +208,9 @@ export default {
       })
     },
     
-    removeFromFollow(item) {
+    async removeFromFollow(item) {
       try {
-        const followList = uni.getStorageSync('followList') || []
-        const newList = followList.filter(follow => follow.id !== item.id)
-        uni.setStorageSync('followList', newList)
-        this.followData = newList
-        this.updateStats()
-        
+        await userStore.removeFollow(item.id, item.type)
         uni.showToast({
           title: '已取消关注',
           icon: 'success',
@@ -222,6 +240,22 @@ export default {
     
     goToRanking() {
       this.switchMainTab('ranking')
+    },
+
+    // 显示登录弹窗
+    showLogin() {
+      this.showLoginModal = true
+    },
+
+    // 隐藏登录弹窗
+    hideLogin() {
+      this.showLoginModal = false
+    },
+
+    // 登录成功回调
+    onLoginSuccess(userInfo) {
+      console.log('登录成功，用户状态已自动更新')
+      // userStore会自动更新状态，不需要手动处理
     }
   }
 }
@@ -234,6 +268,40 @@ export default {
   min-height: 100vh;
   background: $surface-white;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.login-prompt {
+  padding: $spacing-lg;
+  
+  .login-card {
+    .prompt-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: $spacing-xl $spacing-lg;
+      
+      .prompt-icon {
+        font-size: 80rpx;
+        margin-bottom: $spacing-lg;
+        opacity: 0.8;
+      }
+      
+      .prompt-title {
+        font-size: 32rpx;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: $spacing-md;
+      }
+      
+      .prompt-desc {
+        font-size: 26rpx;
+        color: $text-secondary;
+        text-align: center;
+        line-height: 1.4;
+        margin-bottom: $spacing-xl;
+      }
+    }
+  }
 }
 
 .stats-section {

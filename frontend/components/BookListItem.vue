@@ -27,8 +27,8 @@
 
     <view class="book-actions">
       <BaseButton
-          :type="book.isFollowed ? 'secondary' : 'text'"
-          :icon="book.isFollowed ? '★' : '☆'"
+          :type="isFollowed ? 'secondary' : 'text'"
+          :icon="isFollowed ? '★' : '☆'"
           size="small"
           round
           @click="handleFollowClick"
@@ -39,6 +39,7 @@
 
 <script>
 import BaseButton from '@/components/BaseButton.vue'
+import userStore from '@/store/userStore.js'
 import {formatNumber} from '@/utils/format.js'
 
 export default {
@@ -56,15 +57,53 @@ export default {
       required: true
     }
   },
-  emits: ['click', 'follow'],
+  emits: ['click', 'follow', 'login-required'],
+
+  computed: {
+    isLoggedIn() {
+      return userStore.state.isLoggedIn
+    },
+    
+    isFollowed() {
+      if (!this.isLoggedIn) return false
+      return userStore.isFollowing(this.book.id, 'book')
+    }
+  },
   methods: {
     formatNumber(num) {
       return formatNumber(num);
     },
 
-    handleFollowClick(e) {
+    async handleFollowClick(e) {
       e.stopPropagation();
-      this.$emit('follow', this.book);
+      
+      if (!this.isLoggedIn) {
+        // 用户未登录，触发登录要求事件
+        this.$emit('login-required');
+        return;
+      }
+      
+      try {
+        const followItem = {
+          id: this.book.id,
+          type: 'book',
+          name: this.book.title || this.book.name,
+          author: this.book.author || '未知作者',
+          category: '书籍',
+          isOnList: true
+        };
+        
+        await userStore.toggleFollow(followItem);
+        
+        // 触发父组件的follow事件（如果需要额外处理）
+        this.$emit('follow', this.book);
+      } catch (error) {
+        console.error('关注操作失败:', error);
+        uni.showToast({
+          title: error.message || '操作失败',
+          icon: 'none'
+        });
+      }
     },
 
   }

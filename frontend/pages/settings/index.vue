@@ -5,8 +5,8 @@
       <BaseCard class="user-card">
         <view class="user-info">
           <view class="avatar-section">
-            <view class="user-avatar" @tap="selectAvatar">
-              <image v-if="userAvatar" :src="userAvatar" class="avatar-image" />
+            <view class="user-avatar" @tap="handleAvatarTap">
+              <image v-if="displayUserAvatar" :src="displayUserAvatar" class="avatar-image" />
               <view v-else class="avatar-placeholder">
                 <text class="avatar-icon">👤</text>
               </view>
@@ -14,8 +14,26 @@
           </view>
           
           <view class="user-details">
-            <text class="user-name">游客用户</text>
-            <text class="user-status">未登录</text>
+            <text class="user-name">{{ displayUserName }}</text>
+            <text class="user-status">{{ displayUserStatus }}</text>
+          </view>
+          
+          <!-- 登录/退出按钮 -->
+          <view class="user-actions">
+            <BaseButton 
+              v-if="!isLoggedIn"
+              type="primary"
+              size="small"
+              text="登录"
+              @click="showLogin"
+            />
+            <BaseButton 
+              v-else
+              type="text"
+              size="small"
+              text="退出"
+              @click="handleLogout"
+            />
           </view>
         </view>
       </BaseCard>
@@ -116,17 +134,29 @@
       </BaseCard>
     </view>
     
+    <!-- 登录弹窗 -->
+    <LoginModal 
+      :visible="showLoginModal"
+      @close="hideLogin"
+      @login-success="onLoginSuccess"
+    />
+    
   </view>
 </template>
 
 <script>
 import BaseCard from '@/components/BaseCard.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import LoginModal from '@/components/LoginModal.vue'
+import userStore from '@/store/userStore.js'
 import { getCurrentEnvironment, getAvailableEnvironments, setEnvironment } from '@/utils/config.js'
 
 export default {
   name: 'SettingsPage',
   components: {
-    BaseCard
+    BaseCard,
+    BaseButton,
+    LoginModal
   },
   
   data() {
@@ -137,7 +167,30 @@ export default {
         localCache: true
       },
       currentEnv: '',
-      currentEnvName: ''
+      currentEnvName: '',
+      showLoginModal: false
+    }
+  },
+
+  computed: {
+    userInfo() {
+      return userStore.state.userInfo
+    },
+    
+    isLoggedIn() {
+      return userStore.state.isLoggedIn
+    },
+    
+    displayUserName() {
+      return this.isLoggedIn ? this.userInfo?.nickName || '微信用户' : '游客用户'
+    },
+    
+    displayUserStatus() {
+      return this.isLoggedIn ? '已登录' : '未登录'
+    },
+    
+    displayUserAvatar() {
+      return this.isLoggedIn ? this.userInfo?.avatarUrl || '' : this.userAvatar
     }
   },
   
@@ -181,6 +234,18 @@ export default {
       this.saveSettings()
     },
     
+    handleAvatarTap() {
+      if (this.isLoggedIn) {
+        // 已登录用户不允许更改头像（使用微信头像）
+        uni.showToast({
+          title: '使用微信头像',
+          icon: 'none'
+        })
+      } else {
+        this.selectAvatar()
+      }
+    },
+
     selectAvatar() {
       uni.chooseImage({
         count: 1,
@@ -193,6 +258,54 @@ export default {
             uni.setStorageSync('userAvatar', tempFilePath)
           } catch (error) {
             console.error('保存头像失败:', error)
+          }
+        }
+      })
+    },
+
+    // 显示登录弹窗
+    showLogin() {
+      this.showLoginModal = true
+    },
+
+    // 隐藏登录弹窗
+    hideLogin() {
+      this.showLoginModal = false
+    },
+
+    // 登录成功回调
+    onLoginSuccess(userInfo) {
+      console.log('登录成功，用户信息:', userInfo.nickName)
+      // Store会自动更新状态，这里不需要手动处理
+    },
+
+    // 退出登录
+    async handleLogout() {
+      uni.showModal({
+        title: '退出登录',
+        content: '确定要退出当前账号吗？',
+        success: async (res) => {
+          if (res.confirm) {
+            try {
+              const result = await userStore.logout()
+              if (result.success) {
+                uni.showToast({
+                  title: '已退出登录',
+                  icon: 'success'
+                })
+              } else {
+                uni.showToast({
+                  title: result.message || '退出失败',
+                  icon: 'none'
+                })
+              }
+            } catch (error) {
+              console.error('退出登录失败:', error)
+              uni.showToast({
+                title: '退出失败',
+                icon: 'none'
+              })
+            }
           }
         }
       })
@@ -369,6 +482,11 @@ export default {
           font-size: 24rpx;
           color: $text-secondary;
         }
+      }
+      
+      .user-actions {
+        margin-left: $spacing-md;
+        flex-shrink: 0;
       }
     }
   }
