@@ -18,7 +18,7 @@ export const initializeApp = async () => {
     await userStore.initUserState()
     
     // 2. 检查并初始化测试数据（仅在开发阶段）
-    await initTestDataIfNeeded()
+    initTestDataIfNeeded()
     
     console.log('应用初始化完成')
     
@@ -39,7 +39,7 @@ export const initializeApp = async () => {
 /**
  * 检查并初始化测试数据
  */
-const initTestDataIfNeeded = async () => {
+const initTestDataIfNeeded = () => {
   try {
     // 如果用户已登录但关注列表为空，添加测试数据
     if (userStore.state.isLoggedIn && userStore.state.followList.length === 0) {
@@ -73,15 +73,15 @@ const initTestDataIfNeeded = async () => {
 /**
  * 用户登录成功后的初始化
  */
-export const initializeUserData = async (userInfo) => {
+export const initializeUserData = (userInfo) => {
   try {
     console.log('初始化用户数据:', userInfo.nickName)
     
     // 1. 检查是否需要迁移本地数据
-    await migrateLocalDataIfNeeded()
+    migrateLocalDataIfNeeded()
     
     // 2. 同步用户状态
-    await userStore.refreshFollowList()
+    userStore.refreshFollowList()
     
     console.log('用户数据初始化完成')
     
@@ -102,7 +102,7 @@ export const initializeUserData = async (userInfo) => {
 /**
  * 迁移本地数据（如果需要）
  */
-const migrateLocalDataIfNeeded = async () => {
+const migrateLocalDataIfNeeded = () => {
   try {
     // 检查是否有旧版本的关注数据需要迁移
     const oldFollowList = uni.getStorageSync('followList')
@@ -136,12 +136,12 @@ const migrateLocalDataIfNeeded = async () => {
 /**
  * 清理应用数据
  */
-export const clearAppData = async () => {
+export const clearAppData = () => {
   try {
     console.log('开始清理应用数据...')
     
     // 清理用户相关数据
-    await userStore.clearError()
+    userStore.clearError()
     
     // 清理本地存储
     const keysToKeep = ['appSettings'] // 保留应用设置

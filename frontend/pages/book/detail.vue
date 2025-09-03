@@ -9,8 +9,8 @@
         </view>
         <view class="header-actions">
           <BaseButton
-              :type="bookData.isFollowed ? 'secondary' : 'primary'"
-              :icon="bookData.isFollowed ? '★' : '☆'"
+              :type="isFollowed ? 'primary' : 'secondary'"
+              :icon="isFollowed ? '/static/icons/tab-follow-current.png' : '/static/icons/tab-follow.png'"
               size="small"
               round
               @click="toggleFollow"
@@ -112,6 +112,7 @@ import BaseCard from '@/components/BaseCard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import requestManager from '@/api/request.js'
 import navigation from '@/utils/navigation.js'
+import userStore from '@/store/userStore.js'
 
 export default {
   name: 'BookDetailPage',
@@ -129,8 +130,7 @@ export default {
         category: '',
         collectCount: 0,
         clickCount: 0,
-        rankings: [],
-        isFollowed: false
+        rankings: []
       },
       currentTab: 'trend',
       statsTabs: [
@@ -140,6 +140,17 @@ export default {
       ],
       rankingHistory: [],
       loading: false
+    }
+  },
+
+  computed: {
+    isLoggedIn() {
+      return userStore.state.isLoggedIn
+    },
+    
+    isFollowed() {
+      if (!this.isLoggedIn) return false
+      return userStore.isFollowing(this.bookId, 'book')
     }
   },
 
@@ -163,8 +174,7 @@ export default {
             title: this.bookData.title || '书籍详情'
           })
 
-          // 检查是否已关注
-          this.checkFollowStatus()
+          // 关注状态通过computed属性实时获取，无需手动检查
         }
 
         // 加载榜单历史
@@ -196,82 +206,40 @@ export default {
       }
     },
 
-    checkFollowStatus() {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        this.bookData.isFollowed = followList.some(item => item.id === this.bookId)
-      } catch (error) {
-        console.error('检查关注状态失败:', error)
-      }
-    },
 
     switchTab(tabKey) {
       this.currentTab = tabKey
     },
 
-    async toggleFollow() {
+    toggleFollow() {
+      if (!this.isLoggedIn) {
+        uni.showToast({
+          title: '请先登录',
+          icon: 'none'
+        })
+        return
+      }
+      
       try {
-        const isCurrentlyFollowed = this.bookData.isFollowed
-
-        if (isCurrentlyFollowed) {
-          this.removeFromFollow()
-        } else {
-          this.addToFollow()
+        const followItem = {
+          id: this.bookId,
+          type: 'book',
+          name: this.bookData.title,
+          author: this.bookData.author || '未知作者',
+          category: this.bookData.category || '书籍',
+          isOnList: this.rankingHistory.some(r => r.isActive)
         }
-
-        this.bookData.isFollowed = !isCurrentlyFollowed
+        
+        userStore.toggleFollow(followItem)
       } catch (error) {
         console.error('关注操作失败:', error)
         uni.showToast({
-          title: '操作失败',
+          title: error.message || '操作失败',
           icon: 'none'
         })
       }
     },
 
-    addToFollow() {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        const followItem = {
-          id: this.bookData.id || this.bookId,
-          type: 'book',
-          name: this.bookData.title,
-          author: this.bookData.author,
-          category: this.bookData.category,
-          isOnList: this.rankingHistory.some(r => r.isActive),
-          weeklyGrowth: this.bookData.weeklyGrowth || 0,
-          followDate: new Date().toISOString()
-        }
-
-        const existingIndex = followList.findIndex(item => item.id === this.bookId)
-        if (existingIndex === -1) {
-          followList.push(followItem)
-          uni.setStorageSync('followList', followList)
-
-          uni.showToast({
-            title: '已关注',
-            icon: 'success'
-          })
-        }
-      } catch (error) {
-        console.error('添加关注失败:', error)
-      }
-    },
-
-    removeFromFollow() {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        const newList = followList.filter(item => item.id !== this.bookId)
-        uni.setStorageSync('followList', newList)
-
-        uni.showToast({
-          title: '已取消关注',
-          icon: 'success'
-        })
-      } catch (error) {
-        console.error('取消关注失败:', error)
-      }
-    },
 
     formatPeriod(startDate, endDate) {
       if (!startDate && !endDate) return '未知周期'

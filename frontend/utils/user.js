@@ -83,12 +83,12 @@ class UserManager {
       }
 
       // 保存用户信息和登录状态
-      await this.saveUserInfo(userInfo)
-      await this.setLoginStatus(true)
+      this.saveUserInfo(userInfo)
+      this.setLoginStatus(true)
       
       // 首次登录时初始化测试关注数据
-      if (!(await this.getFollowList()).length) {
-        await this.initTestFollowData()
+      if (!this.getFollowList().length) {
+        this.initTestFollowData()
       }
 
       return {
@@ -168,7 +168,7 @@ class UserManager {
    * 保存用户信息
    * @param {Object} userInfo 用户信息
    */
-  async saveUserInfo(userInfo) {
+  saveUserInfo(userInfo) {
     try {
       uni.setStorageSync(this.storageKeys.USER_INFO, userInfo)
     } catch (error) {
@@ -181,7 +181,7 @@ class UserManager {
    * 设置登录状态
    * @param {boolean} status 登录状态
    */
-  async setLoginStatus(status) {
+  setLoginStatus(status) {
     try {
       uni.setStorageSync(this.storageKeys.LOGIN_STATUS, status)
     } catch (error) {
@@ -194,7 +194,7 @@ class UserManager {
    * 获取关注列表
    * @returns {Array} 关注列表
    */
-  async getFollowList() {
+  getFollowList() {
     try {
       return uni.getStorageSync(this.storageKeys.FOLLOW_LIST) || []
     } catch (error) {
@@ -207,7 +207,7 @@ class UserManager {
    * 保存关注列表
    * @param {Array} followList 关注列表
    */
-  async saveFollowList(followList) {
+  saveFollowList(followList) {
     try {
       uni.setStorageSync(this.storageKeys.FOLLOW_LIST, followList)
     } catch (error) {
@@ -220,9 +220,9 @@ class UserManager {
    * 添加关注项
    * @param {Object} item 关注项
    */
-  async addFollowItem(item) {
+  addFollowItem(item) {
     try {
-      const followList = await this.getFollowList()
+      const followList = this.getFollowList()
       
       // 检查是否已关注
       const existingIndex = followList.findIndex(follow => follow.id === item.id && follow.type === item.type)
@@ -233,7 +233,7 @@ class UserManager {
           followDate: new Date().toISOString()
         }
         followList.push(followItem)
-        await this.saveFollowList(followList)
+        this.saveFollowList(followList)
         
         return {
           success: true,
@@ -256,12 +256,12 @@ class UserManager {
    * @param {string} id 项目ID
    * @param {string} type 项目类型
    */
-  async removeFollowItem(id, type) {
+  removeFollowItem(id, type) {
     try {
-      const followList = await this.getFollowList()
+      const followList = this.getFollowList()
       const newList = followList.filter(item => !(item.id === id && item.type === type))
       
-      await this.saveFollowList(newList)
+      this.saveFollowList(newList)
       
       return {
         success: true,
@@ -279,9 +279,9 @@ class UserManager {
    * @param {string} type 项目类型
    * @returns {boolean} 是否已关注
    */
-  async isFollowing(id, type) {
+  isFollowing(id, type) {
     try {
-      const followList = await this.getFollowList()
+      const followList = this.getFollowList()
       return followList.some(item => item.id === id && item.type === type)
     } catch (error) {
       console.error('检查关注状态失败:', error)
@@ -292,10 +292,10 @@ class UserManager {
   /**
    * 初始化测试关注数据
    */
-  async initTestFollowData() {
+  initTestFollowData() {
     try {
       console.log('初始化测试关注数据')
-      await this.saveFollowList(this.testFollowData)
+      this.saveFollowList(this.testFollowData)
     } catch (error) {
       console.error('初始化测试数据失败:', error)
     }
@@ -304,7 +304,7 @@ class UserManager {
   /**
    * 清除所有数据
    */
-  async clearAllData() {
+  clearAllData() {
     try {
       uni.removeStorageSync(this.storageKeys.USER_INFO)
       uni.removeStorageSync(this.storageKeys.FOLLOW_LIST)

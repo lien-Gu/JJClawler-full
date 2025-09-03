@@ -44,8 +44,10 @@ export const useUserStore = () => {
     
     return {
       totalItems: userState.followList.length,
+      totalBooks: books.length, // 关注页面使用的字段名
       booksCount: books.length,
       rankingsCount: rankings.length,
+      onListBooks: books.filter(book => book.isOnList).length, // 关注页面使用的字段名
       onListBooksCount: books.filter(book => book.isOnList).length
     }
   })
@@ -66,7 +68,7 @@ export const useUserStore = () => {
         userState.userInfo = userInfo
         
         // 获取关注列表
-        const followList = await userManager.getFollowList()
+        const followList = userManager.getFollowList()
         userState.followList = followList
         
         console.log('用户状态初始化成功:', {
@@ -96,7 +98,7 @@ export const useUserStore = () => {
         userState.userInfo = result.userInfo
         
         // 重新加载关注列表
-        await refreshFollowList()
+        refreshFollowList()
         
         console.log('用户登录成功:', result.userInfo.nickName)
         return result
@@ -140,9 +142,9 @@ export const useUserStore = () => {
   }
 
   // 刷新关注列表
-  const refreshFollowList = async () => {
+  const refreshFollowList = () => {
     try {
-      const followList = await userManager.getFollowList()
+      const followList = userManager.getFollowList()
       userState.followList = followList
       console.log('关注列表已刷新:', followList.length, '项')
     } catch (error) {
@@ -152,17 +154,17 @@ export const useUserStore = () => {
   }
 
   // 添加关注
-  const addFollow = async (item) => {
+  const addFollow = (item) => {
     if (!userState.isLoggedIn) {
       throw new Error('请先登录')
     }
     
     try {
-      const result = await userManager.addFollowItem(item)
+      const result = userManager.addFollowItem(item)
       
       if (result.success) {
         // 实时更新状态
-        await refreshFollowList()
+        refreshFollowList()
         console.log('关注添加成功:', item.name || item.title)
       }
       
@@ -174,17 +176,17 @@ export const useUserStore = () => {
   }
 
   // 取消关注
-  const removeFollow = async (id, type) => {
+  const removeFollow = (id, type) => {
     if (!userState.isLoggedIn) {
       throw new Error('请先登录')
     }
     
     try {
-      const result = await userManager.removeFollowItem(id, type)
+      const result = userManager.removeFollowItem(id, type)
       
       if (result.success) {
         // 实时更新状态
-        await refreshFollowList()
+        refreshFollowList()
         console.log('关注取消成功:', id)
       }
       
@@ -205,7 +207,7 @@ export const useUserStore = () => {
   }
 
   // 切换关注状态
-  const toggleFollow = async (item) => {
+  const toggleFollow = (item) => {
     if (!userState.isLoggedIn) {
       throw new Error('请先登录')
     }
@@ -215,9 +217,9 @@ export const useUserStore = () => {
     
     try {
       if (isCurrentlyFollowing) {
-        return await removeFollow(id, type)
+        return removeFollow(id, type)
       } else {
-        return await addFollow(item)
+        return addFollow(item)
       }
     } catch (error) {
       console.error('切换关注状态失败:', error)

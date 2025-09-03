@@ -61,6 +61,8 @@
           :ranking="ranking"
           :index="index"
           @click="handleRankingClick"
+          @follow="handleRankingFollow"
+          @login-required="showLoginPrompt"
       />
     </ScrollableList>
     
@@ -82,6 +84,7 @@ import ScrollableList from '@/components/ScrollableList.vue'
 import LoginModal from '@/components/LoginModal.vue'
 import requestManager from '@/api/request.js'
 import {getSitesList} from '@/data/url.js'
+import userStore from '@/store/userStore.js'
 
 export default {
   name: 'RankingPage',
@@ -448,50 +451,55 @@ export default {
     },
 
     handleBookFollow(book) {
+      if (!userStore.state.isLoggedIn) {
+        this.showLoginPrompt()
+        return
+      }
+      
       try {
-        const followList = uni.getStorageSync('followList') || []
-        const existingIndex = followList.findIndex(item => item.id === book.id)
-
-        if (existingIndex === -1) {
-          // 添加关注
-          const followItem = {
-            id: book.id,
-            type: 'book',
-            name: book.title || book.name,
-            author: book.author || '未知作者',
-            category: '夹子榜单',
-            isOnList: true,
-            followDate: new Date().toISOString()
-          }
-
-          followList.push(followItem)
-          uni.setStorageSync('followList', followList)
-          book.isFollowed = true
-
-          uni.showToast({
-            title: '已关注',
-            icon: 'success',
-            duration: 1000
-          })
-        } else {
-          // 取消关注
-          followList.splice(existingIndex, 1)
-          uni.setStorageSync('followList', followList)
-          book.isFollowed = false
-
-          uni.showToast({
-            title: '已取消关注',
-            icon: 'success',
-            duration: 1000
-          })
+        const followItem = {
+          id: book.id,
+          type: 'book',
+          name: book.title || book.name,
+          author: book.author || '未知作者',
+          category: '夹子榜单',
+          isOnList: true
         }
-
-        // 更新状态
-        this.checkJiaziFollowStatus()
+        
+        userStore.toggleFollow(followItem)
+        
+        // 触发页面更新以显示最新关注状态
+        this.$forceUpdate()
       } catch (error) {
         console.error('关注操作失败:', error)
         uni.showToast({
-          title: '操作失败',
+          title: error.message || '操作失败',
+          icon: 'none'
+        })
+      }
+    },
+
+    handleRankingFollow(ranking) {
+      if (!userStore.state.isLoggedIn) {
+        this.showLoginPrompt()
+        return
+      }
+      
+      try {
+        const followItem = {
+          id: ranking.id,
+          type: 'ranking',
+          name: ranking.name,
+          author: '',
+          category: '榜单',
+          isOnList: true
+        }
+        
+        userStore.toggleFollow(followItem)
+      } catch (error) {
+        console.error('关注榜单失败:', error)
+        uni.showToast({
+          title: error.message || '操作失败',
           icon: 'none'
         })
       }

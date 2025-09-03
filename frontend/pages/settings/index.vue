@@ -280,25 +280,33 @@ export default {
     },
 
     // 退出登录
-    async handleLogout() {
+    handleLogout() {
       uni.showModal({
         title: '退出登录',
         content: '确定要退出当前账号吗？',
-        success: async (res) => {
+        success: (res) => {
           if (res.confirm) {
             try {
-              const result = await userStore.logout()
-              if (result.success) {
+              // logout方法现在是异步的，需要保持
+              userStore.logout().then(result => {
+                if (result.success) {
+                  uni.showToast({
+                    title: '已退出登录',
+                    icon: 'success'
+                  })
+                } else {
+                  uni.showToast({
+                    title: result.message || '退出失败',
+                    icon: 'none'
+                  })
+                }
+              }).catch(error => {
+                console.error('退出登录失败:', error)
                 uni.showToast({
-                  title: '已退出登录',
-                  icon: 'success'
-                })
-              } else {
-                uni.showToast({
-                  title: result.message || '退出失败',
+                  title: '退出失败',
                   icon: 'none'
                 })
-              }
+              })
             } catch (error) {
               console.error('退出登录失败:', error)
               uni.showToast({

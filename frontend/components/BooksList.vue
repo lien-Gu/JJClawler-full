@@ -15,6 +15,7 @@
         :index="index"
         @click="goToBookDetail"
         @follow="toggleBookFollow"
+        @login-required="showLoginRequired"
       />
     </view>
 
@@ -39,6 +40,7 @@
 import BookListItem from '@/components/BookListItem.vue'
 import requestManager from '@/api/request.js'
 import navigation from '@/utils/navigation.js'
+import userStore from '@/store/userStore.js'
 
 export default {
   name: 'BooksList',
@@ -127,14 +129,9 @@ export default {
     },
 
     checkBooksFollowStatus() {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        this.booksList.forEach(book => {
-          book.isFollowed = followList.some(item => item.id === book.id)
-        })
-      } catch (error) {
-        console.error('检查关注状态失败:', error)
-      }
+      // 为每本书设置关注状态，但实际状态在BookListItem中通过userStore实时获取
+      // 这里只是为了触发视图更新，不直接修改数据
+      this.$forceUpdate()
     },
 
     async onRefresh() {
@@ -155,67 +152,43 @@ export default {
       })
     },
 
-    async toggleBookFollow(book) {
+    toggleBookFollow(book) {
+      if (!userStore.state.isLoggedIn) {
+        uni.showToast({
+          title: '请先登录',
+          icon: 'none'
+        })
+        return
+      }
+      
       try {
-        if (book.isFollowed) {
-          this.removeBookFromFollow(book)
-        } else {
-          this.addBookToFollow(book)
+        const followItem = {
+          id: book.id,
+          type: 'book',
+          name: book.title || book.name,
+          author: book.author || '未知作者',
+          category: book.category || '书籍',
+          isOnList: true
         }
-        book.isFollowed = !book.isFollowed
+        
+        userStore.toggleFollow(followItem)
+        
+        // 触发视图更新以显示最新状态
+        this.$forceUpdate()
       } catch (error) {
         console.error('关注操作失败:', error)
         uni.showToast({
-          title: '操作失败',
+          title: error.message || '操作失败',
           icon: 'none'
         })
       }
     },
 
-    addBookToFollow(book) {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        const followItem = {
-          id: book.id,
-          type: 'book',
-          name: book.title,
-          author: book.author,
-          category: book.category,
-          isOnList: true,
-          weeklyGrowth: book.weeklyGrowth || 0,
-          followDate: new Date().toISOString()
-        }
-
-        const existingIndex = followList.findIndex(item => item.id === book.id)
-        if (existingIndex === -1) {
-          followList.push(followItem)
-          uni.setStorageSync('followList', followList)
-
-          uni.showToast({
-            title: '已关注',
-            icon: 'success',
-            duration: 1000
-          })
-        }
-      } catch (error) {
-        console.error('添加关注失败:', error)
-      }
-    },
-
-    removeBookFromFollow(book) {
-      try {
-        const followList = uni.getStorageSync('followList') || []
-        const newList = followList.filter(item => item.id !== book.id)
-        uni.setStorageSync('followList', newList)
-
-        uni.showToast({
-          title: '已取消关注',
-          icon: 'success',
-          duration: 1000
-        })
-      } catch (error) {
-        console.error('取消关注失败:', error)
-      }
+    showLoginRequired() {
+      uni.showToast({
+        title: '请先登录',
+        icon: 'none'
+      })
     }
   }
 }

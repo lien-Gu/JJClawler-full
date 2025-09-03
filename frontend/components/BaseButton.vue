@@ -20,7 +20,8 @@
     
     <!-- 图标 -->
     <view v-if="icon && !loading" class="btn-icon">
-      <text class="icon-text">{{ icon }}</text>
+      <image v-if="isImageIcon" :src="icon" class="icon-image" mode="aspectFit" />
+      <text v-else class="icon-text">{{ icon }}</text>
     </view>
     
     <!-- 文字内容 -->
@@ -78,6 +79,11 @@ export default {
     }
   },
   emits: ['click'],
+  computed: {
+    isImageIcon() {
+      return this.icon && (this.icon.includes('/') || this.icon.includes('.'))
+    }
+  },
   methods: {
     handleClick(e) {
       if (this.disabled || this.loading) return;
@@ -142,6 +148,10 @@ export default {
     .icon-text {
       font-size: 20rpx; // 10px
     }
+    .icon-image {
+      width: 20rpx;
+      height: 20rpx;
+    }
   }
 }
 
@@ -154,6 +164,10 @@ export default {
     .icon-text {
       font-size: 28rpx; // 14px
     }
+    .icon-image {
+      width: 28rpx;
+      height: 28rpx;
+    }
   }
 }
 
@@ -165,6 +179,10 @@ export default {
   .btn-icon {
     .icon-text {
       font-size: 32rpx; // 16px
+    }
+    .icon-image {
+      width: 32rpx;
+      height: 32rpx;
     }
   }
 }
@@ -257,5 +275,10 @@ export default {
 
 .btn-icon {
   flex-shrink: 0;
+  
+  .icon-image {
+    width: 24rpx;
+    height: 24rpx;
+  }
 }
 </style>

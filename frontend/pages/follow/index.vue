@@ -148,7 +148,7 @@ export default {
     formatNumber,
     formatTime,
     
-    async loadFollowData() {
+    loadFollowData() {
       if (!this.isLoggedIn) {
         console.log('用户未登录，跳过加载关注数据')
         return
@@ -156,7 +156,7 @@ export default {
       
       try {
         // 刷新用户状态管理中的关注列表
-        await userStore.refreshFollowList()
+        userStore.refreshFollowList()
         console.log('关注数据加载成功')
       } catch (error) {
         console.error('加载关注数据失败:', error)
@@ -167,9 +167,9 @@ export default {
       }
     },
     
-    async onRefresh() {
+    onRefresh() {
       this.refreshing = true
-      await this.loadFollowData()
+      this.loadFollowData()
       this.refreshing = false
     },
     
@@ -208,9 +208,9 @@ export default {
       })
     },
     
-    async removeFromFollow(item) {
+    removeFromFollow(item) {
       try {
-        await userStore.removeFollow(item.id, item.type)
+        userStore.removeFollow(item.id, item.type)
         uni.showToast({
           title: '已取消关注',
           icon: 'success',

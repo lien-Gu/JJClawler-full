@@ -27,8 +27,8 @@
 
     <view class="book-actions">
       <BaseButton
-          :type="isFollowed ? 'secondary' : 'text'"
-          :icon="isFollowed ? '★' : '☆'"
+          :type="isFollowed ? 'primary' : 'secondary'"
+          :icon="isFollowed ? '/static/icons/tab-follow-current.png' : '/static/icons/tab-follow.png'"
           size="small"
           round
           @click="handleFollowClick"
@@ -74,7 +74,7 @@ export default {
       return formatNumber(num);
     },
 
-    async handleFollowClick(e) {
+    handleFollowClick(e) {
       e.stopPropagation();
       
       if (!this.isLoggedIn) {
@@ -93,7 +93,7 @@ export default {
           isOnList: true
         };
         
-        await userStore.toggleFollow(followItem);
+        userStore.toggleFollow(followItem);
         
         // 触发父组件的follow事件（如果需要额外处理）
         this.$emit('follow', this.book);

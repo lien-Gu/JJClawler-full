@@ -12,6 +12,17 @@
         <text class="ranking-description">{{ ranking.description || ranking.hierarchy }}</text>
       </view>
       
+      <!-- 关注按钮 -->
+      <view class="ranking-follow">
+        <BaseButton
+            :type="isFollowed ? 'primary' : 'secondary'"
+            :icon="isFollowed ? '/static/icons/tab-follow-current.png' : '/static/icons/tab-follow.png'"
+            size="small"
+            round
+            @click="handleFollowClick"
+        />
+      </view>
+      
       <!-- 操作按钮 -->
       <view class="ranking-action">
         <text class="action-icon">→</text>
@@ -21,8 +32,14 @@
 </template>
 
 <script>
+import BaseButton from '@/components/BaseButton.vue'
+import userStore from '@/store/userStore.js'
+
 export default {
   name: 'RankingListItem',
+  components: {
+    BaseButton
+  },
   props: {
     ranking: {
       type: Object,
@@ -33,10 +50,53 @@ export default {
       default: 0
     }
   },
-  emits: ['click'],
+  emits: ['click', 'follow', 'login-required'],
+
+  computed: {
+    isLoggedIn() {
+      return userStore.state.isLoggedIn
+    },
+    
+    isFollowed() {
+      if (!this.isLoggedIn) return false
+      return userStore.isFollowing(this.ranking.id, 'ranking')
+    }
+  },
+  
   methods: {
     handleClick() {
       this.$emit('click', this.ranking);
+    },
+
+    handleFollowClick(e) {
+      e.stopPropagation();
+      
+      if (!this.isLoggedIn) {
+        this.$emit('login-required');
+        return;
+      }
+      
+      try {
+        const followItem = {
+          id: this.ranking.id,
+          type: 'ranking',
+          name: this.ranking.name,
+          author: '', // 榜单没有作者
+          category: '榜单',
+          isOnList: true
+        };
+        
+        userStore.toggleFollow(followItem);
+        
+        // 触发父组件的follow事件（如果需要额外处理）
+        this.$emit('follow', this.ranking);
+      } catch (error) {
+        console.error('关注操作失败:', error);
+        uni.showToast({
+          title: error.message || '操作失败',
+          icon: 'none'
+        });
+      }
     }
   }
 }
@@ -114,6 +174,11 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ranking-follow {
+  margin-right: $spacing-sm;
+  flex-shrink: 0;
 }
 
 .ranking-action {
