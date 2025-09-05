@@ -88,6 +88,9 @@ export default {
     handleClick(e) {
       if (this.disabled || this.loading) return;
       
+      // 阻止事件冒泡，防止触发父元素的点击事件
+      e.stopPropagation();
+      
       this.$emit('click', e);
     }
   }

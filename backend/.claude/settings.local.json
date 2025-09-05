@@ -28,7 +28,8 @@
       "Bash(set ALL_PROXY=)",
       "Bash(sqlite3:*)",
       "Bash(.venv/Scripts/python.exe app/database/service/book_service.py)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Read(/D:\\code\\Python\\JJClawler-full\\backend\\app\\crawl/**)"
     ],
     "deny": [],
     "additionalDirectories": [
